@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seleção de Personagem - RPG</title>
+
+  <!-- Tailwind CSS CDN com a paleta do projeto -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            void: '#090b10',
+            dungeon: {
+              950: '#0c0f16',
+              900: '#111622',
+              800: '#182030',
+              700: '#232d42',
+              600: '#32405d',
+            },
+            amberGold: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+            },
+            crimson: {
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+            }
+          },
+          fontFamily: {
+            cinzel: ['"Cinzel"', 'serif'],
+            sans: ['"Inter"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <style>
+    .gold-glow {
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+    }
+
+    .crimson-glow {
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.25);
+    }
+  </style>
+</head>
+
+<body
+  class="bg-void text-slate-200 font-sans min-h-screen flex flex-col selection:bg-amberGold-600 selection:text-white">
+
+  <!-- BARRA SUPERIOR: Modo Excluir (Esquerda) e Usuário / Deslogar (Direita) -->
+  <header
+    class="w-full bg-dungeon-950/80 border-b border-dungeon-800 px-6 py-3 flex justify-between items-center backdrop-blur-md">
+
+    <!-- Canto Esquerdo Superior: Botão Excluir -->
+    <div class="flex items-center gap-4">
+      <button id="btn-toggle-delete" onclick="toggleModoExcluir()"
+        class="text-xs font-cinzel text-slate-400 hover:text-crimson-400 bg-dungeon-900 border border-dungeon-700 hover:border-crimson-600/70 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm">
+        <i id="btn-delete-icon" class="fa-solid fa-trash-can text-xs"></i>
+        <span id="btn-delete-text">Excluir</span>
+      </button>
+
+      <div class="hidden sm:flex font-cinzel text-amberGold-400 font-bold text-sm tracking-wider items-center gap-2">
+        <i class="fa-solid fa-dungeon"></i>
+        <span>GRIMÓRIO RPG</span>
+      </div>
+    </div>
+
+    <!-- Canto Direito Superior: Usuário e Sair -->
+    <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-2 text-xs font-mono text-slate-300 bg-dungeon-900 border border-dungeon-700/80 px-3 py-1.5 rounded-lg shadow-inner">
+        <i class="fa-solid fa-circle-user text-amberGold-400"></i>
+        <span id="user-display-name" class="font-bold text-amber-200">Aventureiro</span>
+      </div>
+
+      <button onclick="deslogar()" title="Encerrar sessão"
+        class="text-xs font-cinzel text-crimson-400 hover:text-crimson-300 bg-dungeon-900 hover:bg-crimson-950/60 border border-crimson-900/60 hover:border-crimson-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        <span>Sair</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ÁREA CENTRALIZADA: Lista de Personagens -->
+  <main class="flex-1 flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-sm flex flex-col gap-3">
+
+      <!-- Título de instrução com aviso se modo de exclusão estiver ligado -->
+      <div class="text-center mb-1">
+        <h2 id="section-title" class="font-cinzel text-sm text-slate-400 tracking-widest uppercase">
+          Escolha o seu Herói
+        </h2>
+        <p id="delete-mode-notice"
+          class="hidden text-[11px] font-mono text-crimson-400 font-semibold tracking-normal mt-0.5">
+          Modo de exclusão ativado. Clique no ícone de lixeira para apagar.
+        </p>
+      </div>
+
+      <!-- Container dos cards de personagem -->
+      <div id="characters-list" class="flex flex-col gap-3">
+
+        <!-- Personagem Inicial de Demonstração -->
+        <div data-character-card data-id="char_johnle" data-nome="johnle"
+          onclick="handleCardClick('char_johnle', 'johnle', '4')"
+          class="character-card group relative w-full bg-dungeon-900 border border-amberGold-600/40 hover:border-amberGold-500 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-lg gold-glow">
+
+          <!-- Mini Ícone de Lixeira no Canto Superior Direito -->
+          <button type="button" onclick="iniciarExclusao(event, 'char_johnle', 'johnle')"
+            class="trash-icon hidden absolute -top-2 -right-2 w-6 h-6 rounded-full bg-crimson-700 hover:bg-crimson-600 text-white flex items-center justify-center text-[10px] shadow-lg border border-red-400 transition transform hover:scale-110">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+
+          <div
+            class="font-cinzel font-bold text-base text-amber-100 group-hover:text-amberGold-400 transition tracking-wide">
+            johnle <span class="text-slate-500 font-mono text-xs mx-1.5">/</span> <span
+              class="text-amberGold-400 font-mono text-sm font-semibold">lv 4</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CARD: NOVO PERSONAGEM (+) -->
+      <div id="btn-novo-personagem" onclick="abrirModalNovoPersonagem()"
+        class="group w-full bg-dungeon-950/60 hover:bg-dungeon-900 border-2 border-dashed border-dungeon-700 hover:border-amberGold-500/80 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] flex items-center justify-center gap-2">
+        <span
+          class="font-cinzel font-bold text-sm text-slate-400 group-hover:text-amberGold-400 tracking-wider transition">
+          novo personagem
+        </span>
+        <i
+          class="fa-solid fa-plus text-xs text-amberGold-500 group-hover:rotate-90 transition-transform duration-200"></i>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO (FOCO NO CENTRO DA TELA) -->
+  <div id="modal-confirmar-exclusao"
+    class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div
+      class="bg-dungeon-900 border-2 border-crimson-600 rounded-2xl max-w-sm w-full p-6 shadow-2xl crimson-glow text-center">
+
+      <div
+        class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-crimson-950 border border-crimson-500 mb-3 text-crimson-400 text-2xl shadow-inner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+
+      <h3 class="font-cinzel font-black text-sm text-crimson-400 tracking-wider mb-2 uppercase">
+        Excluir Personagem
+      </h3>
+
+      <div class="mb-5 p-3 bg-dungeon-950 rounded-lg border border-dungeon-800">
+        <span id="exclusao-nome-alvo" class="font-cinzel font-bold text-amber-200 text-sm">--</span>
+      </div>
+
+      <p class="text-xs text-slate-200 font-mono font-bold mb-6 leading-relaxed">
+        NÃO HÁ COMO DESFAZER ESSA AÇÃO, CONTINUAR?
+      </p>
+
+      <div class="flex gap-2">
+        <button type="button" onclick="cancelarExclusao()"
+          class="flex-1 py-2 text-xs font-mono text-slate-300 bg-dungeon-800 hover:bg-dungeon-700 border border-dungeon-700 rounded-lg transition font-bold">
+          Não
+        </button>
+        <button type="button" onclick="confirmarExclusao()"
+          class="flex-1 py-2 text-xs font-cinzel font-bold text-white bg-crimson-600 hover:bg-crimson-500 rounded-lg transition shadow-md">
+          Sim
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Criar Novo Personagem -->
+  <div id="modal-novo"
+    class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-dungeon-900 border border-amberGold-600/50 rounded-xl max-w-xs w-full p-5 shadow-2xl gold-glow">
+      <h3 class="font-cinzel font-bold text-sm text-amberGold-300 mb-3 text-center">NOVO PERSONAGEM</h3>
+
+      <input type="text" id="novo-nome-input" placeholder="Nome do personagem"
+        class="w-full bg-dungeon-950 border border-dungeon-700 focus:border-amberGold-500 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none mb-4">
+
+      <div class="flex gap-2">
+        <button onclick="fecharModalNovoPersonagem()"
+          class="flex-1 py-1.5 text-xs text-slate-400 hover:bg-dungeon-800 rounded transition font-mono">Cancelar</button>
+        <button onclick="confirmarNovoPersonagem()"
+          class="flex-1 py-1.5 text-xs bg-amberGold-600 hover:bg-amberGold-500 text-black font-cinzel font-bold rounded transition">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let modoExcluirAtivo = false;
+    let personagemAlvoParaExcluir = null;
+
+    // Recupera o usuário logado
+    const usuarioAtual = sessionStorage.getItem('rpg_player') || 'Aventureiro';
+    document.getElementById('user-display-name').innerText = usuarioAtual;
+
+    function deslogar() {
+      sessionStorage.removeItem('rpg_player');
+      sessionStorage.removeItem('rpg_character');
+      window.location.href = '/login';
+    }
+
+    // Alternar o modo de exclusão
+    function toggleModoExcluir() {
+      modoExcluirAtivo = !modoExcluirAtivo;
+
+      const btn = document.getElementById('btn-toggle-delete');
+      const btnText = document.getElementById('btn-delete-text');
+      const btnIcon = document.getElementById('btn-delete-icon');
+      const avisoExclusao = document.getElementById('delete-mode-notice');
+      const btnNovo = document.getElementById('btn-novo-personagem');
+
+      if (modoExcluirAtivo) {
+        btn.className = "text-xs font-cinzel text-white bg-crimson-600 hover:bg-crimson-500 border border-crimson-400 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-crimson-900/50";
+        btnText.innerText = "Cancelar";
+        btnIcon.className = "fa-solid fa-xmark text-xs";
+        avisoExclusao.classList.remove('hidden');
+        btnNovo.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        btn.className = "text-xs font-cinzel text-slate-400 hover:text-crimson-400 bg-dungeon-900 border border-dungeon-700 hover:border-crimson-600/70 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm";
+        btnText.innerText = "Excluir";
+        btnIcon.className = "fa-solid fa-trash-can text-xs";
+        avisoExclusao.classList.add('hidden');
+        btnNovo.classList.remove('opacity-40', 'pointer-events-none');
+      }
+
+      atualizarCardsVisualExclusao();
+    }
+
+    // Aplica ou remove as bordas pontilhadas vermelhas e o mini ícone de lixeira
+    function atualizarCardsVisualExclusao() {
+      const cards = document.querySelectorAll('.character-card');
+
+      cards.forEach(card => {
+        const trashBtn = card.querySelector('.trash-icon');
+
+        if (modoExcluirAtivo) {
+          card.classList.remove('border-amberGold-600/40', 'hover:border-amberGold-500', 'gold-glow');
+          card.classList.add('border-2', 'border-dashed', 'border-crimson-600', 'hover:border-crimson-400', 'crimson-glow');
+          if (trashBtn) trashBtn.classList.remove('hidden');
+        } else {
+          card.classList.remove('border-2', 'border-dashed', 'border-crimson-600', 'hover:border-crimson-400', 'crimson-glow');
+          card.classList.add('border', 'border-amberGold-600/40', 'hover:border-amberGold-500', 'gold-glow');
+          if (trashBtn) trashBtn.classList.add('hidden');
+        }
+      });
+    }
+
+    function handleCardClick(cardId, nome, lv) {
+      if (modoExcluirAtivo) {
+        iniciarExclusao(null, cardId, nome);
+      } else {
+        selecionarPersonagem(nome, lv);
+      }
+    }
+
+    function selecionarPersonagem(nome, lv) {
+      sessionStorage.setItem('rpg_character', nome);
+      window.location.href = '/';
+    }
+
+    // Abre o PopUp de confirmação no centro
+    function iniciarExclusao(event, cardId, nome) {
+      if (event) event.stopPropagation();
+
+      personagemAlvoParaExcluir = { cardId, nome };
+      document.getElementById('exclusao-nome-alvo').innerText = nome;
+      document.getElementById('modal-confirmar-exclusao').classList.remove('hidden');
+    }
+
+    function cancelarExclusao() {
+      personagemAlvoParaExcluir = null;
+      document.getElementById('modal-confirmar-exclusao').classList.add('hidden');
+    }
+
+    function confirmarExclusao() {
+      if (!personagemAlvoParaExcluir) return;
+
+      const card = document.querySelector(`[data-id="${personagemAlvoParaExcluir.cardId}"]`);
+      if (card) {
+        card.remove();
+      }
+
+      cancelarExclusao();
+
+      // Se não sobrar nenhum personagem, desativa o modo de exclusão
+      const restamCards = document.querySelectorAll('.character-card').length;
+      if (restamCards === 0 && modoExcluirAtivo) {
+        toggleModoExcluir();
+      }
+    }
+
+    function abrirModalNovoPersonagem() {
+      document.getElementById('modal-novo').classList.remove('hidden');
+      document.getElementById('novo-nome-input').focus();
+    }
+
+    function fecharModalNovoPersonagem() {
+      document.getElementById('modal-novo').classList.add('hidden');
+      document.getElementById('novo-nome-input').value = '';
+    }
+
+    function confirmarNovoPersonagem() {
+      const nome = document.getElementById('novo-nome-input').value.trim();
+      if (!nome) return;
+
+      const lista = document.getElementById('characters-list');
+      const uniqueId = 'char_' + Date.now();
+
+      const novoCard = document.createElement('div');
+      novoCard.setAttribute('data-character-card', '');
+      novoCard.setAttribute('data-id', uniqueId);
+      novoCard.setAttribute('data-nome', nome);
+      novoCard.className = "character-card group relative w-full bg-dungeon-900 border border-amberGold-600/40 hover:border-amberGold-500 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-lg gold-glow";
+      novoCard.onclick = () => handleCardClick(uniqueId, nome, '1');
+
+      novoCard.innerHTML = `
+        <button type="button" onclick="iniciarExclusao(event, '${uniqueId}', '${nome}')"
+          class="trash-icon hidden absolute -top-2 -right-2 w-6 h-6 rounded-full bg-crimson-700 hover:bg-crimson-600 text-white flex items-center justify-center text-[10px] shadow-lg border border-red-400 transition transform hover:scale-110">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+        <div class="font-cinzel font-bold text-base text-amber-100 group-hover:text-amberGold-400 transition tracking-wide">
+          ${nome} <span class="text-slate-500 font-mono text-xs mx-1.5">/</span> <span class="text-amberGold-400 font-mono text-sm font-semibold">lv 1</span>
+        </div>
+      `;
+
+      lista.appendChild(novoCard);
+
+      if (modoExcluirAtivo) {
+        atualizarCardsVisualExclusao();
+      }
+
+      fecharModalNovoPersonagem();
+    }
+  </script>
+</body>
+
+</html>

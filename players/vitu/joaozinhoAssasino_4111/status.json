@@ -1,0 +1,14 @@
+{
+  "hp": {
+    "current": 34,
+    "max": 40
+  },
+  "vigor": {
+    "current": 18,
+    "max": 25
+  },
+  "sanity": {
+    "current": 4,
+    "max": 10
+  }
+}

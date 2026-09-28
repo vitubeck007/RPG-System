@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Mestre - RPG VTT</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        void: '#090b10',
+                        dungeon: {
+                            950: '#0c0f16',
+                            900: '#111622',
+                            800: '#182030',
+                            700: '#232d42',
+                            600: '#32405d',
+                        },
+                        amberGold: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        },
+                        crimson: {
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                        },
+                        mana: {
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                        },
+                        stress: {
+                            400: '#c084fc',
+                            500: '#a855f7',
+                        }
+                    },
+                    fontFamily: {
+                        cinzel: ['"Cinzel"', 'serif'],
+                        sans: ['"Inter"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Socket.io Client -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0c0f16;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #232d42;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #d97706;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-void text-slate-200 font-sans min-h-screen flex flex-col pb-10 selection:bg-amberGold-600 selection:text-white">
+
+    <!-- Container de Notificações Toast do Mestre -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- TOPO DO MESTRE -->
+    <header
+        class="w-full bg-dungeon-950 border-b border-dungeon-700/80 sticky top-0 z-40 backdrop-blur-md shadow-2xl px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-crown text-2xl text-amberGold-400"></i>
+                <div>
+                    <h1 class="font-cinzel font-black text-xl text-amber-100 tracking-wider">PAINEL DE CONTROLE DO
+                        MESTRE</h1>
+                    <p class="text-xs text-slate-400 font-mono">Hub Central de Monitoramento • Full-Duplex WebSockets
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div
+                    class="flex items-center gap-2 bg-dungeon-900 border border-dungeon-700 px-3 py-1.5 rounded-lg text-xs font-mono">
+                    <i class="fa-solid fa-key text-amberGold-500"></i>
+                    <span class="text-slate-400">Token:</span>
+                    <input type="password" id="master-token-input" autocomplete="current-password"
+                        class="bg-transparent text-amber-200 focus:outline-none w-20 text-center border-b border-transparent focus:border-amberGold-500 font-bold"
+                        title="Informe a chave configurada no servidor">
+                </div>
+
+                <div id="connection-status"
+                    class="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-600/60 text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Servidor Online
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 mt-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- COLUNA 1 & 2: CARDS DOS JOGADORES -->
+        <section class="lg:col-span-2 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-dungeon-800">
+                <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2">
+                    <i class="fa-solid fa-users"></i> Mesa de Jogadores (<span id="connected-count">0</span>/5)
+                </h2>
+                <span class="text-xs text-slate-500 font-mono">Sincronização Ativa em Tempo Real</span>
+            </div>
+
+            <div id="players-cards-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div id="no-players-msg"
+                    class="col-span-full p-8 text-center bg-dungeon-900/60 border border-dashed border-dungeon-700 rounded-xl text-slate-500 text-sm">
+                    <i class="fa-solid fa-dice-d20 text-3xl mb-2 text-slate-600"></i>
+                    <p>Aguardando jogadores abrirem a ficha...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLUNA 3: FEED DE ROLAGENS -->
+        <section class="space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-dungeon-800">
+                <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2">
+                    <i class="fa-solid fa-scroll"></i> Histórico de Rolagens
+                </h2>
+                <button onclick="limparFeedRolagens()"
+                    class="text-xs text-slate-500 hover:text-slate-300 font-mono">Limpar</button>
+            </div>
+
+            <div id="rolls-feed-container" class="space-y-2.5 max-h-[700px] overflow-y-auto pr-1">
+                <div
+                    class="p-6 text-center text-slate-500 text-xs italic bg-dungeon-900 rounded-xl border border-dungeon-800">
+                    Nenhum dado rolado ainda na sessão.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const socket = io();
+        let players = {};
+        let systemConfig = { AtivarMana: false };
+
+        socket.on('connect', () => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = "flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-950/80 border border-emerald-600/60 text-emerald-400";
+            statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Servidor Online';
+        });
+
+        socket.on('disconnect', () => {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = "flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-rose-950/80 border border-rose-600/60 text-rose-400";
+            statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span> Desconectado';
+        });
+
+        socket.on('sync_all_players', (serverPlayers) => {
+            players = serverPlayers || {};
+            renderizarCardsJogadores();
+        });
+
+        socket.on('sync_config', (config) => {
+            if (!config || typeof config.AtivarMana !== 'boolean') return;
+            systemConfig = { ...systemConfig, ...config };
+            renderizarCardsJogadores();
+        });
+
+        socket.on('player_updated', (playerData) => {
+            players[playerData.id] = playerData;
+            renderizarCardsJogadores();
+        });
+
+        socket.on('vital_adjusted', (data) => {
+            if (players[data.charId]) {
+                players[data.charId].vitals = data.vitals;
+                renderizarCardsJogadores();
+            }
+        });
+
+        socket.on('player_removed', ({ charId }) => {
+            delete players[charId];
+            renderizarCardsJogadores();
+        });
+
+        socket.on('dice_rolled', (roll) => {
+            adicionarRolagemAoFeed(roll);
+        });
+
+        // Feedback das ações do mestre
+        socket.on('master_feedback', (fb) => {
+            toast(fb.message, fb.success ? 'success' : 'error');
+        });
+
+        function escaparHtml(valor) {
+            return String(valor)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function renderizarCardsJogadores() {
+            const container = document.getElementById('players-cards-container');
+            const countEl = document.getElementById('connected-count');
+            const playerIds = Object.keys(players);
+
+            countEl.innerText = playerIds.length;
+
+            if (playerIds.length === 0) {
+                container.innerHTML = `
+                  <div class="col-span-full p-8 text-center bg-dungeon-900/60 border border-dashed border-dungeon-700 rounded-xl text-slate-500 text-sm">
+                    <i class="fa-solid fa-dice-d20 text-3xl mb-2 text-slate-600"></i>
+                    <p>Aguardando jogadores abrirem a ficha...</p>
+                  </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            playerIds.forEach(id => {
+                const p = players[id];
+                const v = p.vitals || { hp: 0, hpMax: 10, mana: 0, manaMax: 10, stress: 0, stressMax: 10 };
+
+                const hpPct = Math.round((v.hp / (v.hpMax || 1)) * 100);
+                const manaPct = Math.round((v.mana / (v.manaMax || 1)) * 100);
+                const stressPct = Math.round((v.stress / (v.stressMax || 1)) * 100);
+
+                const card = document.createElement('div');
+                card.className = "bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl flex flex-col justify-between";
+                card.innerHTML = `
+                  <div>
+                    <div class="flex justify-between items-start mb-3 pb-2 border-b border-dungeon-800">
+                      <div>
+                        <h3 class="font-cinzel font-bold text-amber-200 text-sm truncate max-w-[200px]">${escaparHtml(p.name || 'Herói Sem Nome')}</h3>
+                        <span class="text-[10px] text-slate-500 font-mono">Última ação: ${escaparHtml(p.lastUpdate || 'Conectado')}</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800">Online</span>
+                    </div>
+
+                    <div class="space-y-3">
+                      <!-- HP -->
+                      <div>
+                        <div class="flex justify-between text-xs font-mono mb-1">
+                          <span class="text-crimson-400 font-bold flex items-center gap-1"><i class="fa-solid fa-heart-pulse"></i> HP</span>
+                          <span class="text-slate-300 font-bold">${v.hp}/${v.hpMax} (${hpPct}%)</span>
+                        </div>
+                        <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
+                          <div class="bg-crimson-600 h-full transition-all duration-300" style="width: ${hpPct}%"></div>
+                        </div>
+                        <div class="flex gap-1 justify-end">
+                          <button onclick="ajustarVital('${id}', 'hp', -5)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-crimson-900 text-slate-300 rounded border border-dungeon-700 font-mono">-5</button>
+                          <button onclick="ajustarVital('${id}', 'hp', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-crimson-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
+                          <button onclick="ajustarVital('${id}', 'hp', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-emerald-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
+                          <button onclick="ajustarVital('${id}', 'hp', 5)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-emerald-900 text-slate-300 rounded border border-dungeon-700 font-mono">+5</button>
+                        </div>
+                      </div>
+
+                      <!-- VIGOR -->
+                      <div data-mana-vital>
+                        <div class="flex justify-between text-xs font-mono mb-1">
+                          <span class="text-mana-400 font-bold flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Vigor</span>
+                          <span class="text-slate-300 font-bold">${v.mana}/${v.manaMax}</span>
+                        </div>
+                        <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
+                          <div class="bg-mana-500 h-full transition-all duration-300" style="width: ${manaPct}%"></div>
+                        </div>
+                        <div class="flex gap-1 justify-end">
+                          <button onclick="ajustarVital('${id}', 'mana', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-mana-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
+                          <button onclick="ajustarVital('${id}', 'mana', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-cyan-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
+                        </div>
+                      </div>
+
+                      <!-- SANIDADE -->
+                      <div>
+                        <div class="flex justify-between text-xs font-mono mb-1">
+                          <span class="text-stress-400 font-bold flex items-center gap-1"><i class="fa-solid fa-brain"></i> Sanidade</span>
+                          <span class="text-slate-300 font-bold">${v.stress}/${v.stressMax}</span>
+                        </div>
+                        <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
+                          <div class="bg-stress-500 h-full transition-all duration-300" style="width: ${stressPct}%"></div>
+                        </div>
+                        <div class="flex gap-1 justify-end">
+                          <button onclick="ajustarVital('${id}', 'stress', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
+                          <button onclick="ajustarVital('${id}', 'stress', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+                if (!systemConfig.AtivarMana) {
+                    card.querySelector('[data-mana-vital]')?.remove();
+                }
+                container.appendChild(card);
+            });
+        }
+
+        function ajustarVital(charId, type, delta) {
+            if (type === 'mana' && !systemConfig.AtivarMana) return;
+            const token = document.getElementById('master-token-input').value.trim();
+            socket.emit('master_adjust_vital', {
+                token: token,
+                charId: charId,
+                type: type,
+                delta: delta
+            });
+        }
+
+        function adicionarRolagemAoFeed(roll) {
+            const feed = document.getElementById('rolls-feed-container');
+            const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            if (feed.innerText.includes('Nenhum dado rolado')) {
+                feed.innerHTML = '';
+            }
+
+            const card = document.createElement('div');
+            card.className = "p-3 bg-dungeon-900 border border-amberGold-600/40 rounded-xl shadow-lg flex items-center justify-between";
+            card.innerHTML = `
+              <div class="flex-1 min-w-0 pr-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-cinzel font-bold text-amberGold-300 text-xs truncate">${escaparHtml(roll.character)}</span>
+                  <span class="text-[10px] font-mono text-slate-500">${hora}</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escaparHtml(roll.details)}</div>
+              </div>
+              <div class="text-right">
+                <div class="font-cinzel font-black text-2xl text-amberGold-400">= ${roll.total}</div>
+              </div>
+            `;
+            feed.prepend(card);
+        }
+
+        function limparFeedRolagens() {
+            document.getElementById('rolls-feed-container').innerHTML = `
+              <div class="p-6 text-center text-slate-500 text-xs italic bg-dungeon-900 rounded-xl border border-dungeon-800">
+                Feed de rolagens limpo.
+              </div>
+            `;
+        }
+
+        function toast(mensagem, tipo = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toastEl = document.createElement('div');
+            const borderCol = tipo === 'success' ? 'border-emerald-500 text-emerald-300' : 'border-rose-600 text-rose-300';
+            toastEl.className = `p-3 rounded-lg bg-dungeon-950 border-l-4 ${borderCol} shadow-2xl text-xs font-mono flex items-center gap-2 transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+            toastEl.innerHTML = `<span>${mensagem}</span>`;
+            container.appendChild(toastEl);
+            setTimeout(() => toastEl.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toastEl.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toastEl.remove(), 300);
+            }, 2400);
+        }
+    </script>
+</body>
+
+</html>
