@@ -1,0 +1,86 @@
+{
+  "acrobacia": {
+    "id": "acrobacia",
+    "name": "Acrobacia",
+    "mod": 0,
+    "icon": "fa-person-running",
+    "attr": "DES"
+  },
+  "atletismo": {
+    "id": "atletismo",
+    "name": "Atletismo",
+    "mod": 3,
+    "icon": "fa-dumbbell",
+    "attr": "FOR"
+  },
+  "furtividade": {
+    "id": "furtividade",
+    "name": "Furtividade",
+    "mod": 4,
+    "icon": "fa-mask",
+    "attr": "DES"
+  },
+  "investigacao": {
+    "id": "investigacao",
+    "name": "Investigação",
+    "mod": 0,
+    "icon": "fa-magnifying-glass",
+    "attr": "INT"
+  },
+  "luta": {
+    "id": "luta",
+    "name": "Luta Corpórea",
+    "mod": 4,
+    "icon": "fa-hand-fist",
+    "attr": "FOR"
+  },
+  "medicina": {
+    "id": "medicina",
+    "name": "Medicina",
+    "mod": 2,
+    "icon": "fa-mortar-pestle",
+    "attr": "SAB"
+  },
+  "ocultismo": {
+    "id": "ocultismo",
+    "name": "Ocultismo",
+    "mod": 3,
+    "icon": "fa-eye",
+    "attr": "INT"
+  },
+  "percepcao": {
+    "id": "percepcao",
+    "name": "Percepção",
+    "mod": 3,
+    "icon": "fa-binoculars",
+    "attr": "SAB"
+  },
+  "pontaria": {
+    "id": "pontaria",
+    "name": "Pontaria",
+    "mod": 2,
+    "icon": "fa-crosshairs",
+    "attr": "DES"
+  },
+  "sobrevivencia": {
+    "id": "sobrevivencia",
+    "name": "Sobrevivíªncia",
+    "mod": 2,
+    "icon": "fa-campground",
+    "attr": "SAB"
+  },
+  "intimidacao": {
+    "id": "intimidacao",
+    "name": "Intimidação",
+    "mod": 3,
+    "icon": "fa-skull",
+    "attr": "PRE"
+  },
+  "vontade": {
+    "id": "vontade",
+    "name": "Vontade",
+    "mod": 4,
+    "icon": "fa-shield-heart",
+    "attr": "VON"
+  }
+}

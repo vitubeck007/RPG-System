@@ -117,25 +117,7 @@
 
       <!-- Container dos cards de personagem -->
       <div id="characters-list" class="flex flex-col gap-3">
-
-        <!-- Personagem Inicial de Demonstração -->
-        <div data-character-card data-id="char_johnle" data-nome="johnle"
-          onclick="handleCardClick('char_johnle', 'johnle', '4')"
-          class="character-card group relative w-full bg-dungeon-900 border border-amberGold-600/40 hover:border-amberGold-500 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-lg gold-glow">
-
-          <!-- Mini Ícone de Lixeira no Canto Superior Direito -->
-          <button type="button" onclick="iniciarExclusao(event, 'char_johnle', 'johnle')"
-            class="trash-icon hidden absolute -top-2 -right-2 w-6 h-6 rounded-full bg-crimson-700 hover:bg-crimson-600 text-white flex items-center justify-center text-[10px] shadow-lg border border-red-400 transition transform hover:scale-110">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
-
-          <div
-            class="font-cinzel font-bold text-base text-amber-100 group-hover:text-amberGold-400 transition tracking-wide">
-            johnle <span class="text-slate-500 font-mono text-xs mx-1.5">/</span> <span
-              class="text-amberGold-400 font-mono text-sm font-semibold">lv 4</span>
-          </div>
-        </div>
-
+        <p id="characters-loading" class="py-4 text-center text-xs text-slate-500">Carregando personagens...</p>
       </div>
 
       <!-- CARD: NOVO PERSONAGEM (+) -->
@@ -213,12 +195,75 @@
     let personagemAlvoParaExcluir = null;
 
     // Recupera o usuário logado
-    const usuarioAtual = sessionStorage.getItem('rpg_player') || 'Aventureiro';
-    document.getElementById('user-display-name').innerText = usuarioAtual;
+    const usuarioAtual = sessionStorage.getItem('rpg_player');
+    const tokenSessao = sessionStorage.getItem('rpg_token');
+    if (!usuarioAtual || !tokenSessao) {
+      window.location.replace('/login');
+    } else {
+      document.getElementById('user-display-name').innerText = usuarioAtual;
+    }
+
+    async function carregarPersonagens() {
+      const lista = document.getElementById('characters-list');
+      try {
+        const response = await fetch('/api/personagens', {
+          headers: { Authorization: `Bearer ${tokenSessao}` },
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          sessionStorage.removeItem('rpg_token');
+          sessionStorage.removeItem('rpg_player');
+          window.location.replace('/login');
+          return;
+        }
+
+        lista.innerHTML = '';
+        if (!result.personagens.length) {
+          const empty = document.createElement('p');
+          empty.className = 'py-4 text-center text-xs text-slate-500';
+          empty.textContent = 'Você ainda não tem personagens. Crie o primeiro abaixo.';
+          lista.appendChild(empty);
+          return;
+        }
+
+        result.personagens.forEach((personagem, index) => {
+          const cardId = `character-${index}`;
+          const card = document.createElement('div');
+          card.dataset.characterCard = '';
+          card.dataset.id = cardId;
+          card.className = 'character-card group relative w-full bg-dungeon-900 border border-amberGold-600/40 hover:border-amberGold-500 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-lg gold-glow';
+
+          const trash = document.createElement('button');
+          trash.type = 'button';
+          trash.className = 'trash-icon hidden absolute -top-2 -right-2 w-6 h-6 rounded-full bg-crimson-700 hover:bg-crimson-600 text-white flex items-center justify-center text-[10px] shadow-lg border border-red-400 transition transform hover:scale-110';
+          trash.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+          trash.addEventListener('click', (event) => iniciarExclusao(event, cardId, personagem.nome));
+
+          const label = document.createElement('div');
+          label.className = 'font-cinzel font-bold text-base text-amber-100 group-hover:text-amberGold-400 transition tracking-wide';
+          label.textContent = personagem.nome;
+          card.append(trash, label);
+          card.addEventListener('click', () => handleCardClick(cardId, personagem));
+          lista.appendChild(card);
+        });
+
+        atualizarCardsVisualExclusao();
+      } catch (error) {
+        lista.innerHTML = '';
+        const failure = document.createElement('p');
+        failure.className = 'py-4 text-center text-xs text-rose-300';
+        failure.textContent = 'Não foi possível carregar os personagens.';
+        lista.appendChild(failure);
+      }
+    }
+
+    if (usuarioAtual && tokenSessao) carregarPersonagens();
 
     function deslogar() {
       sessionStorage.removeItem('rpg_player');
+      sessionStorage.removeItem('rpg_token');
       sessionStorage.removeItem('rpg_character');
+      sessionStorage.removeItem('rpg_character_name');
       window.location.href = '/login';
     }
 
@@ -268,16 +313,20 @@
       });
     }
 
-    function handleCardClick(cardId, nome, lv) {
+    function handleCardClick(cardId, personagem) {
       if (modoExcluirAtivo) {
-        iniciarExclusao(null, cardId, nome);
+        iniciarExclusao(null, cardId, personagem.nome);
       } else {
-        selecionarPersonagem(nome, lv);
+        selecionarPersonagem(personagem);
       }
     }
 
-    function selecionarPersonagem(nome, lv) {
-      sessionStorage.setItem('rpg_character', nome);
+    function selecionarPersonagem(personagem) {
+      sessionStorage.setItem('rpg_character', JSON.stringify({
+        player: usuarioAtual,
+        nomePasta: personagem.nomePasta,
+      }));
+      sessionStorage.setItem('rpg_character_name', personagem.nome);
       window.location.href = '/';
     }
 
@@ -322,37 +371,28 @@
       document.getElementById('novo-nome-input').value = '';
     }
 
-    function confirmarNovoPersonagem() {
+    async function confirmarNovoPersonagem() {
       const nome = document.getElementById('novo-nome-input').value.trim();
       if (!nome) return;
-
-      const lista = document.getElementById('characters-list');
-      const uniqueId = 'char_' + Date.now();
-
-      const novoCard = document.createElement('div');
-      novoCard.setAttribute('data-character-card', '');
-      novoCard.setAttribute('data-id', uniqueId);
-      novoCard.setAttribute('data-nome', nome);
-      novoCard.className = "character-card group relative w-full bg-dungeon-900 border border-amberGold-600/40 hover:border-amberGold-500 rounded-xl p-4 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] shadow-lg gold-glow";
-      novoCard.onclick = () => handleCardClick(uniqueId, nome, '1');
-
-      novoCard.innerHTML = `
-        <button type="button" onclick="iniciarExclusao(event, '${uniqueId}', '${nome}')"
-          class="trash-icon hidden absolute -top-2 -right-2 w-6 h-6 rounded-full bg-crimson-700 hover:bg-crimson-600 text-white flex items-center justify-center text-[10px] shadow-lg border border-red-400 transition transform hover:scale-110">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-        <div class="font-cinzel font-bold text-base text-amber-100 group-hover:text-amberGold-400 transition tracking-wide">
-          ${nome} <span class="text-slate-500 font-mono text-xs mx-1.5">/</span> <span class="text-amberGold-400 font-mono text-sm font-semibold">lv 1</span>
-        </div>
-      `;
-
-      lista.appendChild(novoCard);
-
-      if (modoExcluirAtivo) {
-        atualizarCardsVisualExclusao();
+      try {
+        const response = await fetch('/api/personagens', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tokenSessao}`,
+          },
+          body: JSON.stringify({ nome }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          window.alert(result.message || 'Não foi possível criar o personagem.');
+          return;
+        }
+        fecharModalNovoPersonagem();
+        await carregarPersonagens();
+      } catch (error) {
+        window.alert('Não foi possível conectar ao servidor.');
       }
-
-      fecharModalNovoPersonagem();
     }
   </script>
 </body>

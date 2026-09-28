@@ -1,1 +1,15 @@
-{}
+{
+  "schemaVersion": 1,
+  "hp": {
+    "current": 0,
+    "max": 0
+  },
+  "vigor": {
+    "current": 0,
+    "max": 0
+  },
+  "sanity": {
+    "current": 0,
+    "max": 0
+  }
+}

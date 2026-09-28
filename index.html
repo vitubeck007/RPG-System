@@ -35,12 +35,12 @@
               600: '#dc2626',
               700: '#b91c1c',
             },
-            mana: {
+            vigor: {
               400: '#60a5fa',
               500: '#3b82f6',
               600: '#2563eb',
             },
-            stress: {
+            sanity: {
               400: '#c084fc',
               500: '#a855f7',
               600: '#9333ea',
@@ -139,43 +139,44 @@
             </div>
           </div>
 
-          <!-- Vigor / Mana -->
-          <div id="mana-card" class="bg-dungeon-900 p-2 rounded-lg border border-dungeon-700/80 shadow-inner">
+          <!-- Vigor -->
+          <div id="vigor-card" class="bg-dungeon-900 p-2 rounded-lg border border-dungeon-700/80 shadow-inner">
             <div class="flex justify-between items-center text-xs mb-1">
-              <span class="font-cinzel font-bold text-mana-400 flex items-center gap-1">
+              <span class="font-cinzel font-bold text-vigor-400 flex items-center gap-1">
                 <i class="fa-solid fa-bolt"></i> Vigor
               </span>
-              <span class="text-[11px] font-mono"><span id="mana-val">18</span>/<span id="mana-max">25</span></span>
+              <span class="text-[11px] font-mono"><span id="vigor-val">18</span>/<span id="vigor-max">25</span></span>
             </div>
             <div class="w-full bg-dungeon-950 rounded-full h-2 overflow-hidden mb-1.5 border border-dungeon-700">
-              <div id="mana-bar" class="bg-gradient-to-r from-mana-600 to-mana-400 h-full transition-all duration-300"
+              <div id="vigor-bar"
+                class="bg-gradient-to-r from-vigor-600 to-vigor-400 h-full transition-all duration-300"
                 style="width: 72%"></div>
             </div>
             <div class="flex justify-between gap-1">
-              <button onclick="alterarVital('mana', -1)"
-                class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-mana-600/40 rounded text-slate-300">-1</button>
-              <button onclick="alterarVital('mana', 1)"
+              <button onclick="alterarVital('vigor', -1)"
+                class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-vigor-600/40 rounded text-slate-300">-1</button>
+              <button onclick="alterarVital('vigor', 1)"
                 class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-cyan-600/40 rounded text-slate-300">+1</button>
             </div>
           </div>
 
-          <!-- Sanidade / Estresse -->
+          <!-- Sanidade -->
           <div class="bg-dungeon-900 p-2 rounded-lg border border-dungeon-700/80 shadow-inner">
             <div class="flex justify-between items-center text-xs mb-1">
-              <span class="font-cinzel font-bold text-stress-400 flex items-center gap-1">
+              <span class="font-cinzel font-bold text-sanity-400 flex items-center gap-1">
                 <i class="fa-solid fa-brain"></i> Sanidade
               </span>
-              <span class="text-[11px] font-mono"><span id="stress-val">4</span>/<span id="stress-max">10</span></span>
+              <span class="text-[11px] font-mono"><span id="sanity-val">4</span>/<span id="sanity-max">10</span></span>
             </div>
             <div class="w-full bg-dungeon-950 rounded-full h-2 overflow-hidden mb-1.5 border border-dungeon-700">
-              <div id="stress-bar"
-                class="bg-gradient-to-r from-stress-600 to-stress-400 h-full transition-all duration-300"
+              <div id="sanity-bar"
+                class="bg-gradient-to-r from-sanity-600 to-sanity-400 h-full transition-all duration-300"
                 style="width: 40%"></div>
             </div>
             <div class="flex justify-between gap-1">
-              <button onclick="alterarVital('stress', -1)"
-                class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-stress-600/40 rounded text-slate-300">-1</button>
-              <button onclick="alterarVital('stress', 1)"
+              <button onclick="alterarVital('sanity', -1)"
+                class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-sanity-600/40 rounded text-slate-300">-1</button>
+              <button onclick="alterarVital('sanity', 1)"
                 class="w-1/2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-600/40 rounded text-slate-300">+1</button>
             </div>
           </div>
@@ -363,7 +364,7 @@
               <p class="text-xs text-slate-400">Armas de combate rápido, itens nas costas e o tipo de bolsa/mochila
                 equipada no corpo.</p>
             </div>
-            <span class="text-xs font-mono text-slate-500"><i class="fa-solid fa-bolt mr-1 text-mana-400"></i> Prontos
+            <span class="text-xs font-mono text-slate-500"><i class="fa-solid fa-bolt mr-1 text-vigor-400"></i> Prontos
               para ação</span>
           </div>
 
@@ -559,7 +560,7 @@
                 </span>
               </div>
               <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 mt-1">
-                <span>Custo: <strong class="text-mana-400">3 Vigor</strong></span>
+                <span>Custo: <strong class="text-vigor-400">3 Vigor</strong></span>
                 <span>•</span>
                 <span>Ação Rápida</span>
               </div>
@@ -592,7 +593,7 @@
                 </span>
               </div>
               <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 mt-1">
-                <span>Custo: <strong class="text-mana-400">4 Vigor</strong></span>
+                <span>Custo: <strong class="text-vigor-400">4 Vigor</strong></span>
                 <span>•</span>
                 <span>Ataque Pesado</span>
               </div>
@@ -616,7 +617,7 @@
               <div class="flex justify-between items-start gap-2">
                 <h3
                   class="font-cinzel text-base font-bold text-amberGold-300 group-hover:text-amberGold-400 transition flex items-center gap-2">
-                  <i class="fa-solid fa-ghost text-stress-400"></i> Lamento das Sombras
+                  <i class="fa-solid fa-ghost text-sanity-400"></i> Lamento das Sombras
                 </h3>
                 <span
                   class="text-[10px] font-mono font-bold px-2 py-0.5 bg-purple-950/80 border border-purple-700/60 text-purple-300 rounded">
@@ -624,7 +625,7 @@
                 </span>
               </div>
               <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 mt-1">
-                <span>Custo: <strong class="text-stress-400">2 Sanidade</strong></span>
+                <span>Custo: <strong class="text-sanity-400">2 Sanidade</strong></span>
                 <span>•</span>
                 <span>Maldição</span>
               </div>

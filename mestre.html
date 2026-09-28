@@ -32,11 +32,11 @@
                             500: '#ef4444',
                             600: '#dc2626',
                         },
-                        mana: {
+                        vigor: {
                             400: '#60a5fa',
                             500: '#3b82f6',
                         },
-                        stress: {
+                        sanity: {
                             400: '#c084fc',
                             500: '#a855f7',
                         }
@@ -243,11 +243,12 @@
 
             playerIds.forEach(id => {
                 const p = players[id];
-                const v = p.vitals || { hp: 0, hpMax: 10, mana: 0, manaMax: 10, stress: 0, stressMax: 10 };
+                const zero = { current: 0, max: 0 };
+                const v = { hp: zero, vigor: zero, sanity: zero, ...(p.vitals || {}) };
 
-                const hpPct = Math.round((v.hp / (v.hpMax || 1)) * 100);
-                const manaPct = Math.round((v.mana / (v.manaMax || 1)) * 100);
-                const stressPct = Math.round((v.stress / (v.stressMax || 1)) * 100);
+                const hpPct = Math.round((v.hp.current / (v.hp.max || 1)) * 100);
+                const vigorPct = Math.round((v.vigor.current / (v.vigor.max || 1)) * 100);
+                const sanityPct = Math.round((v.sanity.current / (v.sanity.max || 1)) * 100);
 
                 const card = document.createElement('div');
                 card.className = "bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl flex flex-col justify-between";
@@ -266,7 +267,7 @@
                       <div>
                         <div class="flex justify-between text-xs font-mono mb-1">
                           <span class="text-crimson-400 font-bold flex items-center gap-1"><i class="fa-solid fa-heart-pulse"></i> HP</span>
-                          <span class="text-slate-300 font-bold">${v.hp}/${v.hpMax} (${hpPct}%)</span>
+                          <span class="text-slate-300 font-bold">${v.hp.current}/${v.hp.max} (${hpPct}%)</span>
                         </div>
                         <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
                           <div class="bg-crimson-600 h-full transition-all duration-300" style="width: ${hpPct}%"></div>
@@ -280,46 +281,46 @@
                       </div>
 
                       <!-- VIGOR -->
-                      <div data-mana-vital>
+                      <div data-vigor-vital>
                         <div class="flex justify-between text-xs font-mono mb-1">
-                          <span class="text-mana-400 font-bold flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Vigor</span>
-                          <span class="text-slate-300 font-bold">${v.mana}/${v.manaMax}</span>
+                          <span class="text-vigor-400 font-bold flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Vigor</span>
+                          <span class="text-slate-300 font-bold">${v.vigor.current}/${v.vigor.max}</span>
                         </div>
                         <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
-                          <div class="bg-mana-500 h-full transition-all duration-300" style="width: ${manaPct}%"></div>
+                          <div class="bg-vigor-500 h-full transition-all duration-300" style="width: ${vigorPct}%"></div>
                         </div>
                         <div class="flex gap-1 justify-end">
-                          <button onclick="ajustarVital('${id}', 'mana', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-mana-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
-                          <button onclick="ajustarVital('${id}', 'mana', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-cyan-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
+                          <button onclick="ajustarVital('${id}', 'vigor', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-vigor-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
+                          <button onclick="ajustarVital('${id}', 'vigor', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-cyan-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
                         </div>
                       </div>
 
                       <!-- SANIDADE -->
                       <div>
                         <div class="flex justify-between text-xs font-mono mb-1">
-                          <span class="text-stress-400 font-bold flex items-center gap-1"><i class="fa-solid fa-brain"></i> Sanidade</span>
-                          <span class="text-slate-300 font-bold">${v.stress}/${v.stressMax}</span>
+                          <span class="text-sanity-400 font-bold flex items-center gap-1"><i class="fa-solid fa-brain"></i> Sanidade</span>
+                          <span class="text-slate-300 font-bold">${v.sanity.current}/${v.sanity.max}</span>
                         </div>
                         <div class="w-full bg-dungeon-950 h-2 rounded-full overflow-hidden border border-dungeon-700 mb-1.5">
-                          <div class="bg-stress-500 h-full transition-all duration-300" style="width: ${stressPct}%"></div>
+                          <div class="bg-sanity-500 h-full transition-all duration-300" style="width: ${sanityPct}%"></div>
                         </div>
                         <div class="flex gap-1 justify-end">
-                          <button onclick="ajustarVital('${id}', 'stress', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
-                          <button onclick="ajustarVital('${id}', 'stress', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
+                          <button onclick="ajustarVital('${id}', 'sanity', -1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">-1</button>
+                          <button onclick="ajustarVital('${id}', 'sanity', 1)" class="px-2 py-0.5 text-xs bg-dungeon-800 hover:bg-purple-900 text-slate-300 rounded border border-dungeon-700 font-mono">+1</button>
                         </div>
                       </div>
                     </div>
                   </div>
                 `;
                 if (!systemConfig.AtivarMana) {
-                    card.querySelector('[data-mana-vital]')?.remove();
+                    card.querySelector('[data-vigor-vital]')?.remove();
                 }
                 container.appendChild(card);
             });
         }
 
         function ajustarVital(charId, type, delta) {
-            if (type === 'mana' && !systemConfig.AtivarMana) return;
+            if (type === 'vigor' && !systemConfig.AtivarMana) return;
             const token = document.getElementById('master-token-input').value.trim();
             socket.emit('master_adjust_vital', {
                 token: token,

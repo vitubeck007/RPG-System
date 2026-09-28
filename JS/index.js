@@ -1,12 +1,38 @@
 ﻿/* =========================================================================
        CONEXÃO WEBSOCKET COM O SERVIDOR
        ========================================================================= */
-const socket = io();
+function lerIdentidadePersonagem() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem("rpg_character") || "null");
+    if (
+      saved &&
+      typeof saved.player === "string" &&
+      typeof saved.nomePasta === "string" &&
+      saved.player &&
+      saved.nomePasta
+    ) {
+      return { player: saved.player, nomePasta: saved.nomePasta };
+    }
+  } catch (error) {
+    console.warn("[RPG] Identidade de personagem inválida na sessão.");
+  }
+  return null;
+}
 
-socket.emit("carregar_personagem", {
-  player: "vitu",
-  nomePasta: "joaozinhoAssasino_4111",
-});
+const CHARACTER = lerIdentidadePersonagem();
+const AUTH_TOKEN = sessionStorage.getItem("rpg_token");
+const CHARACTER_NAME = sessionStorage.getItem("rpg_character_name") || "";
+const socket = io({ auth: { token: AUTH_TOKEN } });
+let personagemCarregado = false;
+
+function criarIdEstado(identidade) {
+  const source = `${identidade.player}/${identidade.nomePasta}`;
+  let hash = 2166136261;
+  for (const character of source) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  }
+  return `char_${(hash >>> 0).toString(36)}`;
+}
 
 // Encaminha alterações importantes ao terminal do servidor para facilitar o diagnóstico.
 function registrarNoTerminal(acao, detalhes = {}) {
@@ -25,7 +51,7 @@ function registrarNoTerminal(acao, detalhes = {}) {
 /* =========================================================================
        ESTADO CENTRAL DA FICHA
    ========================================================================= */
-const PLAYER_ID_STORAGE_KEY = "rpg-system-player-id";
+// Mesmos padrões do DEFAULT_CONFIG do servidor; valem só até chegar o sync_config.
 const GLOBAL_CONFIG = {
   AtivarRiquezas: false,
   UsarEx: false,
@@ -33,109 +59,69 @@ const GLOBAL_CONFIG = {
   AtivarMana: false,
 };
 
-function obterIdPersonagem() {
-  let id = localStorage.getItem(PLAYER_ID_STORAGE_KEY);
-  if (!id) {
-    id = `char_${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
-    localStorage.setItem(PLAYER_ID_STORAGE_KEY, id);
-  }
-  return id;
+/* Catálogo FIXO de perícias (dado global do sistema, não da ficha).
+   A ficha do personagem guarda apenas o modificador de cada perícia (pericias.json). */
+const CATALOGO_PERICIAS = [
+  {
+    id: "acrobacia",
+    name: "Acrobacia",
+    icon: "fa-person-running",
+    attr: "DES",
+  },
+  { id: "atletismo", name: "Atletismo", icon: "fa-dumbbell", attr: "FOR" },
+  { id: "furtividade", name: "Furtividade", icon: "fa-mask", attr: "DES" },
+  {
+    id: "investigacao",
+    name: "Investigação",
+    icon: "fa-magnifying-glass",
+    attr: "INT",
+  },
+  { id: "luta", name: "Luta Corpórea", icon: "fa-hand-fist", attr: "FOR" },
+  { id: "medicina", name: "Medicina", icon: "fa-mortar-pestle", attr: "SAB" },
+  { id: "ocultismo", name: "Ocultismo", icon: "fa-eye", attr: "INT" },
+  { id: "percepcao", name: "Percepção", icon: "fa-binoculars", attr: "SAB" },
+  { id: "pontaria", name: "Pontaria", icon: "fa-crosshairs", attr: "DES" },
+  {
+    id: "sobrevivencia",
+    name: "Sobrevivência",
+    icon: "fa-campground",
+    attr: "SAB",
+  },
+  { id: "intimidacao", name: "Intimidação", icon: "fa-skull", attr: "PRE" },
+  { id: "vontade", name: "Vontade", icon: "fa-shield-heart", attr: "VON" },
+];
+
+// Junta o catálogo com os modificadores salvos: { id: { mod } } -> lista para a interface.
+function montarPericias(modsSalvos = {}) {
+  return CATALOGO_PERICIAS.map((pericia) => ({
+    ...pericia,
+    mod: Number.isFinite(Number(modsSalvos?.[pericia.id]?.mod))
+      ? Number(modsSalvos[pericia.id].mod)
+      : 0,
+  }));
 }
 
 const STATE = {
-  // Cada navegador recebe um id persistente, evitando que jogadores se sobrescrevam.
-  id: obterIdPersonagem(),
-  name: "Aelric 'O Flagelo Silencioso'",
+  id: CHARACTER ? criarIdEstado(CHARACTER) : "character-unselected",
+  name: CHARACTER_NAME || "Personagem",
   progressionMode: "ex",
   progressionValues: { ex: "5%", nv: "4" },
   vitals: {
-    hp: 34,
-    hpMax: 40,
-    mana: 18,
-    manaMax: 25,
-    stress: 4,
-    stressMax: 10,
+    hp: {
+      current: 10,
+      max: 10,
+    },
+    vigor: {
+      current: 10,
+      max: 10,
+    },
+    sanity: {
+      current: 10,
+      max: 10,
+    },
   },
-  skills: [
-    {
-      id: "acrobacia",
-      name: "Acrobacia",
-      mod: 2,
-      icon: "fa-person-running",
-      attr: "DES",
-    },
-    {
-      id: "atletismo",
-      name: "Atletismo",
-      mod: 3,
-      icon: "fa-dumbbell",
-      attr: "FOR",
-    },
-    {
-      id: "furtividade",
-      name: "Furtividade",
-      mod: 4,
-      icon: "fa-mask",
-      attr: "DES",
-    },
-    {
-      id: "investigacao",
-      name: "Investigação",
-      mod: 1,
-      icon: "fa-magnifying-glass",
-      attr: "INT",
-    },
-    {
-      id: "luta",
-      name: "Luta Corpórea",
-      mod: 4,
-      icon: "fa-hand-fist",
-      attr: "FOR",
-    },
-    {
-      id: "medicina",
-      name: "Medicina",
-      mod: 2,
-      icon: "fa-mortar-pestle",
-      attr: "SAB",
-    },
-    { id: "ocultismo", name: "Ocultismo", mod: 5, icon: "fa-eye", attr: "INT" },
-    {
-      id: "percepcao",
-      name: "Percepção",
-      mod: 3,
-      icon: "fa-binoculars",
-      attr: "SAB",
-    },
-    {
-      id: "pontaria",
-      name: "Pontaria",
-      mod: 2,
-      icon: "fa-crosshairs",
-      attr: "DES",
-    },
-    {
-      id: "sobrevivencia",
-      name: "Sobrevivíªncia",
-      mod: 2,
-      icon: "fa-campground",
-      attr: "SAB",
-    },
-    {
-      id: "intimidacao",
-      name: "Intimidação",
-      mod: 3,
-      icon: "fa-skull",
-      attr: "PRE",
-    },
-    {
-      id: "vontade",
-      name: "Vontade",
-      mod: 4,
-      icon: "fa-shield-heart",
-      attr: "VON",
-    },
-  ],
+
+  skills: montarPericias(),
   spells: [],
 
   // Definições de tamanho das mochilas
@@ -206,7 +192,7 @@ const STATE = {
       color: "from-red-950/80 to-stone-900 border-red-500/80",
       dice: "2d4",
       twoHanded: false,
-      type: "Consumí­vel",
+      type: "Consumível",
       icon: "fa-flask-vial",
     },
     {
@@ -236,9 +222,10 @@ const STATE = {
        SOCKET.IO INTEGRAÇÃO EM TEMPO REAL
        ========================================================================= */
 function syncPlayerToServer() {
-  if (socket && socket.connected) {
+  if (personagemCarregado && CHARACTER && socket?.connected) {
     socket.emit("player_update", {
       id: STATE.id,
+      character: CHARACTER,
       name: document.getElementById("char-name-input")?.value || STATE.name,
       vitals: STATE.vitals,
       equipped: STATE.equipped,
@@ -248,10 +235,40 @@ function syncPlayerToServer() {
   }
 }
 
+// Envia UM arquivo do personagem ao servidor (que valida, normaliza e grava).
+function salvarArquivoPersonagem(arquivo, dados) {
+  if (!personagemCarregado || !CHARACTER || !socket?.connected) return;
+  socket.emit("salvar_personagem", {
+    player: CHARACTER.player,
+    nomePasta: CHARACTER.nomePasta,
+    arquivo,
+    dados: { schemaVersion: 1, ...dados },
+  });
+}
+
+function salvarStatus() {
+  salvarArquivoPersonagem("status", STATE.vitals);
+}
+
+function salvarPericias() {
+  const skills = Object.fromEntries(
+    STATE.skills.map((skill) => [skill.id, { mod: skill.mod }]),
+  );
+  salvarArquivoPersonagem("pericias", { skills });
+}
+
+socket.on("salvamento_personagem_erro", (erro) => {
+  console.error(
+    `[RPG] Falha ao salvar ${erro?.arquivo || "personagem"}:`,
+    erro?.message,
+  );
+});
+
 socket.on("vital_adjusted", (data) => {
   if (data.charId === STATE.id) {
     STATE.vitals = data.vitals;
     atualizarBarras();
+    salvarStatus();
     registrarNoTerminal(
       "Atributos vitais atualizados pelo mestre",
       data.vitals,
@@ -266,56 +283,69 @@ socket.on("sync_config", (config) => {
 });
 
 socket.on("personagem_carregado", (personagem) => {
-  console.log("Personagem recebido:", personagem);
-
-  const status = personagem.status || {};
-  const valorVital = (chave, legado, campo, atual) => {
-    const vital = status[chave] || status[legado];
-    if (vital && typeof vital === "object") {
-      const value = Number(vital[campo]);
-      return Number.isFinite(value) ? value : atual;
-    }
-
-    // Aceita também o formato antigo achatado usado diretamente por STATE.vitals.
-    const flatKey = campo === "current" ? legado : `${legado}Max`;
-    const flatValue = Number(status[flatKey]);
-    return Number.isFinite(flatValue) ? flatValue : atual;
-  };
-
-  STATE.vitals = {
-    ...STATE.vitals,
-    hp: valorVital("hp", "hp", "current", STATE.vitals.hp),
-    hpMax: valorVital("hp", "hp", "max", STATE.vitals.hpMax),
-    mana: valorVital("vigor", "mana", "current", STATE.vitals.mana),
-    manaMax: valorVital("vigor", "mana", "max", STATE.vitals.manaMax),
-    stress: valorVital("sanity", "stress", "current", STATE.vitals.stress),
-    stressMax: valorVital("sanity", "stress", "max", STATE.vitals.stressMax),
-  };
-
-  const mochila = personagem.backpack;
-  if (Array.isArray(mochila)) {
-    STATE.backpackItems = mochila;
-  } else if (mochila && typeof mochila === "object") {
-    const itens = mochila.items ?? mochila.backpackItems;
-    if (Array.isArray(itens)) STATE.backpackItems = itens;
-    if (mochila.equipped && typeof mochila.equipped === "object") {
-      STATE.equipped = { ...STATE.equipped, ...mochila.equipped };
-    }
+  if (
+    !CHARACTER ||
+    personagem?.player !== CHARACTER.player ||
+    personagem?.nomePasta !== CHARACTER.nomePasta
+  ) {
+    socket.emit("client_log", {
+      action: "Resposta de personagem ignorada por identidade divergente",
+      context: { personagem: CHARACTER?.nomePasta || "sem seleção" },
+    });
+    return;
   }
 
-  const habilidades = personagem.habilidades;
-  if (Array.isArray(habilidades)) STATE.skills = habilidades;
-  else if (Array.isArray(habilidades?.skills))
-    STATE.skills = habilidades.skills;
+  // O servidor entrega todos os arquivos já no formato oficial (ver personagem.js).
+  const vital = (v) => ({
+    current: Number(v?.current) || 0,
+    max: Number(v?.max) || 0,
+  });
+  const status = personagem.status || {};
+  STATE.vitals = {
+    hp: vital(status.hp),
+    vigor: vital(status.vigor),
+    sanity: vital(status.sanity),
+  };
 
-  const magias = personagem.magias;
-  if (Array.isArray(magias)) STATE.spells = magias;
-  else if (Array.isArray(magias?.spells)) STATE.spells = magias.spells;
+  const inventario = personagem.inventario || {};
+  STATE.backpackItems = Array.isArray(inventario.items) ? inventario.items : [];
+  STATE.equipped = {
+    mainHand: null,
+    offHand: null,
+    back: null,
+    backpack: null,
+    ...(inventario.equipped || {}),
+  };
+
+  STATE.skills = montarPericias(personagem.pericias?.skills);
+  STATE.spells = Array.isArray(personagem.magias?.items)
+    ? personagem.magias.items
+    : [];
+
+  STATE.name =
+    CHARACTER_NAME ||
+    personagem.perfil?.nome ||
+    CHARACTER.nomePasta.replace(/_\d+(?:_\d+)?$/, "");
+  const nomeEl = document.getElementById("char-name-input");
+  if (nomeEl) nomeEl.value = STATE.name;
+  personagemCarregado = true;
 
   atualizarBarras();
   renderizarPericias();
   renderizarSlotsEquipados();
   renderizarMochilaGrid();
+  registrarNoTerminal("Personagem carregado", {
+    player: CHARACTER.player,
+    nomePasta: CHARACTER.nomePasta,
+  });
+  syncPlayerToServer();
+});
+
+socket.on("personagem_erro", (erro) => {
+  personagemCarregado = false;
+  toast(erro?.message || "Não foi possível carregar o personagem.", "error");
+  sessionStorage.removeItem("rpg_character");
+  setTimeout(() => window.location.replace("/selecao"), 900);
 });
 
 function aplicarConfiguracaoGlobal(config) {
@@ -361,7 +391,7 @@ function aplicarConfiguracaoGlobal(config) {
 
   const manaEnabled = GLOBAL_CONFIG.AtivarMana;
   document
-    .getElementById("mana-card")
+    .getElementById("vigor-card")
     ?.classList.toggle("hidden", !manaEnabled);
   const vitalCards = document.getElementById("vital-cards-container");
   vitalCards?.classList.toggle("grid-cols-3", manaEnabled);
@@ -462,33 +492,51 @@ function trocarAba(abaNum) {
 }
 
 function alterarVital(tipo, delta) {
-  if (tipo === "mana" && !GLOBAL_CONFIG.AtivarMana) return;
-  const max = STATE.vitals[tipo + "Max"];
-  let novoValor = STATE.vitals[tipo] + delta;
-  if (novoValor < 0) novoValor = 0;
-  if (novoValor > max) novoValor = max;
+  if (tipo === "vigor" && !GLOBAL_CONFIG.AtivarMana) return;
 
-  STATE.vitals[tipo] = novoValor;
+  const vital = STATE.vitals[tipo];
+  if (!vital) return;
+
+  const anterior = vital.current;
+
+  vital.current += delta;
+
+  if (vital.current < 0) {
+    vital.current = 0;
+  }
+
+  if (vital.current > vital.max) {
+    vital.current = vital.max;
+  }
+
   atualizarBarras();
+  salvarStatus();
+
   registrarNoTerminal("Atributo vital alterado", {
     atributo: tipo,
-    anterior: novoValor - delta,
+    anterior,
     variacao: delta,
-    atual: novoValor,
-    maximo: max,
+    atual: vital.current,
+    maximo: vital.max,
   });
+
   syncPlayerToServer();
 }
 
 function atualizarBarras() {
-  ["hp", "mana", "stress"].forEach((tipo) => {
+  ["hp", "vigor", "sanity"].forEach((tipo) => {
+    const vital = STATE.vitals[tipo];
+
     const valEl = document.getElementById(`${tipo}-val`);
     const maxEl = document.getElementById(`${tipo}-max`);
     const barEl = document.getElementById(`${tipo}-bar`);
-    if (valEl && maxEl && barEl) {
-      valEl.innerText = STATE.vitals[tipo];
-      maxEl.innerText = STATE.vitals[tipo + "Max"];
-      const pct = (STATE.vitals[tipo] / STATE.vitals[tipo + "Max"]) * 100;
+
+    if (valEl && maxEl && barEl && vital) {
+      valEl.innerText = vital.current;
+      maxEl.innerText = vital.max;
+
+      const pct = vital.max > 0 ? (vital.current / vital.max) * 100 : 0;
+
       barEl.style.width = `${pct}%`;
     }
   });
@@ -539,11 +587,12 @@ function alterarModPericia(id, delta) {
     skill.mod += delta;
     const el = document.getElementById(`skill-mod-${id}`);
     if (el) el.innerText = skill.mod >= 0 ? `+${skill.mod}` : skill.mod;
-    registrarNoTerminal("Perí­cia alterada", {
+    registrarNoTerminal("Perícia alterada", {
       pericia: skill.name,
       anterior,
       atual: skill.mod,
     });
+    salvarPericias();
   }
 }
 
@@ -745,7 +794,7 @@ function renderizarMochilaGrid() {
   });
 
   dimLabel.innerText = config.label;
-  blocksCountEl.innerText = `Grade ativa: ${totalCells} slots disponí­veis`;
+  blocksCountEl.innerText = `Grade ativa: ${totalCells} slots disponíveis`;
   document.getElementById("backpack-weight-label").innerHTML =
     `Carga total: <strong class="text-amber-200">${pesoTotal.toFixed(1)} kg</strong>`;
 }
@@ -953,7 +1002,7 @@ function atualizarInterfaceCombo() {
   if (STATE.combo.length === 0) {
     container.innerHTML = `
           <span id="combo-empty-msg" class="text-xs text-slate-500 italic">
-            Nenhum componente no combo. Adicione armas do inventário, bônus de perí­cias ou habilidades do grimório.
+            Nenhum componente no combo. Adicione armas do inventário, bônus de perícias ou habilidades do grimório.
           </span>
         `;
     formulaDisplay.innerText = "0d0";
@@ -1201,6 +1250,11 @@ function salvarAvatar() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  if (!CHARACTER || !AUTH_TOKEN) {
+    window.location.replace(AUTH_TOKEN ? "/selecao" : "/login");
+    return;
+  }
+
   atualizarBarras();
   renderizarPericias();
   renderizarSlotsEquipados();
@@ -1212,7 +1266,7 @@ window.addEventListener("DOMContentLoaded", () => {
     registrarNoTerminal("Conexão com o servidor estabelecida", {
       socketId: socket.id,
     });
-    syncPlayerToServer();
+    socket.emit("carregar_personagem", CHARACTER);
   });
 
   socket.on("disconnect", (reason) => {

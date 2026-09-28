@@ -3,24 +3,49 @@ const http = require("http");
 const { Server } = require("socket.io");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+const personagemModelo = require("./personagem");
+const {
+  MAX_VITAL,
+  VITAL_TYPES,
+  NORMALIZADORES,
+  criarArquivosPadrao,
+  carregarPersonagemDaPasta,
+  gravarJson,
+} = personagemModelo;
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
+// Fonte única dos padrões da mesa (o cliente usa os mesmos valores até receber sync_config).
 const DEFAULT_CONFIG = {
   AtivarRiquezas: false,
-  UsarEx: true,
-  AtivarSlotMochila: false,
+  UsarEx: false,
+  AtivarSlotMochila: true,
   AtivarMana: false,
 };
-const VITAL_TYPES = new Set(["hp", "mana", "stress"]);
-const DEFAULT_STATUS = {
-  hp: { current: 34, max: 40 },
-  vigor: { current: 18, max: 25 },
-  sanity: { current: 4, max: 10 },
-};
-const MAX_VITAL = 100_000;
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 // Defina SENHA_MESTRE no ambiente antes de expor a mesa na rede.
 const SENHA_MESTRE = process.env.SENHA_MESTRE || "2245";
+const SESSIONS = new Map();
+
+function criarSessao(player) {
+  const token = crypto.randomUUID();
+  SESSIONS.set(token, player);
+  return token;
+}
+
+function obterPlayerAutenticado(req) {
+  const authorization = req.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
+  return SESSIONS.get(token) || null;
+}
+
+// Pasta raiz das contas/personagens.
+const PLAYERS_PATH = path.join(__dirname, "players");
+if (!fs.existsSync(PLAYERS_PATH)) {
+  fs.mkdirSync(PLAYERS_PATH);
+}
 
 const app = express();
 app.use(express.json());
@@ -36,6 +61,16 @@ app.post("/api/login", (req, res) => {
   // Sanitiza o nome para evitar caracteres perigosos de pastas
   const safeNome = nome.trim().replace(/[/\\?%*:|"<>]/g, "");
   const pastaJogador = path.join(PLAYERS_PATH, safeNome);
+  if (
+    !safeNome ||
+    safeNome === "." ||
+    safeNome === ".." ||
+    safeNome.length > 40
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Nome de usuário inválido." });
+  }
 
   // 1. Se a pasta da conta NÃO existe
   if (!fs.existsSync(pastaJogador)) {
@@ -51,6 +86,8 @@ app.post("/api/login", (req, res) => {
         return res.json({
           success: true,
           message: "Conta criada com sucesso!",
+          player: safeNome,
+          token: criarSessao(safeNome),
         });
       } catch (err) {
         return res.status(500).json({
@@ -79,6 +116,8 @@ app.post("/api/login", (req, res) => {
       return res.json({
         success: true,
         message: "Senha cadastrada com sucesso!",
+        player: safeNome,
+        token: criarSessao(safeNome),
       });
     } catch (err) {
       return res
@@ -91,7 +130,11 @@ app.post("/api/login", (req, res) => {
   try {
     const dadosLogin = JSON.parse(fs.readFileSync(caminhoLogin, "utf8"));
     if (dadosLogin.senha === String(senha || "")) {
-      return res.json({ success: true });
+      return res.json({
+        success: true,
+        player: safeNome,
+        token: criarSessao(safeNome),
+      });
     } else {
       return res.json({ success: false, message: "Senha incorreta!" });
     }
@@ -103,31 +146,7 @@ app.post("/api/login", (req, res) => {
 });
 
 //=============================== ARQUIVOS DE PERSONAGEM ==================================//
-const PLAYERS_PATH = path.join(__dirname, "players");
-
-if (!fs.existsSync(PLAYERS_PATH)) {
-  fs.mkdirSync(PLAYERS_PATH);
-}
-
-function criarArquivosPersonagem(personagemPath) {
-  const arquivos = {
-    "backpack.json": {
-      items: [],
-      equipped: { mainHand: null, offHand: null, back: null, backpack: null },
-    },
-    "status.json": DEFAULT_STATUS,
-    "habilidades.json": [],
-    "magias.json": [],
-  };
-
-  Object.entries(arquivos).forEach(([nomeArquivo, dados]) => {
-    fs.writeFileSync(
-      path.join(personagemPath, nomeArquivo),
-      JSON.stringify(dados, null, 2),
-      "utf8",
-    );
-  });
-}
+// O formato de cada arquivo (nomes, defaults, validação, migração) vive em personagem.js.
 
 function gerarIdPersonagem(player, nome) {
   for (let tentativa = 0; tentativa < 100; tentativa++) {
@@ -148,8 +167,7 @@ function criarPersonagem(player, nome) {
   const personagemPath = path.join(PLAYERS_PATH, player, nomePasta);
 
   fs.mkdirSync(personagemPath, { recursive: true });
-
-  criarArquivosPersonagem(personagemPath);
+  criarArquivosPadrao(personagemPath, { id, nome });
 
   return {
     id,
@@ -166,43 +184,105 @@ function carregarPersonagem(player, nomePasta) {
     return null;
   }
 
-  const arquivos = [
-    "backpack.json",
-    "status.json",
-    "habilidades.json",
-    "magias.json",
-  ];
-
-  const personagem = {};
-
-  for (const arquivo of arquivos) {
-    const caminho = path.join(personagemPath, arquivo);
-
-    if (!fs.existsSync(caminho)) {
-      console.error(`Arquivo ausente: ${caminho}`);
-      return null;
-    }
-
-    try {
-      personagem[arquivo.replace(".json", "")] = JSON.parse(
-        fs.readFileSync(caminho, "utf8"),
+  try {
+    const { personagem, erros } = carregarPersonagemDaPasta(personagemPath);
+    if (erros) {
+      console.error(
+        `Personagem com arquivos inválidos em ${personagemPath}:`,
+        erros,
       );
-    } catch (error) {
-      console.error(`JSON inválido em ${caminho}:`, error);
       return null;
     }
+    return personagem;
+  } catch (error) {
+    console.error(`Falha ao carregar ${personagemPath}:`, error);
+    return null;
+  }
+}
+
+// Só grava arquivos da lista oficial, depois de validar/normalizar com o modelo.
+function salvarArquivoPersonagem(player, nomePasta, arquivo, dados) {
+  const normalizar = Object.hasOwn(NORMALIZADORES, arquivo)
+    ? NORMALIZADORES[arquivo]
+    : null;
+  if (!normalizar)
+    return { ok: false, message: "Arquivo de personagem desconhecido." };
+
+  const limpo = normalizar(dados);
+  if (!limpo)
+    return { ok: false, message: `Formato inválido para ${arquivo}.` };
+
+  const caminho = path.join(PLAYERS_PATH, player, nomePasta, `${arquivo}.json`);
+  gravarJson(caminho, limpo);
+  return { ok: true };
+}
+
+app.get("/api/personagens", (req, res) => {
+  const player = obterPlayerAutenticado(req);
+  if (!player) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Sessão inválida." });
   }
 
-  return personagem;
-}
+  const pastaJogador = path.join(PLAYERS_PATH, player);
+  if (!fs.existsSync(pastaJogador)) {
+    return res.json({ success: true, personagens: [] });
+  }
 
-function salvarDadosPersonagem(player, nomePasta, arquivo, dados) {
-  const personagemPath = path.join(PLAYERS_PATH, player, nomePasta);
+  try {
+    const personagens = fs
+      .readdirSync(pastaJogador, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({
+        nome: entry.name.replace(/_\d+(?:_\d+)?$/, ""),
+        nomePasta: entry.name,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
-  const caminho = path.join(personagemPath, arquivo);
+    return res.json({ success: true, personagens });
+  } catch (error) {
+    console.error(`Erro ao listar personagens de ${player}:`, error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Erro ao listar personagens." });
+  }
+});
 
-  fs.writeFileSync(caminho, JSON.stringify(dados, null, 2), "utf8");
-}
+app.post("/api/personagens", (req, res) => {
+  const player = obterPlayerAutenticado(req);
+  if (!player) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Sessão inválida." });
+  }
+
+  const nome = typeof req.body?.nome === "string" ? req.body.nome.trim() : "";
+  if (
+    !nome ||
+    nome === "." ||
+    nome === ".." ||
+    nome.length > 40 ||
+    /[/\\?%*:|"<>\u0000]/.test(nome)
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Nome de personagem inválido." });
+  }
+
+  try {
+    const personagem = criarPersonagem(player, nome);
+    return res.status(201).json({
+      success: true,
+      personagem: { nome: personagem.nome, nomePasta: personagem.pasta },
+    });
+  } catch (error) {
+    console.error(`Erro ao criar personagem para ${player}:`, error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Erro ao criar personagem." });
+  }
+});
 
 //================================== SERVIDOR ==================================//
 function normalizarConfig(config) {
@@ -236,23 +316,12 @@ function salvarConfig(config) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
-function limitarNumero(value, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) return fallback;
-  return Math.max(0, Math.min(Math.round(number), MAX_VITAL));
-}
-
+// Vitais para broadcast (sem schemaVersion): { hp, vigor, sanity } com { current, max }.
 function normalizarVitais(vitais) {
-  if (!vitais || typeof vitais !== "object") return null;
-
-  const normalized = {};
-  for (const type of VITAL_TYPES) {
-    const maxKey = `${type}Max`;
-    const max = limitarNumero(vitais[maxKey], 0);
-    normalized[maxKey] = max;
-    normalized[type] = Math.min(limitarNumero(vitais[type], 0), max);
-  }
-  return normalized;
+  const status = NORMALIZADORES.status(vitais);
+  if (!status) return null;
+  const { schemaVersion, ...vitaisLimpos } = status;
+  return vitaisLimpos;
 }
 
 function normalizarId(value, fallback) {
@@ -300,12 +369,12 @@ app.get(["/", "/index.html"], (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  res.sendFile(path.join(__dirname, "login", "login.html"));
+  res.sendFile(path.join(__dirname, "login", "entrar.html"));
 });
 
-app.get("/selecao", (req, res) =>
-  res.sendFile(path.join(__dirname, "login", "selecao.html")),
-);
+app.get("/selecao", (req, res) => {
+  res.sendFile(path.join(__dirname, "login", "login.html"));
+});
 
 app.get(["/mestre", "/mestre.html"], verificarAcessoMestre, (req, res) => {
   res.sendFile(path.join(__dirname, "mestre.html"));
@@ -317,7 +386,24 @@ io.on("connection", (socket) => {
   socket.emit("sync_all_players", playersState);
   socket.emit("sync_config", systemConfig);
 
-  socket.on("carregar_personagem", ({ player, nomePasta }) => {
+  socket.on("carregar_personagem", (identidade = {}) => {
+    const { player, nomePasta } = identidade;
+    const playerAutenticado = SESSIONS.get(socket.handshake.auth?.token);
+    if (
+      !playerAutenticado ||
+      playerAutenticado !== player ||
+      typeof nomePasta !== "string" ||
+      nomePasta === "." ||
+      nomePasta === ".." ||
+      path.basename(nomePasta) !== nomePasta ||
+      /[/\\\u0000]/.test(nomePasta)
+    ) {
+      socket.emit("personagem_erro", {
+        message: "Sessão inválida para carregar este personagem.",
+      });
+      return;
+    }
+
     console.log("Solicitação para carregar:", player, nomePasta);
 
     const personagem = carregarPersonagem(player, nomePasta);
@@ -331,7 +417,55 @@ io.on("connection", (socket) => {
 
     console.log("Personagem carregado:", personagem);
 
-    socket.emit("personagem_carregado", personagem);
+    socket.emit("personagem_carregado", { ...personagem, player, nomePasta });
+  });
+
+  function identidadeValidaParaSalvar(data) {
+    const playerAutenticado = SESSIONS.get(socket.handshake.auth?.token);
+    return (
+      playerAutenticado &&
+      data?.player === playerAutenticado &&
+      typeof data.nomePasta === "string" &&
+      data.nomePasta !== "." &&
+      data.nomePasta !== ".." &&
+      path.basename(data.nomePasta) === data.nomePasta &&
+      !/[/\\\u0000]/.test(data.nomePasta)
+    );
+  }
+
+  socket.on("salvar_personagem", (data = {}) => {
+    const arquivo = typeof data.arquivo === "string" ? data.arquivo : "";
+
+    if (!identidadeValidaParaSalvar(data)) {
+      socket.emit("salvamento_personagem_erro", {
+        arquivo,
+        message: "Sessão inválida para salvar este personagem.",
+      });
+      return;
+    }
+
+    try {
+      const resultado = salvarArquivoPersonagem(
+        data.player,
+        data.nomePasta,
+        arquivo,
+        data.dados,
+      );
+      if (!resultado.ok) {
+        socket.emit("salvamento_personagem_erro", {
+          arquivo,
+          message: resultado.message,
+        });
+        return;
+      }
+      socket.emit("personagem_salvo", { arquivo });
+    } catch (error) {
+      console.error(`Falha ao salvar ${arquivo}.json:`, error);
+      socket.emit("salvamento_personagem_erro", {
+        arquivo,
+        message: "Não foi possível salvar o arquivo do personagem.",
+      });
+    }
   });
 
   socket.on("player_update", (data) => {
@@ -347,7 +481,7 @@ io.on("connection", (socket) => {
       lastUpdate: new Date().toLocaleTimeString(),
     };
     console.log(
-      `[FICHA] ${playersState[charId].name} | Update: / HP ${vitals.hp}/${vitals.hpMax} / Vigor ${vitals.mana}/${vitals.manaMax} / Sanidade ${vitals.stress}/${vitals.stressMax} |`,
+      `[FICHA] ${playersState[charId].name} | Update: / HP ${vitals.hp.current}/${vitals.hp.max} / Vigor ${vitals.vigor.current}/${vitals.vigor.max} / Sanidade ${vitals.sanity.current}/${vitals.sanity.max} |`,
     );
     io.emit("player_updated", playersState[charId]);
   });
@@ -403,10 +537,22 @@ io.on("connection", (socket) => {
     const type = data.type;
     const delta = Number(data.delta);
     const player = playersState[charId];
-    if (type === "mana" && !systemConfig.AtivarMana) {
+    if (
+      !VITAL_TYPES.includes(type) ||
+      !Number.isFinite(delta) ||
+      Math.abs(delta) > MAX_VITAL
+    ) {
       socket.emit("master_feedback", {
         success: false,
-        message: "Mana está desativada nas regras da mesa.",
+        message: "Ajuste de atributo inválido.",
+      });
+      return;
+    }
+    // Enquanto o recurso "Vigor" for controlado por AtivarMana (regra atual da mesa).
+    if (type === "vigor" && !systemConfig.AtivarMana) {
+      socket.emit("master_feedback", {
+        success: false,
+        message: "Vigor está desativado nas regras da mesa.",
       });
       return;
     }
@@ -417,25 +563,23 @@ io.on("connection", (socket) => {
       });
       return;
     }
-    if (
-      !VITAL_TYPES.has(type) ||
-      !Number.isFinite(delta) ||
-      Math.abs(delta) > MAX_VITAL
-    ) {
+
+    const vital = player.vitals[type];
+
+    if (!vital) {
       socket.emit("master_feedback", {
         success: false,
-        message: "Ajuste de atributo inválido.",
+        message: "Atributo vital inválido.",
       });
       return;
     }
 
-    const maxKey = `${type}Max`;
-    player.vitals[type] = Math.max(
+    vital.current = Math.max(
       0,
-      Math.min(player.vitals[type] + Math.round(delta), player.vitals[maxKey]),
+      Math.min(vital.current + Math.round(delta), vital.max),
     );
     console.log(
-      `[MESTRE] ${player.name}: ${type.toUpperCase()} ${delta > 0 ? "+" : ""}${Math.round(delta)} => ${player.vitals[type]}/${player.vitals[maxKey]}`,
+      `[MESTRE] ${player.name}: ${type.toUpperCase()} ${delta > 0 ? "+" : ""}${Math.round(delta)} => ${vital.current}/${vital.max}`,
     );
     io.emit("vital_adjusted", { charId, vitals: player.vitals });
     socket.emit("master_feedback", {
@@ -488,7 +632,8 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`RPG Login disponível em http://localhost:${PORT}/login`);
   console.log(`RPG VTT disponível em http://localhost:${PORT}`);
   console.log(`Painel do mestre: http://localhost:${PORT}/mestre`);
 });

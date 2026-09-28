@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "skills": {
+    "acrobacia": {
+      "mod": 0
+    },
+    "atletismo": {
+      "mod": 3
+    },
+    "furtividade": {
+      "mod": 4
+    },
+    "investigacao": {
+      "mod": 0
+    },
+    "luta": {
+      "mod": 4
+    },
+    "medicina": {
+      "mod": 2
+    },
+    "ocultismo": {
+      "mod": 3
+    },
+    "percepcao": {
+      "mod": 3
+    },
+    "pontaria": {
+      "mod": 2
+    },
+    "sobrevivencia": {
+      "mod": 2
+    },
+    "intimidacao": {
+      "mod": 3
+    },
+    "vontade": {
+      "mod": 4
+    }
+  }
+}
