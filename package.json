@@ -1,5 +1,5 @@
 {
-  "name": "rpg-sitem",
+  "name": "rpg-system",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
@@ -14,5 +14,9 @@
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.2",
+    "socket.io-client": "^4.8.4"
   }
 }

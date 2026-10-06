@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "FOR": 0,
-  "DES": 0,
-  "INT": 0,
-  "SAB": 0,
-  "PRE": 0,
-  "VON": 0
+  "FOR": 10,
+  "DES": 10,
+  "INT": 10,
+  "SAB": 10,
+  "PRE": 10,
+  "VON": 12
 }

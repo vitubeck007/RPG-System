@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "hp": {
-    "current": 14,
+    "current": 40,
     "max": 40
   },
   "vigor": {
-    "current": 1,
+    "current": 40,
     "max": 40
   },
   "sanity": {
-    "current": 0,
+    "current": 40,
     "max": 40
   }
 }

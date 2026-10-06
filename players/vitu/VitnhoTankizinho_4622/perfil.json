@@ -3,6 +3,10 @@
   "id": "4622",
   "nome": "VitnhoTankizinho",
   "classe": "",
+  "origem": "a",
+  "idade": "b",
+  "alinhamento": "c",
+  "divindade": "d",
   "progressao": {
     "ex": "0%",
     "nv": "1"

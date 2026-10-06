@@ -4,13 +4,19 @@ const { Server } = require("socket.io");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const os = require("os");
+const { enderecoEhLocal, lerCookie } = require("./acesso.js");
 const personagemModelo = require("./personagem");
 const {
   MAX_VITAL,
   VITAL_TYPES,
   NORMALIZADORES,
+  normalizarEntradaCodice,
+  ehIdSeguro,
+  extrairNomeEId,
   criarArquivosPadrao,
   carregarPersonagemDaPasta,
+  lerArquivosNormalizados,
   gravarJson,
 } = personagemModelo;
 
@@ -27,9 +33,14 @@ const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const SENHA_MESTRE = process.env.SENHA_MESTRE || "2245";
 const SESSIONS = new Map();
 
-function criarSessao(player) {
+const COOKIE_SESSAO = "rpg_sessao";
+
+// Abre a sessão. Com `res`, o token vai também num cookie: é ele que permite ao servidor exigir
+// login para abrir as páginas (a ficha continua usando o token do sessionStorage nos sockets).
+function criarSessao(player, res) {
   const token = crypto.randomUUID();
   SESSIONS.set(token, player);
+  if (res) res.setHeader("Set-Cookie", `${COOKIE_SESSAO}=${token}; Path=/; HttpOnly; SameSite=Lax`);
   return token;
 }
 
@@ -72,68 +83,41 @@ app.post("/api/login", (req, res) => {
       .json({ success: false, message: "Nome de usuário inválido." });
   }
 
-  // 1. Se a pasta da conta NÃO existe
+  const caminhoLogin = path.join(pastaJogador, "login.json");
+  const senhaDigitada = String(senha || "");
+
+  // Cria a pasta (se preciso), grava a senha digitada e já abre a sessão.
+  const cadastrar = (mensagemOk, mensagemErro) => {
+    try {
+      fs.mkdirSync(pastaJogador, { recursive: true });
+      fs.writeFileSync(caminhoLogin, JSON.stringify({ senha: senhaDigitada }, null, 2), "utf8");
+      return res.json({ success: true, message: mensagemOk, player: safeNome, token: criarSessao(safeNome, res) });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: mensagemErro });
+    }
+  };
+
+  // 1. A pasta da conta NÃO existe: cria a conta, ou avisa para o cliente abrir o popup
   if (!fs.existsSync(pastaJogador)) {
     if (criarSeNaoExistir) {
-      try {
-        fs.mkdirSync(pastaJogador, { recursive: true });
-        const dadosLogin = { senha: String(senha || "") };
-        fs.writeFileSync(
-          path.join(pastaJogador, "login.json"),
-          JSON.stringify(dadosLogin, null, 2),
-          "utf8",
-        );
-        return res.json({
-          success: true,
-          message: "Conta criada com sucesso!",
-          player: safeNome,
-          token: criarSessao(safeNome),
-        });
-      } catch (err) {
-        return res.status(500).json({
-          success: false,
-          message: "Erro ao criar a conta no servidor.",
-        });
-      }
+      return cadastrar("Conta criada com sucesso!", "Erro ao criar a conta no servidor.");
     }
-
-    // Retorna avisando que a conta não existe para abrir o popup
     return res.json({ exists: false, message: "A conta não existe." });
   }
 
-  // 2. Se a pasta da conta EXISTE
-  const caminhoLogin = path.join(pastaJogador, "login.json");
-
-  // Se não tem login.json, cria o arquivo com a senha digitada
+  // 2. A pasta existe mas não tem login.json: cadastra a senha digitada
   if (!fs.existsSync(caminhoLogin)) {
-    try {
-      const dadosLogin = { senha: String(senha || "") };
-      fs.writeFileSync(
-        caminhoLogin,
-        JSON.stringify(dadosLogin, null, 2),
-        "utf8",
-      );
-      return res.json({
-        success: true,
-        message: "Senha cadastrada com sucesso!",
-        player: safeNome,
-        token: criarSessao(safeNome),
-      });
-    } catch (err) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Erro ao gravar login.json." });
-    }
+    return cadastrar("Senha cadastrada com sucesso!", "Erro ao gravar login.json.");
   }
 
-  // Se o login.json já existe, confere se a senha confere
+  // 3. Já existe login.json: confere a senha
   try {
     const dadosLogin = JSON.parse(fs.readFileSync(caminhoLogin, "utf8"));
-    if (dadosLogin.senha === String(senha || "")) {
+    if (dadosLogin.senha === senhaDigitada) {
       return res.json({
         success: true,
         player: safeNome,
-        token: criarSessao(safeNome),
+        token: criarSessao(safeNome, res),
       });
     } else {
       return res.json({ success: false, message: "Senha incorreta!" });
@@ -177,11 +161,12 @@ function criarPersonagem(player, nome) {
   };
 }
 
+// Devolve { personagem } ou { motivo: "nao_encontrado" | "invalido" } (para a ficha mostrar a mensagem certa).
 function carregarPersonagem(player, nomePasta) {
   const personagemPath = path.join(PLAYERS_PATH, player, nomePasta);
 
   if (!fs.existsSync(personagemPath)) {
-    return null;
+    return { motivo: "nao_encontrado" };
   }
 
   try {
@@ -191,12 +176,12 @@ function carregarPersonagem(player, nomePasta) {
         `Personagem com arquivos inválidos em ${personagemPath}:`,
         erros,
       );
-      return null;
+      return { motivo: "invalido" };
     }
-    return personagem;
+    return { personagem };
   } catch (error) {
     console.error(`Falha ao carregar ${personagemPath}:`, error);
-    return null;
+    return { motivo: "invalido" };
   }
 }
 
@@ -214,7 +199,23 @@ function salvarArquivoPersonagem(player, nomePasta, arquivo, dados) {
 
   const caminho = path.join(PLAYERS_PATH, player, nomePasta, `${arquivo}.json`);
   gravarJson(caminho, limpo);
-  return { ok: true };
+  return { ok: true, dados: limpo };
+}
+
+// O nome exibido vem de perfil.json (editável na ficha); a pasta nome_id nunca é renomeada.
+function lerNomeDoPerfil(pastaJogador, nomePasta) {
+  const nomeDaPasta = extrairNomeEId(nomePasta).nome;
+  try {
+    const perfil = JSON.parse(
+      fs
+        .readFileSync(path.join(pastaJogador, nomePasta, "perfil.json"), "utf8")
+        .replace(/^\uFEFF/, ""),
+    );
+    const nome = typeof perfil?.nome === "string" ? perfil.nome.trim() : "";
+    return nome ? nome.slice(0, 40) : nomeDaPasta;
+  } catch {
+    return nomeDaPasta;
+  }
 }
 
 app.get("/api/personagens", (req, res) => {
@@ -235,7 +236,7 @@ app.get("/api/personagens", (req, res) => {
       .readdirSync(pastaJogador, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => ({
-        nome: entry.name.replace(/_\d+(?:_\d+)?$/, ""),
+        nome: lerNomeDoPerfil(pastaJogador, entry.name),
         nomePasta: entry.name,
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -284,6 +285,58 @@ app.post("/api/personagens", (req, res) => {
   }
 });
 
+//=============================== CATÁLOGO GLOBAL (Sprint 5) ==================================//
+// Arquivos catalogo/magias.json e catalogo/habilidades.json: { schemaVersion, items: [{ id, nome, ... }] }.
+// Somente leitura para os jogadores; o mestre edita os arquivos à mão por enquanto.
+const CATALOGO_PATH = path.join(__dirname, "catalogo");
+const TIPOS_CATALOGO = ["magias", "habilidades"];
+const MAX_CATALOGO = 2000;
+
+function carregarCatalogo(tipo) {
+  const caminho = path.join(CATALOGO_PATH, `${tipo}.json`);
+  if (!fs.existsSync(caminho)) return [];
+
+  const bruto = JSON.parse(fs.readFileSync(caminho, "utf8").replace(/^\uFEFF/, ""));
+  const lista = Array.isArray(bruto?.items) ? bruto.items.slice(0, MAX_CATALOGO) : [];
+  const idsVistos = new Set();
+  const itens = [];
+
+  for (const entrada of lista) {
+    if (!entrada || typeof entrada !== "object" || Array.isArray(entrada)) continue;
+    // Entrada sem id válido, ou com id repetido, é ignorada (o id liga a ficha ao catálogo).
+    if (!ehIdSeguro(entrada.id) || idsVistos.has(entrada.id)) continue;
+    idsVistos.add(entrada.id);
+    const { uid, ...limpa } = normalizarEntradaCodice(entrada, new Set());
+    itens.push(limpa);
+  }
+  return itens;
+}
+
+app.get("/api/catalogo/:tipo", (req, res) => {
+  const player = obterPlayerAutenticado(req);
+  if (!player) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Sessão inválida." });
+  }
+
+  const tipo = req.params.tipo;
+  if (!TIPOS_CATALOGO.includes(tipo)) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Catálogo desconhecido." });
+  }
+
+  try {
+    return res.json({ success: true, tipo, items: carregarCatalogo(tipo) });
+  } catch (error) {
+    console.error(`Erro ao ler o catálogo de ${tipo}:`, error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Erro ao ler o catálogo." });
+  }
+});
+
 //================================== SERVIDOR ==================================//
 function normalizarConfig(config) {
   const source = config && typeof config === "object" ? config : {};
@@ -325,9 +378,19 @@ function normalizarVitais(vitais) {
 }
 
 function normalizarId(value, fallback) {
-  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(value)
-    ? value
-    : fallback;
+  return ehIdSeguro(value) ? value : fallback;
+}
+
+// A pasta do personagem é só um nome (sem caminho), para ninguém sair de players/<jogador>/.
+function nomePastaValido(nomePasta) {
+  return (
+    typeof nomePasta === "string" &&
+    nomePasta !== "" &&
+    nomePasta !== "." &&
+    nomePasta !== ".." &&
+    path.basename(nomePasta) === nomePasta &&
+    !/[/\\\u0000]/.test(nomePasta)
+  );
 }
 
 function normalizarTexto(value, fallback, maxLength) {
@@ -340,12 +403,60 @@ const server = http.createServer(app);
 const io = new Server(server);
 let playersState = {};
 
+// Arquivos da ficha que o mestre pode ver (a biografia é privada do jogador).
+const ARQUIVOS_DO_MESTRE = [
+  "perfil",
+  "atributos",
+  "pericias",
+  "inventario",
+  "magias",
+  "habilidades",
+];
+const SALA_MESTRES = "mestres";
+const rolagensVistas = new Set(); // ids das últimas rolagens (evita duplicar um reenvio)
+// Arquivos cuja versão normalizada (a do servidor) volta no aviso de salvamento, para a ficha conferir.
+const ARQUIVOS_CONFERIDOS = ["status", "inventario"];
+const ESPERA_OUTRA_ABA_MS = 600; // folga para uma aba que está fechando/recarregando
+
+// Estado enviado a todos os clientes: sem a identidade (player/pasta) do personagem no disco.
+function estadoPublico(estado) {
+  const { player, nomePasta, ...publico } = estado;
+  return publico;
+}
+
+function todosEstadosPublicos() {
+  return Object.fromEntries(
+    Object.entries(playersState).map(([id, e]) => [id, estadoPublico(e)]),
+  );
+}
+
+// O card do mestre mostra o que o SERVIDOR tem salvo: vida vem do status.json e o nome do perfil.json
+// (nunca do que o cliente diz). Chamado depois de cada salvamento bem-sucedido.
+function atualizarCardPeloSalvo(socket, arquivo, dados) {
+  if (arquivo === "perfil") socket.data.nomePersonagem = dados.nome;
+  const charId = socket.data.charId;
+  const card = charId && playersState[charId];
+  if (!card || (arquivo !== "status" && arquivo !== "perfil")) return;
+
+  if (arquivo === "status") card.vitals = normalizarVitais(dados) ?? card.vitals;
+  else card.name = dados.nome;
+  card.lastUpdate = new Date().toLocaleTimeString();
+  io.emit("player_updated", estadoPublico(card));
+}
+
+function charIdDoSocket(socketId) {
+  return Object.keys(playersState).find(
+    (id) => playersState[id].socketId === socketId,
+  );
+}
+
 function verificarAcessoMestre(req, res, next) {
   const ip = req.socket.remoteAddress || "";
-  const isLocalhost =
-    ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  const enderecosProprios = Object.values(os.networkInterfaces())
+    .flat()
+    .map((placa) => placa?.address);
 
-  if (isLocalhost || req.query.chave === SENHA_MESTRE) {
+  if (enderecoEhLocal(ip, enderecosProprios) || req.query.chave === SENHA_MESTRE) {
     next();
     return;
   }
@@ -364,17 +475,28 @@ function verificarAcessoMestre(req, res, next) {
 app.use("/JS", express.static(path.join(__dirname, "JS")));
 app.use("/CSS", express.static(path.join(__dirname, "CSS")));
 
-app.get(["/", "/index.html"], (req, res) => {
+// Ficha e seleção só abrem com login: sem sessão válida, volta para /login.
+function exigirLogin(req, res, next) {
+  if (SESSIONS.has(lerCookie(req.headers.cookie, COOKIE_SESSAO))) {
+    next();
+    return;
+  }
+  res.redirect("/login");
+}
+
+app.get(["/", "/index.html"], exigirLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.get("/login", (req, res) => {
-  res.sendFile(path.join(__dirname, "login", "entrar.html"));
-});
-
-app.get("/selecao", (req, res) => {
-  res.sendFile(path.join(__dirname, "login", "login.html"));
-});
+// Rota -> arquivo. Atenção aos nomes: "login/entrar.html" é a tela de LOGIN e "login/login.html" é a de
+// SELEÇÃO de personagem. Ao renomear os arquivos (ex.: login.html -> selecao.html), mude só aqui.
+const PAGINAS = {
+  "/login": { arquivo: path.join(__dirname, "login", "entrar.html"), protegida: false },
+  "/selecao": { arquivo: path.join(__dirname, "login", "login.html"), protegida: true },
+};
+for (const [rota, { arquivo, protegida }] of Object.entries(PAGINAS)) {
+  app.get(rota, ...(protegida ? [exigirLogin] : []), (req, res) => res.sendFile(arquivo));
+}
 
 app.get(["/mestre", "/mestre.html"], verificarAcessoMestre, (req, res) => {
   res.sendFile(path.join(__dirname, "mestre.html"));
@@ -383,21 +505,21 @@ app.get(["/mestre", "/mestre.html"], verificarAcessoMestre, (req, res) => {
 io.on("connection", (socket) => {
   const peer = socket.handshake.address || "IP desconhecido";
   console.log(`[CONEXÃO] Cliente conectado: ${socket.id} (${peer})`);
-  socket.emit("sync_all_players", playersState);
+  socket.emit("sync_all_players", todosEstadosPublicos());
   socket.emit("sync_config", systemConfig);
 
   socket.on("carregar_personagem", (identidade = {}) => {
-    const { player, nomePasta } = identidade;
+    const { player, nomePasta, reconexao } = identidade;
     const playerAutenticado = SESSIONS.get(socket.handshake.auth?.token);
-    if (
-      !playerAutenticado ||
-      playerAutenticado !== player ||
-      typeof nomePasta !== "string" ||
-      nomePasta === "." ||
-      nomePasta === ".." ||
-      path.basename(nomePasta) !== nomePasta ||
-      /[/\\\u0000]/.test(nomePasta)
-    ) {
+    if (!playerAutenticado) {
+      // As sessões ficam só na memória: reiniciar o servidor expira todas.
+      socket.emit("personagem_erro", {
+        code: "sessao_invalida",
+        message: "Sessão expirada. Entre novamente.",
+      });
+      return;
+    }
+    if (playerAutenticado !== player || !nomePastaValido(nomePasta)) {
       socket.emit("personagem_erro", {
         message: "Sessão inválida para carregar este personagem.",
       });
@@ -406,30 +528,65 @@ io.on("connection", (socket) => {
 
     console.log("Solicitação para carregar:", player, nomePasta);
 
-    const personagem = carregarPersonagem(player, nomePasta);
+    const entregar = () => {
+      const { personagem, motivo } = carregarPersonagem(player, nomePasta);
 
-    if (!personagem) {
-      socket.emit("personagem_erro", {
-        message: "Personagem não encontrado.",
-      });
+      if (!personagem) {
+        socket.emit("personagem_erro", {
+          message:
+            motivo === "invalido"
+              ? "Os arquivos deste personagem estão inválidos. Veja o log do servidor."
+              : "Personagem não encontrado.",
+        });
+        return;
+      }
+
+      console.log("Personagem carregado:", nomePasta);
+
+      socket.data.personagem = { player, nomePasta }; // identidade confiável (vem da sessão)
+      socket.data.nomePersonagem = personagem.perfil?.nome || extrairNomeEId(nomePasta).nome;
+      socket.emit("personagem_carregado", { ...personagem, player, nomePasta });
+    };
+
+    // Cada personagem fica aberto em UMA aba só (duas abas se sobrescreveriam). A nova aba é
+    // recusada e a ficha volta para a seleção. Exceções: reconexão da própria aba (o socket antigo
+    // pode demorar a sumir) e aba que está fechando/recarregando (por isso a pequena espera).
+    const outraAba = () =>
+      [...io.sockets.sockets.values()].find(
+        (s) =>
+          s.id !== socket.id &&
+          s.data.personagem?.player === player &&
+          s.data.personagem?.nomePasta === nomePasta,
+      );
+
+    if (!reconexao && outraAba()) {
+      setTimeout(() => {
+        if (!socket.connected) return;
+        if (outraAba()) {
+          socket.emit("personagem_erro", {
+            code: "ja_carregado",
+            message: "Personagem já carregado em outra aba.",
+          });
+          return;
+        }
+        entregar();
+      }, ESPERA_OUTRA_ABA_MS);
       return;
     }
-
-    console.log("Personagem carregado:", personagem);
-
-    socket.emit("personagem_carregado", { ...personagem, player, nomePasta });
+    entregar();
   });
 
+  // Só grava no personagem que ESTA aba abriu (carregar_personagem): nada de escrever em outro
+  // personagem da conta, nem numa aba que foi recusada por "já carregado".
   function identidadeValidaParaSalvar(data) {
     const playerAutenticado = SESSIONS.get(socket.handshake.auth?.token);
-    return (
+    const aberto = socket.data.personagem;
+    return Boolean(
       playerAutenticado &&
-      data?.player === playerAutenticado &&
-      typeof data.nomePasta === "string" &&
-      data.nomePasta !== "." &&
-      data.nomePasta !== ".." &&
-      path.basename(data.nomePasta) === data.nomePasta &&
-      !/[/\\\u0000]/.test(data.nomePasta)
+        data?.player === playerAutenticado &&
+        nomePastaValido(data.nomePasta) &&
+        aberto?.player === data.player &&
+        aberto?.nomePasta === data.nomePasta,
     );
   }
 
@@ -439,7 +596,7 @@ io.on("connection", (socket) => {
     if (!identidadeValidaParaSalvar(data)) {
       socket.emit("salvamento_personagem_erro", {
         arquivo,
-        message: "Sessão inválida para salvar este personagem.",
+        message: "Este personagem não está aberto nesta aba (ou a sessão é inválida).",
       });
       return;
     }
@@ -458,7 +615,23 @@ io.on("connection", (socket) => {
         });
         return;
       }
-      socket.emit("personagem_salvo", { arquivo });
+      // Os arquivos que o jogador precisa ver iguais ao servidor voltam já corrigidos (status e inventário).
+      socket.emit("personagem_salvo", {
+        arquivo,
+        ...(ARQUIVOS_CONFERIDOS.includes(arquivo) ? { dados: resultado.dados } : {}),
+      });
+      atualizarCardPeloSalvo(socket, arquivo, resultado.dados);
+
+      if (ARQUIVOS_DO_MESTRE.includes(arquivo)) {
+        const charId = charIdDoSocket(socket.id);
+        if (charId) {
+          io.to(SALA_MESTRES).emit("ficha_arquivo", {
+            charId,
+            arquivo,
+            dados: resultado.dados,
+          });
+        }
+      }
     } catch (error) {
       console.error(`Falha ao salvar ${arquivo}.json:`, error);
       socket.emit("salvamento_personagem_erro", {
@@ -469,21 +642,45 @@ io.on("connection", (socket) => {
   });
 
   socket.on("player_update", (data) => {
-    const vitals = normalizarVitais(data?.vitals);
+    const charId = normalizarId(data?.id, socket.id);
+    const identidade = socket.data.personagem ?? null;
+
+    // Um socket representa um único personagem e não pode publicar (nem sobrescrever) o card de outro.
+    // A mesma ficha aberta em duas abas é permitida (mesma identidade).
+    if (socket.data.charId && socket.data.charId !== charId) {
+      console.warn(`[SEGURANÇA] player_update recusado: ${socket.id} já representa outro personagem.`);
+      return;
+    }
+    const atual = playersState[charId];
+    if (atual && atual.socketId !== socket.id && io.sockets.sockets.has(atual.socketId)) {
+      const mesmaFicha =
+        identidade && atual.player === identidade.player && atual.nomePasta === identidade.nomePasta;
+      if (!mesmaFicha) {
+        console.warn(`[SEGURANÇA] player_update recusado: ${socket.id} tentou usar o card ${charId}.`);
+        return;
+      }
+    }
+    socket.data.charId = charId;
+
+    // Com personagem aberto, a vida vem do que o servidor tem (card atual ou status.json) e o nome do
+    // perfil salvo: o que o cliente manda aqui é ignorado. Sem personagem aberto, vale o enviado.
+    const vitals = identidade
+      ? (atual?.vitals ?? normalizarVitais(lerArquivosNormalizados(path.join(PLAYERS_PATH, identidade.player, identidade.nomePasta), ["status"]).status))
+      : normalizarVitais(data?.vitals);
     if (!vitals) return;
 
-    const charId = normalizarId(data.id, socket.id);
     playersState[charId] = {
       id: charId,
       socketId: socket.id,
-      name: normalizarTexto(data.name, "Herói Sem Nome", 80),
+      name: socket.data.nomePersonagem || normalizarTexto(data?.name, "Herói Sem Nome", 80),
       vitals,
       lastUpdate: new Date().toLocaleTimeString(),
+      ...(socket.data.personagem ?? {}), // player + nomePasta, para o mestre ler a ficha
     };
     console.log(
       `[FICHA] ${playersState[charId].name} | Update: / HP ${vitals.hp.current}/${vitals.hp.max} / Vigor ${vitals.vigor.current}/${vitals.vigor.max} / Sanidade ${vitals.sanity.current}/${vitals.sanity.max} |`,
     );
-    io.emit("player_updated", playersState[charId]);
+    io.emit("player_updated", estadoPublico(playersState[charId]));
   });
 
   socket.on("client_log", (data) => {
@@ -508,30 +705,54 @@ io.on("connection", (socket) => {
     );
   });
 
-  socket.on("dice_roll", (data) => {
+  socket.on("dice_roll", (data, confirmar) => {
+    const responder = (ok) => typeof confirmar === "function" && confirmar(ok);
+    const nome = socket.data.nomePersonagem; // quem rola é o personagem aberto nesta aba
     const total = Number(data?.total);
-    if (!Number.isFinite(total) || Math.abs(total) > MAX_VITAL) return;
+    if (!nome || !Number.isFinite(total) || Math.abs(total) > MAX_VITAL) {
+      responder(false);
+      return;
+    }
 
+    // `rid` identifica a rolagem: se a ficha reenviar (ex.: o aviso de recebimento se perdeu), não duplica.
+    const rid = ehIdSeguro(data.rid) ? data.rid : "";
+    if (rid && rolagensVistas.has(rid)) {
+      responder(true);
+      return;
+    }
+    if (rid) {
+      rolagensVistas.add(rid);
+      if (rolagensVistas.size > 500) rolagensVistas.delete(rolagensVistas.values().next().value);
+    }
+
+    const quando = Number(data.quando);
+    const agora = Date.now();
     const roll = {
-      character: normalizarTexto(data.character, "Herói Sem Nome", 80),
+      character: nome,
       total: Math.round(total),
       details: normalizarTexto(data.details, "Rolagem", 300),
+      // hora em que foi rolada (uma rolagem feita sem conexão chega depois)
+      quando: Number.isFinite(quando) && quando <= agora + 60_000 && quando >= agora - 86_400_000 ? Math.round(quando) : agora,
     };
     console.log(`[DADOS] ${roll.character}: ${roll.details} = ${roll.total}`);
     io.emit("dice_rolled", roll);
+    responder(true);
   });
 
+  // Confere o token do mestre; se errado, avisa o cliente (com `extra`, ex.: o charId) e devolve false.
+  function exigirMestre(data, acao, extra = {}) {
+    if (data?.token === SENHA_MESTRE) return true;
+    console.warn(`[SEGURANÇA] ${acao} recusado para o cliente ${socket.id}: token inválido.`);
+    socket.emit("master_feedback", {
+      success: false,
+      message: "Token/Senha do mestre incorreta!",
+      ...extra,
+    });
+    return false;
+  }
+
   socket.on("master_adjust_vital", (data) => {
-    if (data?.token !== SENHA_MESTRE) {
-      console.warn(
-        `[SEGURANÇA] Ajuste vital recusado para o cliente ${socket.id}: token inválido.`,
-      );
-      socket.emit("master_feedback", {
-        success: false,
-        message: "Token/Senha do mestre incorreta!",
-      });
-      return;
-    }
+    if (!exigirMestre(data, "Ajuste vital")) return;
 
     const charId = normalizarId(data.charId, "");
     const type = data.type;
@@ -581,24 +802,65 @@ io.on("connection", (socket) => {
     console.log(
       `[MESTRE] ${player.name}: ${type.toUpperCase()} ${delta > 0 ? "+" : ""}${Math.round(delta)} => ${vital.current}/${vital.max}`,
     );
-    io.emit("vital_adjusted", { charId, vitals: player.vitals });
+
+    // O servidor passa a ser a fonte da verdade: grava no status.json mesmo que a aba do
+    // jogador esteja em segundo plano. O delta vai junto para o cliente aplicar sobre o
+    // valor dele (assim uma edição simultânea do jogador não é perdida).
+    if (player.player && player.nomePasta) {
+      try {
+        const salvo = salvarArquivoPersonagem(
+          player.player,
+          player.nomePasta,
+          "status",
+          player.vitals,
+        );
+        if (!salvo.ok) console.warn(`[MESTRE] status.json não gravado: ${salvo.message}`);
+      } catch (error) {
+        console.error("[MESTRE] Falha ao gravar status.json:", error);
+      }
+    }
+    io.emit("vital_adjusted", {
+      charId,
+      vitals: player.vitals,
+      type,
+      delta: Math.round(delta),
+    });
     socket.emit("master_feedback", {
       success: true,
       message: `${type.toUpperCase()} ajustado (${delta > 0 ? "+" : ""}${Math.round(delta)})!`,
     });
   });
 
-  socket.on("master_update_config", (data) => {
-    if (data?.token !== SENHA_MESTRE) {
-      console.warn(
-        `[SEGURANÇA] Atualização de configuração recusada para o cliente ${socket.id}: token inválido.`,
-      );
-      socket.emit("master_feedback", {
-        success: false,
-        message: "Token incorreto!",
-      });
+  socket.on("master_get_personagem", (data) => {
+    const charId = normalizarId(data?.charId, "");
+    // O charId vai junto nas falhas para o painel fechar o card que ficaria "carregando" para sempre.
+    const falhar = (message) =>
+      socket.emit("master_feedback", { success: false, message, charId });
+
+    if (!exigirMestre(data, "Leitura de ficha", { charId })) return;
+
+    const entrada = playersState[charId];
+    if (!entrada?.player || !entrada?.nomePasta) {
+      falhar("Ficha indisponível: o jogador precisa estar com o personagem aberto.");
       return;
     }
+
+    const pasta = path.join(PLAYERS_PATH, entrada.player, entrada.nomePasta);
+    if (!fs.existsSync(pasta)) {
+      falhar("Não foi possível ler a ficha deste personagem.");
+      return;
+    }
+
+    socket.join(SALA_MESTRES); // passa a receber ficha_arquivo em tempo real
+    socket.emit("master_personagem", {
+      charId,
+      // Leitura pura: não migra nem grava nada (quem migra é a carga feita pelo próprio jogador).
+      personagem: lerArquivosNormalizados(pasta, ARQUIVOS_DO_MESTRE),
+    });
+  });
+
+  socket.on("master_update_config", (data) => {
+    if (!exigirMestre(data, "Atualização de configuração")) return;
 
     systemConfig = normalizarConfig({ ...systemConfig, ...data.config });
     try {
@@ -621,16 +883,36 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`[DESCONEXÃO] Cliente desconectado: ${socket.id}`);
     for (const [charId, player] of Object.entries(playersState)) {
-      if (player.socketId === socket.id) {
-        delete playersState[charId];
-        console.log(
-          `[FICHA] ${player.name} (${charId}) removido: cliente desconectado.`,
-        );
-        io.emit("player_removed", { charId });
+      if (player.socketId !== socket.id) continue;
+
+      // Mesma ficha aberta em outra aba: o card continua, agora ligado a essa aba.
+      const outraAba = [...io.sockets.sockets.values()].find(
+        (s) =>
+          s.id !== socket.id &&
+          player.player &&
+          s.data.personagem?.player === player.player &&
+          s.data.personagem?.nomePasta === player.nomePasta,
+      );
+      if (outraAba) {
+        player.socketId = outraAba.id;
+        outraAba.data.charId = charId;
+        outraAba.emit("sincronizar_ficha");
+        console.log(`[FICHA] ${player.name} (${charId}) segue ativo em outra aba.`);
+        continue;
       }
+
+      delete playersState[charId];
+      console.log(
+        `[FICHA] ${player.name} (${charId}) removido: cliente desconectado.`,
+      );
+      io.emit("player_removed", { charId });
     }
   });
 });
+
+if (!process.env.SENHA_MESTRE) {
+  console.warn('[AVISO] Usando a senha padrão do mestre ("2245"). Defina a variável SENHA_MESTRE para trocar.');
+}
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`RPG Login disponível em http://localhost:${PORT}/login`);

@@ -1,0 +1,60 @@
+// perfil.json
+{
+  "schemaVersion": 1,
+  "id": "1234",                 // igual ao sufixo da pasta; imutável
+  "nome": "Aelric",             // fonte oficial do nome (a pasta não é renomeada)
+  "classe": "Lâmina Rúnica • Ocultista",
+  "origem": "Bastião de Cinzas",             // Sprint 2: campos de texto da ficha básica
+  "idade": "29 Ciclos",                      //   (lista em CAMPOS_PERFIL, personagem.js)
+  "alinhamento": "Pragmático / Sombrio",
+  "divindade": "A Chama Esquecida",          // Divindade/Pacto
+  "progressao": { "ex": "5%", "nv": "4" },   // o MODO (ex/nv) é global: vem de UsarEx
+  "avatar": "https://..."
+}
+
+// atributos.json   (reservado: hoje as perícias referenciam esses 6 atributos, mas não há valores)
+{ "schemaVersion": 1, "FOR": 0, "DES": 0, "INT": 0, "SAB": 0, "PRE": 0, "VON": 0 }
+
+// status.json
+{
+  "schemaVersion": 1,
+  "hp":     { "current": 10, "max": 10 },
+  "vigor":  { "current": 10, "max": 10 },
+  "sanity": { "current": 10, "max": 10 }
+}
+
+// pericias.json   (nome, ícone e atributo vêm do catálogo global, não da ficha)
+{
+  "schemaVersion": 1,
+  "skills": { "acrobacia": { "mod": 0 }, "ocultismo": { "mod": 5 } }
+}
+
+// inventario.json
+{
+  "schemaVersion": 1,
+  "items": [
+    { "id": "espada-longa", "name": "...", "desc": "...",
+      "col": 1, "row": 1, "w": 1, "h": 3, "weight": 3.5,
+      "color": "...", "dice": "2d5", "twoHanded": false,
+      "type": "Arma Cortante", "icon": "fa-khanda",
+      "backpackType": null, "isBackpackItem": false }
+  ],
+  "equipped": { "mainHand": null, "offHand": null, "back": null, "backpack": null }
+}
+// `uid` (identificador único da instância, problema 14) fica para o sprint seguinte;
+// hoje o servidor aceita itens sem `uid` e a remoção continua por `id`.
+
+// magias.json / habilidades.json   (proposta a partir do HTML atual, "Custo: 3 Vigor")
+{
+  "schemaVersion": 1,
+  "items": [
+    { "id": "lamento-das-sombras", "name": "...", "desc": "...",
+      "cost": { "vital": "sanity", "amount": 2 }, "dice": "1d6" }
+  ]
+}
+
+// biografia.json
+{ "schemaVersion": 1, "history": "", "scars": "", "notes": "" }
+
+// riquezas.json
+{ "schemaVersion": 1, "po": 0, "pp": 0, "pc": 0, "sangue": 0 }   // ouro, prata, cobre, Moeda de Sangue

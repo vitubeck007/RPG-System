@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "skills": {
     "acrobacia": {
-      "mod": 0
+      "mod": 7
     },
     "atletismo": {
-      "mod": 3
+      "mod": 5
     },
     "furtividade": {
       "mod": 4
@@ -14,16 +14,16 @@
       "mod": 0
     },
     "luta": {
-      "mod": 4
+      "mod": 5
     },
     "medicina": {
-      "mod": 2
+      "mod": 4
     },
     "ocultismo": {
-      "mod": 3
+      "mod": 4
     },
     "percepcao": {
-      "mod": 3
+      "mod": 2
     },
     "pontaria": {
       "mod": 2
@@ -32,10 +32,10 @@
       "mod": 2
     },
     "intimidacao": {
-      "mod": 3
+      "mod": 2
     },
     "vontade": {
-      "mod": 4
+      "mod": 2
     }
   }
 }

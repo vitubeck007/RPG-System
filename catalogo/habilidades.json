@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "habilidade-malada",
+      "nome": "Habilidade Malada",
+      "icon": "fa-fire",
+      "dice": "3d4",
+      "tipoDano": "Fogo",
+      "cost": { "vital": "vigor", "amount": 3 },
+      "acao": "Ação Rápida",
+      "alcance": "Toque",
+      "desc": "Canaliza as chamas obscuras forjadas nas fendas do submundo através do fio da lâmina. Impacto explode somando 3d4 de dano de fogo puro."
+    },
+    {
+      "id": "golpe-demolidor",
+      "nome": "Golpe Demolidor",
+      "icon": "fa-gavel",
+      "dice": "2d8",
+      "tipoDano": "Impacto",
+      "cost": { "vital": "vigor", "amount": 4 },
+      "acao": "Ataque Pesado",
+      "alcance": "Corpo a Corpo",
+      "desc": "Descarrega o peso da armadura e da força bruta em um único ponto, rompendo escudos e carapaças."
+    },
+    {
+      "id": "lamento-das-sombras",
+      "nome": "Lamento das Sombras",
+      "icon": "fa-ghost",
+      "dice": "2d6",
+      "tipoDano": "Necrótico",
+      "cost": { "vital": "sanity", "amount": 2 },
+      "acao": "Maldição",
+      "alcance": "10m",
+      "desc": "Liberta os sussurros atormentados retidos na alma do guerreiro, sugando vitalidade orgânica do alvo."
+    }
+  ]
+}
