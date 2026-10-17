@@ -138,6 +138,9 @@ const STATE = {
   // Itens na mochila (grade). Preenchido ao carregar o inventário.
   backpackItems: [],
 
+  // Entregas do mestre (loot) já aplicadas: recibo guardado no inventario.json (nunca aplica duas vezes).
+  entregasRecebidas: [],
+
   combo: [],
   history: [],
 };

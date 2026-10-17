@@ -1,22 +1,25 @@
 {
-  "name": "rpg-system",
+  "name": "s7",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "test": "node testes/executar.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.1",
     "socket.io-client": "^4.8.4"
-  }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
 }

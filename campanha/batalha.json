@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "ativa": true,
+  "combatentes": [
+    {
+      "alvoId": "cb_eca9643735",
+      "tipo": "inimigo",
+      "modeloId": "ini_b59eb42c18",
+      "nome": "Goblin 1",
+      "imagem": "",
+      "hp": {
+        "atual": 10,
+        "max": 10
+      },
+      "derrotado": false,
+      "atributos": {
+        "FOR": 10,
+        "DES": 12,
+        "INT": 8,
+        "SAB": 6,
+        "PRE": 8,
+        "VON": 8
+      },
+      "ataques": [
+        {
+          "nome": "a",
+          "dado": "2d20",
+          "tipo": "sla",
+          "alcance": "2",
+          "nota": "alguma coisa muito legal"
+        }
+      ],
+      "habilidades": [],
+      "nota": ""
+    }
+  ]
+}

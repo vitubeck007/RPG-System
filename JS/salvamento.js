@@ -108,7 +108,7 @@ function dadosParaSalvar(arquivo) {
         ),
       };
     case "inventario":
-      return { items: STATE.backpackItems, equipped: STATE.equipped };
+      return { items: STATE.backpackItems, equipped: STATE.equipped, recebidas: STATE.entregasRecebidas };
     case "riquezas":
       return Object.fromEntries(
         Object.entries(MOEDAS).map(([chave, id]) => [

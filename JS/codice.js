@@ -267,7 +267,7 @@ function criarBotaoRemoverCodice(tipo, hab) {
 }
 
 /* ------------------------- adicionar / remover (salvamento central) ------------------------- */
-function adicionarEntradaCodice(tipo, entrada) {
+function adicionarEntradaCodice(tipo, entrada, mensagem = null) {
   const cfg = CODICE_TIPOS[tipo];
   cfg.definir([...listaCodice(tipo), entrada]);
   cfg.salvar();
@@ -277,7 +277,7 @@ function adicionarEntradaCodice(tipo, entrada) {
   });
   renderizarCodice();
   renderizarResultadosCatalogo();
-  toast(`${cfg.rotulo} adicionada: ${nomeDaEntradaCodice(entrada, cfg.rotulo)}`, "info");
+  toast(mensagem ?? `${cfg.rotulo} adicionada: ${nomeDaEntradaCodice(entrada, cfg.rotulo)}`, "info");
 }
 
 function removerEntradaCodice(tipo, entrada) {
@@ -560,4 +560,92 @@ function criarLinhaCatalogo(tipo, entrada) {
   if (!jaTem) botao.addEventListener("click", () => adicionarDoCatalogo(tipo, entrada));
   linha.appendChild(botao);
   return linha;
+}
+
+/* ------------------------- entregas do mestre (Sprint 2) -------------------------
+   O mestre não grava na ficha: deixa uma "entrega" e ESTA ficha a aplica pelo salvamento central
+   (adicionarEntradaCodice). Depois que o servidor confirma o salvamento, a ficha avisa
+   (entrega_aplicada) e o servidor marca como entregue. Repetida ou já possuída (catalogId): não duplica.
+   Formato inválido é recusado. */
+const ENTREGA_ID_VALIDO = /^[A-Za-z0-9_-]{1,64}$/;
+const entregasAguardandoSalvar = new Map(); // entregaId -> arquivo ("habilidades" | "magias")
+
+function entregaValida(entrega) {
+  return (
+    ehEntradaCodice(entrega) &&
+    ENTREGA_ID_VALIDO.test(String(entrega.entregaId || "")) &&
+    (Object.hasOwn(CODICE_TIPOS, entrega.tipo) || entrega.tipo === "itens") &&
+    ehEntradaCodice(entrega.entrada) &&
+    ENTREGA_ID_VALIDO.test(String(entrega.entrada.catalogId || "")) &&
+    JSON.stringify(entrega.entrada).length <= 8000
+  );
+}
+
+function aplicarEntrega(entrega) {
+  if (!entregaValida(entrega)) {
+    registrarNoTerminal("Entrega recusada (formato inválido)", {});
+    return false;
+  }
+  if (entrega.tipo === "itens") return aplicarEntregaDeItem(entrega);
+  if (!personagemCarregado || entregasAguardandoSalvar.has(entrega.entregaId)) return false;
+
+  const { entregaId, tipo, entrada } = entrega;
+  const cfg = CODICE_TIPOS[tipo];
+  if (listaCodice(tipo).some((item) => item?.catalogId === entrada.catalogId)) {
+    socket.emit("entrega_aplicada", { entregaId }); // já tem: só confirma, não duplica
+    return true;
+  }
+  if (codiceCheio(tipo)) return false; // fica pendente no servidor
+  const copia = JSON.parse(JSON.stringify(entrada));
+  delete copia.id;
+  entregasAguardandoSalvar.set(entregaId, tipo);
+  adicionarEntradaCodice(tipo, { ...copia, uid: novoUidCodice() }, `Você recebeu: ${nomeDaEntradaCodice(copia, cfg.rotulo)}`);
+  return true;
+}
+
+// Loot de baú: tudo-ou-nada na mochila. Cabendo, grava (com o recibo) e confirma depois do salvamento;
+// sem espaço, recusa e o servidor devolve o item ao baú.
+function aplicarEntregaDeItem({ entregaId, entrada }) {
+  if (!personagemCarregado || entregasAguardandoSalvar.has(entregaId)) return false;
+  if (STATE.entregasRecebidas.includes(entregaId)) {
+    socket.emit("entrega_aplicada", { entregaId }); // já aplicada antes: só confirma
+    return true;
+  }
+  const quantidade = Number(entrada.quantity);
+  if (typeof entrada.name !== "string" || !entrada.name || !Number.isInteger(quantidade) || quantidade < 1 || quantidade > 999) {
+    registrarNoTerminal("Entrega de item recusada (formato inválido)", {});
+    return false;
+  }
+  const modelo = JSON.parse(JSON.stringify(entrada));
+  delete modelo.quantity;
+  delete modelo.catalogId;
+  STATE.entregasRecebidas.push(entregaId); // o recibo vai junto no mesmo salvamento do item
+  if (STATE.entregasRecebidas.length > 50) STATE.entregasRecebidas.shift();
+  const resultado = adicionarItemAoInventario(modelo, quantidade, { tudoOuNada: true, silencioso: true });
+  if (resultado.adicionado < quantidade) {
+    STATE.entregasRecebidas = STATE.entregasRecebidas.filter((id) => id !== entregaId);
+    toast(`Sem espaço na mochila para ${quantidade} × ${entrada.name}. O item voltou ao baú.`, "error");
+    socket.emit("entrega_recusada", { entregaId, motivo: "sem_espaco" });
+    return false;
+  }
+  entregasAguardandoSalvar.set(entregaId, "inventario");
+  toast(`Você pegou: ${quantidade} × ${entrada.name}`, "info");
+  return true;
+}
+
+socket.on("entrega", aplicarEntrega);
+
+// Salvamento confirmado pelo servidor: agora sim a entrega está no arquivo da ficha.
+socket.on("personagem_salvo", ({ arquivo } = {}) => {
+  for (const [entregaId, tipo] of [...entregasAguardandoSalvar]) {
+    if (tipo !== arquivo) continue;
+    entregasAguardandoSalvar.delete(entregaId);
+    socket.emit("entrega_aplicada", { entregaId });
+  }
+});
+
+// Chamado quando a ficha termina de montar a tela (e a cada reconexão): pede as entregas pendentes.
+function pedirEntregasPendentes() {
+  entregasAguardandoSalvar.clear();
+  socket.emit("entregas_pedir");
 }

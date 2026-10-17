@@ -336,7 +336,9 @@ function repararInventarioAoCarregar() {
  * tipo, depois cria pilhas novas onde houver espaço. Retorna { adicionado, sobrou }.
  * (É a porta de entrada para loot, itens dados pelo mestre e futura loja/catálogo.)
  */
-function adicionarItemAoInventario(modelo, quantidade = 1) {
+function adicionarItemAoInventario(modelo, quantidade = 1, { tudoOuNada = false, silencioso = false } = {}) {
+  // tudoOuNada: se não couber a quantidade INTEIRA, nada muda (usado pelo loot). silencioso: sem aviso de falta de espaço.
+  const antes = tudoOuNada ? JSON.parse(JSON.stringify(STATE.backpackItems)) : null;
   let restante = Math.max(1, Math.floor(Number(quantidade)) || 1);
   const total = restante;
   const maximo = limiteDaPilha(modelo);
@@ -377,6 +379,10 @@ function adicionarItemAoInventario(modelo, quantidade = 1) {
     novos.push(novo);
     restante -= parte;
   }
+  if (tudoOuNada && restante > 0) {
+    STATE.backpackItems.splice(0, STATE.backpackItems.length, ...antes); // desfaz as pilhas completadas
+    return { adicionado: 0, sobrou: total };
+  }
   if (novos.length) {
     aplicarLayout(calcularLayout([...STATE.backpackItems, ...novos], config));
     STATE.backpackItems.push(...novos);
@@ -391,7 +397,7 @@ function adicionarItemAoInventario(modelo, quantidade = 1) {
     renderizarMochilaGrid();
     salvarInventario();
   }
-  if (restante > 0) {
+  if (restante > 0 && !silencioso) {
     toast(
       `Sem espaço: ${restante} × ${modelo.name} não couberam na mochila.`,
       "error",

@@ -1,3 +1,4 @@
+/* global CHARACTER, AUTH_TOKEN, socket, STATE, registrarNoTerminal, jaCarregouAntes, aoDesconectarFicha, iniciarFichaBasica, atualizarEstadoFicha, atualizarBarras, renderizarPericias, renderizarSlotsEquipados, renderizarMochilaGrid, atualizarInterfaceCombo, syncPlayerToServer */
 /* =========================================================================
    INICIALIZAÇÃO
    Último arquivo carregado: roda quando a página abre. A ordem dos scripts está em index.html
@@ -60,6 +61,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   } catch (erro) {
     console.error("[RPG] Falha ao iniciar a ficha:", erro);
+    // eslint-disable-next-line no-undef -- `let` global declarada em conexao.js (este arquivo carrega por último)
     falhaDeInicializacao = erro?.message || String(erro);
     atualizarEstadoFicha();
   }

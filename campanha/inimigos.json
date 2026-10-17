@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "ini_b59eb42c18",
+      "nome": "Goblin",
+      "imagem": "",
+      "hpMax": 10,
+      "atributos": {
+        "FOR": 10,
+        "DES": 12,
+        "INT": 8,
+        "SAB": 6,
+        "PRE": 8,
+        "VON": 8
+      },
+      "ataques": [
+        {
+          "nome": "a",
+          "dado": "2d20",
+          "tipo": "sla",
+          "alcance": "2",
+          "nota": "alguma coisa muito legal"
+        }
+      ],
+      "habilidades": [],
+      "nota": "",
+      "criadoEm": "2026-10-17T17:56:48.385Z",
+      "atualizadoEm": "2026-10-17T17:56:48.385Z"
+    }
+  ]
+}

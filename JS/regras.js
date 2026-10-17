@@ -1,6 +1,6 @@
 /* =========================================================================
    REGRAS COMPARTILHADAS (ficha do jogador e painel do mestre)
-   Carregado por index.html e mestre.html ANTES dos scripts de cada página.
+   Carregado pela ficha (index.html) e pelas páginas do mestre (mestre/*.html) ANTES dos scripts de cada página.
    Fonte única do catálogo de perícias, das contas de regra e dos pequenos auxiliares usados nos
    dois lados. Também é carregado pelo servidor (personagem.js) via require: no navegador as
    declarações abaixo ficam globais; no Node saem pelo module.exports do final.
@@ -82,8 +82,50 @@ function custoDaEntrada(entrada) {
   return { texto: "0", vital: "", definido: false };
 }
 
+/* ----------------------- fórmulas de dados e dano (Sprint 6) -----------------------
+   Mesmo leitor e mesma conta na ficha, na página do mestre e no servidor: o que a página mostra na
+   prévia é exatamente o que o servidor aplica. */
+// Fórmulas aceitas: bônus puro ("+5", "-3") ou dados ("d20", "2d6", "3d12-2"). Limites iguais aos da ficha
+// (até 999 dados de até 1000 lados) + bônus limitado a ±100000 (evita números absurdos).
+const COMBO_BONUS = /^[+-]\s*\d+$/;
+const COMBO_DADOS = /^(\d*)d(\d+)\s*([+-]\s*\d+)?$/i;
+const COMBO_MAX_DADOS = 999;
+const COMBO_MAX_LADOS = 1000;
+const COMBO_MAX_BONUS = 100000;
+
+function lerFormulaCombo(texto) {
+  const formula = String(texto ?? "").trim();
+  if (COMBO_BONUS.test(formula)) {
+    const bonus = parseInt(formula.replace(/\s/g, ""), 10);
+    return Math.abs(bonus) <= COMBO_MAX_BONUS ? { tipo: "bonus", formula, bonus } : null;
+  }
+  const m = formula.match(COMBO_DADOS);
+  if (!m) return null;
+  const qtd = m[1] === "" ? 1 : parseInt(m[1], 10);
+  const lados = parseInt(m[2], 10);
+  if (qtd < 1 || qtd > COMBO_MAX_DADOS || lados < 1 || lados > COMBO_MAX_LADOS) return null;
+  const bonus = m[3] ? parseInt(m[3].replace(/\s/g, ""), 10) : 0;
+  if (Math.abs(bonus) > COMBO_MAX_BONUS) return null;
+  return { tipo: "dados", formula, qtd, lados, bonus };
+}
+
+// Multiplicadores de dano permitidos (lista fechada): ×1 (total), ×½ (metade) e ×2 (dobro).
+const MULTIPLICADORES_DANO = [0.5, 1, 2];
+
+// Dano aplicado a um alvo: nunca negativo; metade arredonda PARA BAIXO (7 → 3; 1 → 0).
+function calcularDano(total, multiplicador) {
+  if (!MULTIPLICADORES_DANO.includes(multiplicador)) return null;
+  const t = Number(total);
+  if (!Number.isFinite(t)) return null;
+  return Math.floor(Math.max(0, Math.trunc(t)) * multiplicador);
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
+    lerFormulaCombo,
+    calcularDano,
+    MULTIPLICADORES_DANO,
+    COMBO_MAX_DADOS,
     CATALOGO_PERICIAS,
     modificadorDeAtributo,
     formatarBonus,

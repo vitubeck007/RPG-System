@@ -222,25 +222,7 @@ function rolarDadoIndividual(lados) {
   return Math.floor(Math.random() * lados) + 1;
 }
 
-// Fórmulas aceitas no combo: bônus puro ("+5", "-3") ou dados ("d20", "2d6", "3d12-2").
-const COMBO_BONUS = /^[+-]\s*\d+$/;
-const COMBO_DADOS = /^(\d*)d(\d+)\s*([+-]\s*\d+)?$/i;
-const COMBO_MAX_DADOS = 999;
-const COMBO_MAX_LADOS = 1000;
-
-function lerFormulaCombo(texto) {
-  const formula = String(texto ?? "").trim();
-  if (COMBO_BONUS.test(formula)) {
-    return { tipo: "bonus", formula, bonus: parseInt(formula.replace(/\s/g, ""), 10) };
-  }
-  const m = formula.match(COMBO_DADOS);
-  if (!m) return null;
-  const qtd = m[1] === "" ? 1 : parseInt(m[1], 10);
-  const lados = parseInt(m[2], 10);
-  if (qtd < 1 || qtd > COMBO_MAX_DADOS || lados < 1 || lados > COMBO_MAX_LADOS) return null;
-  const bonus = m[3] ? parseInt(m[3].replace(/\s/g, ""), 10) : 0;
-  return { tipo: "dados", formula, qtd, lados, bonus };
-}
+// O leitor de fórmulas do combo (lerFormulaCombo) agora é compartilhado: vem de JS/regras.js.
 
 function rolarCombo() {
   if (STATE.combo.length === 0) {

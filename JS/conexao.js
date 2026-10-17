@@ -68,6 +68,7 @@ socket.on("personagem_carregado", (personagem) => {
     STATE.backpackItems = Array.isArray(inventario.items)
       ? inventario.items
       : [];
+    STATE.entregasRecebidas = Array.isArray(inventario.recebidas) ? inventario.recebidas : [];
     STATE.equipped = {
       mainHand: null,
       offHand: null,
@@ -148,6 +149,7 @@ socket.on("personagem_carregado", (personagem) => {
   });
   syncPlayerToServer();
   enviarSalvamentosPendentes();
+  pedirEntregasPendentes();
   enviarRolagensPendentes();
   atualizarEstadoFicha();
 });

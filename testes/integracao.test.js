@@ -6,7 +6,7 @@ const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { io: clienteIo } = require("socket.io-client");
 const { ARQUIVOS } = require("../personagem.js");
-const { iniciarServidor, abrirFicha, esperar, esperarAte } = require("./ajuda/ambiente.js");
+const { iniciarServidor, abrirFicha, abrirPaginaMestre, esperar, esperarAte } = require("./ajuda/ambiente.js");
 
 const NOMES = ["perfil", "biografia", "atributos", "pericias", "status", "inventario", "magias", "habilidades"];
 
@@ -380,11 +380,12 @@ describe("Estabilização: carregamento, conexão e erros", { concurrency: false
 });
 
 describe("Correções de bugs (regressão)", { concurrency: false }, () => {
-  const { JSDOM } = require("jsdom");
   const fs = require("node:fs");
   const path = require("node:path");
   const { NORMALIZADORES } = require("../personagem.js");
-  let s, tokens = {}, pastas = {};
+  let s;
+  const tokens = {};
+  const pastas = {};
   const vitais = { hp: { current: 5, max: 10 }, vigor: { current: 3, max: 5 }, sanity: { current: 6, max: 6 } };
 
   before(async () => {
@@ -666,44 +667,36 @@ describe("Correções de bugs (regressão)", { concurrency: false }, () => {
     f.fechar();
   });
 
-  it("painel do mestre: cards não esticam, ficha ilegível fecha o card, undefined não aparece", () => {
-    let html = fs.readFileSync(path.join(s.dir, "mestre.html"), "utf8");
-    const regras = fs.readFileSync(path.join(s.dir, "JS", "regras.js"), "utf8");
-    const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].pop()[1];
-    html = html.replace(/<script[\s\S]*?<\/script>/g, "");
-    const dom = new JSDOM(html, { runScripts: "outside-only" });
-    const w = dom.window;
-    const h = {}, emitidos = [];
-    w.io = () => ({ on: (e, fn) => { h[e] = fn; }, emit: (e, d) => emitidos.push([e, d]) });
-    w.eval(`${regras}\n${inline}`);
-    const doc = w.document;
+  it("Mesa do mestre: cards não esticam, ficha ilegível fecha o card, undefined não aparece", async () => {
+    const m = await abrirPaginaMestre(s, "index");
+    const doc = m.document;
 
     assert.match(doc.getElementById("players-cards-container").className, /items-start/);
-    assert.equal(w.escaparHtml(undefined), "");
+    assert.equal(m.window.escaparHtml(undefined), "");
 
-    h.sync_config({ AtivarMana: true });
-    h.sync_all_players({ a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" }, b: { id: "b", name: "B", vitals: vitais, lastUpdate: "1" } });
+    m.disparar("sync_config", { AtivarMana: true });
+    m.disparar("sync_all_players", { a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" }, b: { id: "b", name: "B", vitals: vitais, lastUpdate: "1" } });
     doc.getElementById("master-token-input").value = "errado";
-    w.alternarFicha("a");
+    m.window.alternarFicha("a");
     assert.match(doc.getElementById("players-cards-container").textContent, /Carregando ficha/);
-    h.master_feedback({ success: false, message: "Token/Senha do mestre incorreta!", charId: "a" });
+    m.disparar("master_feedback", { success: false, message: "Token/Senha do mestre incorreta!", charId: "a" });
     const cards = doc.getElementById("players-cards-container").textContent;
     assert.doesNotMatch(cards, /Carregando ficha/, "o card não fica preso em 'Carregando'");
     assert.equal((cards.match(/Ver ficha/g) || []).length, 2, "os dois cards voltam a 'Ver ficha'");
 
     // reconectar sem token no campo não deixa fichas abertas esperando
-    w.alternarFicha("b");
+    m.window.alternarFicha("b");
     doc.getElementById("master-token-input").value = "";
-    h.connect();
-    h.sync_all_players({ a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" }, b: { id: "b", name: "B", vitals: vitais, lastUpdate: "1" } });
+    m.disparar("connect");
+    m.disparar("sync_all_players", { a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" }, b: { id: "b", name: "B", vitals: vitais, lastUpdate: "1" } });
     assert.doesNotMatch(doc.getElementById("players-cards-container").textContent, /Carregando ficha/);
+    m.fechar();
   });
 });
 
 describe("Simplificações (o comportamento não mudou)", { concurrency: false }, () => {
   const fs = require("node:fs");
   const path = require("node:path");
-  const { JSDOM } = require("jsdom");
   const regras = require("../JS/regras.js");
   const { extrairNomeEId, ehIdSeguro } = require("../personagem.js");
   let s, token, pasta;
@@ -840,8 +833,12 @@ describe("Simplificações (o comportamento não mudou)", { concurrency: false }
       { id: "", nome: "Vazia" },
       { id: "ok-2", nome: "Outra boa" },
     ] }));
+    // o catálogo vive no armazém (memória): arquivo editado à mão vale ao ligar o servidor
+    await s.reiniciar();
+    token = (await s.api("/api/login", { nome: "dani", senha: "x" })).token;
     const r = await s.api("/api/catalogo/habilidades", null, token);
     assert.deepEqual(r.items.map((i) => i.id), ["ok-1", "ok-2"]);
+    assert.equal(r.items.every((i) => i.publico === undefined), true, "controle do mestre não vai para a ficha");
     assert.equal(r.items[0].nome, "Boa", "fica a primeira de cada id");
   });
 
@@ -890,31 +887,26 @@ describe("Simplificações (o comportamento não mudou)", { concurrency: false }
     f.fechar();
   });
 
-  it("painel do mestre: contador usa o limite do script e as funções vêm do regras.js", () => {
-    let html = fs.readFileSync(path.join(s.dir, "mestre.html"), "utf8");
-    const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].pop()[1];
-    const regrasJs = fs.readFileSync(path.join(s.dir, "JS", "regras.js"), "utf8");
-    assert.doesNotMatch(inline, /function escaparHtml|const ROTULO_VITAL/, "sem cópia própria");
-    html = html.replace(/<script[\s\S]*?<\/script>/g, "");
-    const w = new JSDOM(html, { runScripts: "outside-only" }).window;
-    const h = {};
-    w.io = () => ({ on: (e, fn) => { h[e] = fn; }, emit() {} });
-    w.eval(`${regrasJs}\n${inline}`);
-    assert.equal(w.document.getElementById("max-players").textContent, "5");
+  it("Mesa do mestre: contador usa o limite do script e as funções vêm do regras.js", async () => {
+    const painel = fs.readFileSync(path.join(s.dir, "mestre", "JS", "painel.js"), "utf8");
+    assert.doesNotMatch(painel, /function escaparHtml|const ROTULO_VITAL/, "sem cópia própria");
+    const m = await abrirPaginaMestre(s, "index");
+    assert.equal(m.document.getElementById("max-players").textContent, "5");
 
-    h.sync_config({ AtivarMana: true });
-    h.sync_all_players({ a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" } });
-    w.document.getElementById("master-token-input").value = "t";
-    w.alternarFicha("a");
-    h.master_personagem({ charId: "a", personagem: {
+    m.disparar("sync_config", { AtivarMana: true });
+    m.disparar("sync_all_players", { a: { id: "a", name: "A", vitals: vitais, lastUpdate: "1" } });
+    m.document.getElementById("master-token-input").value = "t";
+    m.window.alternarFicha("a");
+    m.disparar("master_personagem", { charId: "a", personagem: {
       inventario: { items: [{ name: "Adaga", weight: 1.5, quantity: 2 }], equipped: { backpack: { name: "Mochila", weight: 2.5 } } },
       habilidades: { items: [{ nome: "Golpe", dice: "2d8", cost: { vital: "vigor", amount: 4 } }, { nome: "Sem custo" }] },
       magias: { items: [] },
     } });
-    const texto = w.document.getElementById("players-cards-container").textContent.replace(/\s+/g, " ");
+    const texto = m.document.getElementById("players-cards-container").textContent.replace(/\s+/g, " ");
     assert.match(texto, /carga 5\.5/, "1,5 x 2 + mochila 2,5");
     assert.match(texto, /2d8 • custo 4 Vigor/);
     assert.doesNotMatch(texto, /Sem custo[^G]*custo/, "entrada sem custo não mostra 'custo'");
+    m.fechar();
   });
 });
 
@@ -923,7 +915,9 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
   const http = require("node:http");
   const path = require("node:path");
   const { enderecoEhLocal, lerCookie } = require("../acesso.js");
-  let s, tokens = {}, pastas = {};
+  let s;
+  const tokens = {};
+  const pastas = {};
   const vitais = { hp: { current: 5, max: 10 }, vigor: { current: 3, max: 5 }, sanity: { current: 6, max: 6 } };
   const arquivo = (conta, pasta, nome) => path.join(s.dir, "players", conta, pasta, `${nome}.json`);
 
@@ -966,7 +960,7 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
   // GET cru (sem o fetch "arrumar" o caminho); `de` = endereço de origem da conexão.
   const pedir = (caminho, { de, cookie } = {}) => new Promise((res, rej) => {
     const req = http.request({ host: "127.0.0.1", port: s.porta, path: caminho, method: "GET", localAddress: de, headers: cookie ? { Cookie: cookie } : {} }, (r) => {
-      let corpo = ""; r.on("data", (d) => (corpo += d)); r.on("end", () => res({ status: r.statusCode, local: r.headers.location, corpo }));
+      let corpo = ""; r.on("data", (d) => (corpo += d)); r.on("end", () => res({ status: r.statusCode, local: r.headers.location, corpo, cookie: r.headers["set-cookie"]?.[0] }));
     });
     req.on("error", rej); req.end();
   });
@@ -1061,18 +1055,40 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
     assert.equal((await pedir("/JS/regras.js")).status, 200, "os scripts da página continuam servidos");
   });
 
-  it("/mestre só abre na máquina do servidor ou com a chave", async (t) => {
-    assert.equal((await pedir("/mestre")).status, 200, "a máquina do mestre abre");
-    assert.equal((await pedir("/mestre.html")).status, 200);
+  it("o painel do mestre (todas as páginas, scripts e estilos) só abre na máquina do servidor ou com a chave", async (t) => {
+    const paginas = ["/mestre", "/mestre/", "/mestre/rolagem", "/mestre/inimigos", "/mestre/npc", "/mestre/loot", "/mestre/habilidades-magias"];
+    const arquivos = ["/mestre/JS/comum.js", "/mestre/JS/painel.js", "/mestre/JS/tailwind-config.js", "/mestre/CSS/mestre.css", "/mestre/rolagem.html"];
+
+    for (const alvo of [...paginas, ...arquivos]) assert.equal((await pedir(alvo)).status, 200, `${alvo}: a máquina do mestre abre`);
+    const legado = await pedir("/mestre.html");
+    assert.deepEqual([legado.status, legado.local], [302, "/mestre"], "o endereço antigo leva ao painel novo");
+    assert.equal((await pedir("/mestre/nao-existe")).status, 404);
+    const fuga = await pedir("/mestre/JS/..%2f..%2fserver.js");
+    assert.notEqual(fuga.status, 200, "não sai da pasta mestre/");
+    assert.doesNotMatch(fuga.corpo, /SENHA_MESTRE/);
 
     let remoto;
     try { remoto = await pedir("/mestre", { de: "127.0.0.2" }); } catch { return t.skip("este sistema não permite usar 127.0.0.2 como origem"); }
     assert.equal(remoto.status, 403, "outro endereço sem chave: bloqueado");
     assert.match(remoto.corpo, /restrita ao Mestre/);
-    for (const caminho of ["/mestre.html", "/mestre?chave=errada", "/mestre?chave=senha-teste&chave=outra", "/mestre?chave[]=senha-teste", "/mestre?chave="]) {
+    for (const alvo of [...paginas, ...arquivos, "/mestre.html"]) {
+      assert.equal((await pedir(alvo, { de: "127.0.0.2" })).status, 403, `${alvo} bloqueado`);
+    }
+    for (const caminho of ["/mestre?chave=errada", "/mestre?chave=senha-teste&chave=outra", "/mestre?chave[]=senha-teste", "/mestre?chave=", "/mestre/rolagem?chave=errada"]) {
       assert.equal((await pedir(caminho, { de: "127.0.0.2" })).status, 403, `${caminho} bloqueado`);
     }
-    assert.equal((await pedir("/mestre?chave=senha-teste", { de: "127.0.0.2" })).status, 200, "com a chave certa abre");
+
+    // com a chave certa abre e entrega um cookie: dá para navegar e carregar os arquivos sem repetir ?chave=
+    const entrada = await pedir("/mestre/rolagem?chave=senha-teste", { de: "127.0.0.2" });
+    assert.equal(entrada.status, 200, "com a chave certa abre");
+    assert.match(entrada.cookie, /^rpg_mestre=[\w-]+; Path=\/mestre; HttpOnly/);
+    const cookie = entrada.cookie.split(";")[0];
+    for (const alvo of [...paginas, ...arquivos]) {
+      assert.equal((await pedir(alvo, { de: "127.0.0.2", cookie })).status, 200, `${alvo} abre com o cookie`);
+    }
+    assert.equal((await pedir("/mestre", { de: "127.0.0.2", cookie: "rpg_mestre=inventado" })).status, 403, "cookie inventado não vale");
+    assert.equal((await pedir("/mestre", { de: "127.0.0.2", cookie: "rpg_sessao=qualquer" })).status, 403, "o cookie de jogador não vale");
+    assert.equal((await pedir("/mestre", { de: "127.0.0.2" })).cookie, undefined, "sem chave não ganha cookie");
   });
 
   it("ficha e seleção exigem login; a tela de login é pública", async () => {
@@ -1161,6 +1177,29 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
     f.fechar();
   });
 
+  it("erro ao montar a tela não impede a ficha de conectar e carregar, e o erro aparece no topo", async () => {
+    const f = await abrirFicha(s, {
+      player: "e1", nomePasta: pastas.b, token: tokens.e1, atrasarInicio: 50,
+      antesDoInicio: (rodar) => rodar("iniciarFichaBasica = () => { throw new Error('falha de teste'); }"),
+    });
+    assert.equal(f.carregada(), true, "conectou e carregou mesmo com a tela falhando");
+    const faixa = f.document.getElementById("estado-ficha").textContent;
+    assert.match(faixa, /Erro ao iniciar a ficha: falha de teste/);
+    assert.match(faixa, /F12/);
+    f.fechar();
+  });
+
+  it("se a inicialização (index.js) não rodar, em 6 s a faixa diz isso em vez de ficar 'Conectando…'", async () => {
+    const f = await abrirFicha(s, { player: "e1", nomePasta: pastas.b, token: tokens.e1, esperarCarga: false, omitirScripts: ["JS/index.js"] });
+    const faixa = () => f.document.getElementById("estado-ficha").textContent;
+    await esperar(1000);
+    assert.match(faixa(), /Conectando/, "no início ainda é só 'Conectando'");
+    await esperarAte(() => /A ficha não iniciou/.test(faixa()), { ms: 9000, rotulo: "aviso de que a ficha não iniciou" });
+    assert.match(faixa(), /Ctrl\+F5/);
+    assert.equal(f.carregada(), false);
+    f.fechar();
+  });
+
   it("rolagem feita sem conexão fica na fila e chega ao mestre (uma vez, com a hora real) ao reconectar", async () => {
     const m = await conectar();
     const feed = [];
@@ -1192,5 +1231,134 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
     await esperar(300);
     assert.equal(feed.length, 2, "sem duplicar");
     f.fechar(); m.close();
+  });
+});
+
+describe("Painel do mestre em páginas (Mesa pronta, demais preparadas)", { concurrency: false }, () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const ROTAS = {
+    index: "/mestre", rolagem: "/mestre/rolagem", inimigos: "/mestre/inimigos",
+    npc: "/mestre/npc", loot: "/mestre/loot", "habilidades-magias": "/mestre/habilidades-magias",
+  };
+  const PREPARADAS = [];
+  // Páginas com script próprio (cada sprint da Fase 2 move uma página da lista acima para cá).
+  const COM_SCRIPT = ["habilidades-magias", "loot", "npc", "inimigos", "rolagem"];
+  // Únicos scripts que as páginas preparadas podem carregar (infraestrutura comum, sem lógica própria).
+  const PERMITIDOS = ["https://cdn.tailwindcss.com", "/mestre/JS/tailwind-config.js", "/socket.io/socket.io.js", "/JS/regras.js", "/mestre/JS/comum.js"];
+  let s, token, pasta;
+
+  before(async () => {
+    s = await iniciarServidor();
+    token = (await s.api("/api/login", { nome: "mest", senha: "x", criarSeNaoExistir: true })).token;
+    pasta = (await s.api("/api/personagens", { nome: "Lyra" }, token)).personagem.nomePasta;
+  });
+  after(async () => { await s?.parar(); });
+
+  const baixar = async (caminho) => { const r = await fetch(`${s.url}${caminho}`); return { status: r.status, tipo: r.headers.get("content-type") || "", corpo: await r.text() }; };
+  const arquivoDaPagina = (id) => fs.readFileSync(path.join(s.dir, "mestre", `${id}.html`), "utf8");
+  const srcs = (html, tag, atributo) => [...html.replace(/<!--[\s\S]*?-->/g, "").matchAll(new RegExp(`<${tag}[^>]*?${atributo}="([^"]+)"`, "g"))].map((m) => m[1]);
+
+  it("as seis páginas abrem e cada uma sabe quem ela é", async () => {
+    for (const [id, rota] of Object.entries(ROTAS)) {
+      const r = await baixar(rota);
+      assert.equal(r.status, 200, rota);
+      assert.match(r.tipo, /text\/html/);
+      assert.match(r.corpo, new RegExp(`<header id="mestre-cabecalho" data-pagina="${id}">`), `${rota} declara a sua página`);
+    }
+  });
+
+  it("toda página só referencia arquivos que existem, e as cinco preparadas não têm script próprio", async () => {
+    for (const id of Object.keys(ROTAS)) {
+      const html = arquivoDaPagina(id);
+      for (const ref of [...srcs(html, "script", "src"), ...srcs(html, "link", "href")].filter((r) => r.startsWith("/"))) {
+        assert.equal((await baixar(ref)).status, 200, `${id}: ${ref} existe`);
+      }
+    }
+    for (const id of PREPARADAS) {
+      const html = arquivoDaPagina(id);
+      assert.deepEqual(srcs(html, "script", "src"), PERMITIDOS, `${id}: só a infraestrutura comum`);
+      assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ""), /<script(?![^>]*\bsrc=)/, `${id}: sem script inline`);
+      assert.doesNotMatch(html, /onclick=/, `${id}: sem botões falsos`);
+      assert.match(html, new RegExp(`<!-- Script desta página \\(a fazer.*mestre/JS/${id}\\.js`), `${id}: deixa indicado onde entra o script`);
+      assert.equal(fs.existsSync(path.join(s.dir, "mestre", "JS", `${id}.js`)), false, `${id}: o script ainda não existe`);
+      assert.match(html, /Em\s+construção/);
+      assert.match(html, new RegExp(`id="${id.replace("habilidades-magias", "habmag")}-`), `${id}: tem as zonas do esqueleto`);
+    }
+    assert.ok(srcs(arquivoDaPagina("index"), "script", "src").includes("/mestre/JS/painel.js"), "a Mesa carrega o seu script");
+    for (const id of COM_SCRIPT) {
+      assert.deepEqual(srcs(arquivoDaPagina(id), "script", "src").slice(-2), ["/mestre/JS/comum.js", `/mestre/JS/${id}.js`], `${id}: comum.js e depois o seu script`);
+    }
+  });
+
+  it("menu: as seis páginas aparecem, a atual fica marcada e as que não existem ainda dizem 'em breve'", async () => {
+    for (const id of Object.keys(ROTAS)) {
+      const m = await abrirPaginaMestre(s, id);
+      try {
+        const links = [...m.document.querySelectorAll("nav a[data-pagina-link]")];
+        assert.deepEqual(links.map((a) => a.getAttribute("href")), Object.values(ROTAS), `${id}: links na ordem`);
+        const ativos = links.filter((a) => a.getAttribute("aria-current") === "page");
+        assert.deepEqual(ativos.map((a) => a.dataset.paginaLink), [id], `${id}: só ela está marcada`);
+        const emBreve = links.filter((a) => /em breve/i.test(a.textContent)).map((a) => a.dataset.paginaLink);
+        assert.deepEqual(emBreve, PREPARADAS, `${id}: 'em breve' nas preparadas`);
+        assert.equal(m.falso.conexoes, 1, `${id}: conecta uma vez, no fim da inicialização`);
+        assert.deepEqual(m.erros, [], `${id}: sem erros de script`);
+      } finally { m.fechar(); }
+    }
+  });
+
+  it("indicador de conexão e token: o token digitado vale para as outras páginas da aba", async () => {
+    const a = await abrirPaginaMestre(s, "rolagem");
+    try {
+      const status = () => a.document.getElementById("connection-status").textContent.trim();
+      assert.equal(status(), "Conectando…");
+      a.disparar("connect");
+      assert.equal(status(), "Servidor Online");
+      a.disparar("disconnect");
+      assert.equal(status(), "Desconectado");
+
+      const campo = a.document.getElementById("master-token-input");
+      assert.equal(campo.value, "");
+      campo.value = " senha-teste ";
+      campo.dispatchEvent(new a.window.Event("input"));
+      assert.equal(a.run("tokenDoMestre()"), "senha-teste", "o token vem do campo, sem espaços");
+      assert.equal(a.window.sessionStorage.getItem("rpg_mestre_token"), "senha-teste");
+    } finally { a.fechar(); }
+
+    const b = await abrirPaginaMestre(s, "loot", { tokenInicial: "senha-teste" });
+    assert.equal(b.document.getElementById("master-token-input").value, "senha-teste", "a outra página já abre com o token");
+    b.fechar();
+  });
+
+  it("Mesa de verdade (servidor real): jogador aparece, vida ajustada pelo mestre chega à ficha, rolagem cai no feed", async () => {
+    const f = await abrirFicha(s, { player: "mest", nomePasta: pasta, token });
+    f.run("Math.random = () => 0.5");
+    f.run("definirMaximoVital('hp', 10)");
+    await f.salvos();
+    const m = await abrirPaginaMestre(s, "index", { real: true, tokenInicial: "senha-teste" });
+    try {
+      const cards = () => m.document.getElementById("players-cards-container").textContent.replace(/\s+/g, " ");
+      await esperarAte(() => /Lyra/.test(cards()) && /10\/10/.test(cards()), { rotulo: "card do jogador com a vida" });
+      assert.equal(m.document.getElementById("connected-count").textContent, "1");
+      assert.equal(m.document.getElementById("connection-status").textContent.trim(), "Servidor Online");
+
+      // ajuste do mestre: servidor grava, ficha e card ficam iguais
+      const charId = f.run("STATE.id");
+      m.window.ajustarVital(charId, "hp", -3);
+      await esperarAte(() => f.run("STATE.vitals.hp.current") === 7, { rotulo: "ficha receber o ajuste" });
+      await esperarAte(() => /7\/10/.test(cards()), { rotulo: "card do mestre mostrar 7/10" });
+      await f.salvos();
+      assert.equal(JSON.parse(fs.readFileSync(path.join(s.dir, "players", "mest", pasta, "status.json"), "utf8")).hp.current, 7);
+
+      // rolagem do jogador no feed
+      f.run("rolarAtributo('FOR', 'Força')");
+      await esperarAte(() => /Força/.test(m.document.getElementById("rolls-feed-container").textContent), { rotulo: "rolagem no feed" });
+      assert.match(m.document.getElementById("rolls-feed-container").textContent, /Lyra[\s\S]*= 11/);
+
+      // ficha completa, somente leitura
+      m.window.alternarFicha(charId);
+      await esperarAte(() => /Atributos/.test(cards()), { rotulo: "ficha expandida" });
+      assert.deepEqual(m.erros, []);
+    } finally { m.fechar(); f.fechar(); }
   });
 });

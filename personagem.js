@@ -95,6 +95,7 @@ const DEFAULTS = {
     schemaVersion: SCHEMA_VERSION,
     items: [],
     equipped: DEFAULT_INVENTARIO_EQUIPPED(),
+    recebidas: [],
   }),
   magias: () => ({ schemaVersion: SCHEMA_VERSION, items: [] }),
   habilidades: () => ({ schemaVersion: SCHEMA_VERSION, items: [] }),
@@ -174,7 +175,9 @@ const NORMALIZADORES = {
       if (!ehObjeto(item) || typeof item.id !== "string") return null;
       equipped[slot] = normalizarItem(item, uidsVistos, false);
     }
-    return { schemaVersion: SCHEMA_VERSION, items, equipped };
+    // Recibo das entregas do mestre já aplicadas (idempotência: a ficha nunca aplica a mesma duas vezes).
+    const recebidas = Array.isArray(d.recebidas) ? d.recebidas.filter(ehIdSeguro).slice(-50) : [];
+    return { schemaVersion: SCHEMA_VERSION, items, equipped, recebidas };
   },
 
   magias: normalizarCodice,
@@ -333,7 +336,7 @@ const LEGADO = {
   },
 
   pericias(d) {
-    let lista = [];
+    let lista;
     if (Array.isArray(d)) lista = d;
     else if (ehObjeto(d) && Array.isArray(d.skills)) lista = d.skills;
     else if (ehObjeto(d))
@@ -378,10 +381,32 @@ function lerJson(caminho) {
   return JSON.parse(fs.readFileSync(caminho, "utf8").replace(/^\uFEFF/, ""));
 }
 
+const ERROS_DE_ARQUIVO_EM_USO = new Set(["EPERM", "EBUSY", "EACCES"]);
+const esperarSincrono = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+// Troca atômica de arquivo (rename por cima). No Windows o rename falha de vez em quando (antivírus ou indexador
+// segurando o arquivo): tenta de novo algumas vezes e, em último caso, copia por cima (não atômico, mas não perde o dado).
+function trocarArquivo(origem, destino, { tentativas = 6, espera = 25 } = {}) {
+  for (let i = 1; ; i++) {
+    try {
+      fs.renameSync(origem, destino);
+      return;
+    } catch (erro) {
+      if (!ERROS_DE_ARQUIVO_EM_USO.has(erro.code)) throw erro;
+      if (i >= tentativas) {
+        fs.copyFileSync(origem, destino);
+        fs.rmSync(origem, { force: true });
+        return;
+      }
+      esperarSincrono(espera * i);
+    }
+  }
+}
+
 function gravarJson(caminho, dados) {
   const tmp = `${caminho}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(dados, null, 2), "utf8");
-  fs.renameSync(tmp, caminho); // troca atômica: evita JSON pela metade
+  trocarArquivo(tmp, caminho); // troca atômica: evita JSON pela metade
 }
 
 function extrairNomeEId(nomePasta) {
@@ -516,7 +541,18 @@ module.exports = {
   normalizarEntradaCodice,
   ehIdSeguro,
   extrairNomeEId,
+  // auxiliares compartilhados com o armazém do mestre (campanha.js)
+  ATRIBUTOS,
+  MAX_PILHA,
+  DADO_VALIDO,
+  ICONE_VALIDO,
+  ehObjeto,
+  inteiro,
+  texto,
+  normalizarItem,
+  lerJson,
   gravarJson,
+  trocarArquivo,
   criarArquivosPadrao,
   carregarPersonagemDaPasta,
   lerArquivosNormalizados,

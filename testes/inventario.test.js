@@ -1,4 +1,5 @@
 const { JSDOM, VirtualConsole } = require("jsdom");
+const vm = require("node:vm");
 // Sem ruído: o log [RPG] da ficha só aparece com VERBOSE=1; erros reais do jsdom sempre aparecem.
 const vc = new VirtualConsole();
 vc.on("jsdomError", (e) => console.error("[jsdom]", e.message));
@@ -7,9 +8,11 @@ const fs = require("fs");
 let falhas = 0;
 const ok = (c, m) => { console.log((c ? "  ✔ " : "  ✘ ") + m); if (!c) falhas++; };
 const RAIZ = process.cwd();
-const ARQ_JS = fs.existsSync(RAIZ + "/JS/index.js") ? RAIZ + "/JS/index.js" : RAIZ + "/index.js";
-const html = fs.readFileSync(RAIZ + "/index.html", "utf8").replace(/<script[^>]*src=[^>]*><\/script>/g, "");
-const codigo = fs.readFileSync(ARQ_JS, "utf8").replace(/^\uFEFF/, "");
+const htmlOriginal = fs.readFileSync(RAIZ + "/index.html", "utf8");
+const html = htmlOriginal.replace(/<script[^>]*src=[^>]*><\/script>/g, "");
+const scripts = [...htmlOriginal.matchAll(/<script src="(JS\/[^"]+)"/g)].map((m) =>
+  fs.readFileSync(RAIZ + "/" + m[1], "utf8").replace(/^\uFEFF/, ""),
+);
 
 // Cria uma ficha nova (jsdom) já carregada com o inventário informado.
 function ficha(inventario, extra = {}) {
@@ -18,9 +21,23 @@ function ficha(inventario, extra = {}) {
   w.sessionStorage.setItem("rpg_character", JSON.stringify({ player: "bia", nomePasta: "A_1" }));
   w.sessionStorage.setItem("rpg_token", "t");
   const h = {}, em = [];
-  const sock = { connected: true, id: "s", on: (e, f) => (h[e] = f), emit: (e, d) => em.push([e, d]) };
+  const sock = {
+    connected: true,
+    id: "s",
+    on: (e, f) => {
+      const anterior = h[e];
+      h[e] = (...args) => {
+        anterior?.(...args);
+        f(...args);
+      };
+    },
+    emit: (e, d) => em.push([e, d]),
+    connect() {},
+  };
   w.io = () => sock; w.scrollTo = () => {};
-  w.eval(codigo + "\n;window.__T={STATE,BALANCEAMENTO,setPop:(i)=>{itemPopoverAtual=i;},get sem(){return [...itensSemEspaco]},get emVoo(){return {...emVoo}}};");
+  const contexto = dom.getInternalVMContext();
+  for (const codigo of scripts) new vm.Script(codigo).runInContext(contexto);
+  new vm.Script("window.__T={STATE,BALANCEAMENTO,setPop:(i)=>{itemPopoverAtual=i;},get sem(){return [...itensSemEspaco]},get emVoo(){return {...emVoo}}};").runInContext(contexto);
   w.dispatchEvent(new w.Event("DOMContentLoaded"));
   const carga = () => ({ player: "bia", nomePasta: "A_1", perfil: { schemaVersion: 1, id: "1", nome: "A", progressao: { ex: "0%", nv: "1" }, avatar: "" }, biografia: {}, atributos: {}, status: { hp: { current: 5, max: 5 }, vigor: { current: 0, max: 0 }, sanity: { current: 0, max: 0 } }, pericias: { skills: {} }, inventario, magias: { items: [] }, habilidades: { items: [] }, ...extra });
   h.sync_config({ AtivarSlotMochila: true, AtivarMana: true, AtivarRiquezas: true, UsarEx: false });

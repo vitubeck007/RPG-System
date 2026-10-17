@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesa • Painel do Mestre - RPG VTT</title>
+
+    <!-- Tailwind CSS (CDN) e as cores/fontes do painel -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/mestre/JS/tailwind-config.js"></script>
+
+    <!-- Socket.io Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Regras compartilhadas com a ficha (catálogo de perícias, modificadores, escape de HTML...) -->
+    <script src="/JS/regras.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/mestre/CSS/mestre.css">
+</head>
+
+<body
+    class="bg-void text-slate-200 font-sans min-h-screen flex flex-col pb-10 selection:bg-amberGold-600 selection:text-white">
+
+    <!-- Menu, token e conexão: montados pelo comum.js -->
+    <header id="mestre-cabecalho" data-pagina="index"></header>
+
+    <main class="max-w-7xl mx-auto px-6 mt-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- COLUNA 1 & 2: CARDS DOS JOGADORES -->
+        <section class="lg:col-span-2 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-dungeon-800">
+                <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2">
+                    <i class="fa-solid fa-users"></i> Mesa de Jogadores (<span id="connected-count">0</span>/<span id="max-players"></span>)
+                </h2>
+                <span class="text-xs text-slate-500 font-mono">Sincronização Ativa em Tempo Real</span>
+            </div>
+
+            <div id="players-cards-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                <div id="no-players-msg"
+                    class="col-span-full p-8 text-center bg-dungeon-900/60 border border-dashed border-dungeon-700 rounded-xl text-slate-500 text-sm">
+                    <i class="fa-solid fa-dice-d20 text-3xl mb-2 text-slate-600"></i>
+                    <p>Aguardando jogadores abrirem a ficha...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLUNA 3: FEED DE ROLAGENS -->
+        <section class="space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-dungeon-800">
+                <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2">
+                    <i class="fa-solid fa-scroll"></i> Histórico de Rolagens
+                </h2>
+                <button onclick="limparFeedRolagens()"
+                    class="text-xs text-slate-500 hover:text-slate-300 font-mono">Limpar</button>
+            </div>
+
+            <div id="rolls-feed-container" class="space-y-2.5 max-h-[700px] overflow-y-auto pr-1">
+                <div
+                    class="p-6 text-center text-slate-500 text-xs italic bg-dungeon-900 rounded-xl border border-dungeon-800">
+                    Nenhum dado rolado ainda na sessão.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/mestre/JS/comum.js"></script>
+    <script src="/mestre/JS/painel.js"></script>
+</body>
+
+</html>

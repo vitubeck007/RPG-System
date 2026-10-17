@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loot • Painel do Mestre - RPG VTT</title>
+
+    <!-- Tailwind CSS (CDN) e as cores/fontes do painel -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/mestre/JS/tailwind-config.js"></script>
+
+    <!-- Socket.io Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Regras compartilhadas com a ficha (catálogo de perícias, modificadores, escape de HTML...) -->
+    <script src="/JS/regras.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/mestre/CSS/mestre.css">
+</head>
+
+<body
+    class="bg-void text-slate-200 font-sans min-h-screen flex flex-col pb-10 selection:bg-amberGold-600 selection:text-white">
+
+    <!-- Menu, token e conexão: montados pelo comum.js -->
+    <header id="mestre-cabecalho" data-pagina="loot"></header>
+
+    <main class="max-w-7xl mx-auto px-6 mt-6 flex-1 w-full space-y-6">
+
+        <div class="flex flex-wrap justify-between items-center gap-3 pb-2 border-b border-dungeon-800">
+            <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2"><i class="fa-solid fa-gem"></i> Loot</h2>
+            <div class="flex gap-2" role="tablist">
+                <button id="loot-aba-itens" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Itens</button>
+                <button id="loot-aba-baus" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Baús</button>
+            </div>
+        </div>
+
+        <!-- Catálogo de itens -->
+        <div id="loot-itens" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
+                <div class="flex gap-2">
+                    <input id="loot-busca-item" type="text" maxlength="80" placeholder="Buscar item…" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
+                    <select id="loot-filtro-tipo" class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono"><option value="">Todos os tipos</option></select>
+                    <button id="loot-novo-item" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo</button>
+                </div>
+                <div id="loot-lista-itens" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </section>
+            <section id="loot-editor-item" class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
+                <h3 id="li-titulo" class="font-cinzel font-bold text-amber-200 text-sm"></h3>
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <label class="col-span-2">Nome<input id="li-name"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Tipo<input id="li-type"   maxlength="40" placeholder="Arma, Poção…" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Ícone<input id="li-icon"   maxlength="40" placeholder="fa-flask" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Dado<input id="li-dice"   maxlength="30" placeholder="1d6+2" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Cor<input id="li-color"   maxlength="40" placeholder="text-amber-400" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Peso<input id="li-weight"   type="number" min="0" step="0.01" value="0" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Pilha máx.<input id="li-maxStack"   type="number" min="1" max="999" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Largura<input id="li-w"   type="number" min="1" max="10" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Altura<input id="li-h"   type="number" min="1" max="10" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="col-span-2">Descrição<textarea id="li-desc" rows="3" maxlength="2000" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></textarea></label>
+                    <label class="col-span-2 flex items-center gap-2"><input id="li-twoHanded" type="checkbox"> Duas mãos</label>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button id="li-salvar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
+                    <button id="li-cancelar" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Baús -->
+        <div id="loot-baus" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
+                <div class="flex justify-between items-center">
+                    <p class="text-[11px] text-slate-500">Liberar mostra o baú aos jogadores conectados; recolher o esconde. Baú liberado não se edita.</p>
+                    <button id="loot-novo-bau" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo baú</button>
+                </div>
+                <div id="loot-lista-baus" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </section>
+            <section id="loot-editor-bau" class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
+                <h3 id="lb-titulo" class="font-cinzel font-bold text-amber-200 text-sm"></h3>
+                <label class="text-xs font-mono block">Nome do baú<input id="lb-nome"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                <div id="lb-linhas" class="space-y-1"></div>
+                <div class="flex gap-2 text-xs font-mono">
+                    <select id="lb-item" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
+                    <input id="lb-qtd" type="number" min="1" max="999" value="1" class="w-16 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1">
+                    <button id="lb-add" type="button" class="px-2 py-1 rounded border border-dungeon-700">Adicionar</button>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button id="lb-salvar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
+                    <button id="lb-cancelar" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <script src="/mestre/JS/comum.js"></script>
+    <script src="/mestre/JS/loot.js"></script>
+</body>
+
+</html>
