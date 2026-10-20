@@ -29,12 +29,12 @@ const arquivosTmp = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith(".tmp"
 describe("Normalizadores da campanha", () => {
   it("NPC: limites, tipos e campos desconhecidos descartados", () => {
     const n = normalizarNpc({
-      nome: "  Ana  ", lore: "x".repeat(900), segredo: "s".repeat(3000), papel: 5,
+      nome: "  Ana  ", lore: "x".repeat(5000), segredo: "s".repeat(3000), papel: 5,
       hp: { atual: 99, max: 20 }, atributos: { FOR: "15", DES: "abc", XXX: 3, INT: 5000 },
       retrato: "javascript:alert(1)", hackeado: true, id: "../etc",
     });
     assert.equal(n.nome, "Ana");
-    assert.equal(n.lore.length, 500);
+    assert.equal(n.lore.length, 4000);
     assert.equal(n.segredo.length, 2000);
     assert.deepEqual(n.hp, { atual: 20, max: 20 });
     assert.deepEqual(n.atributos, { FOR: 15, INT: 999 });
@@ -281,7 +281,7 @@ describe("Armazém: arquivos estragados e editados à mão", () => {
     const dir = novaPasta();
     fs.writeFileSync(path.join(dir, "npcs.json"), JSON.stringify({ schemaVersion: 1, items: [{ id: "n1", nome: "Ana", lore: "y".repeat(800), extra: 1 }] }));
     const c = nova(dir);
-    assert.equal(c.ler("npcs")[0].lore.length, 500);
+    assert.equal(c.ler("npcs")[0].lore.length, 800);
     const gravado = JSON.parse(fs.readFileSync(path.join(dir, "npcs.json"), "utf8"));
     assert.equal(gravado.items[0].extra, undefined);
     const backups = c.listarBackups();

@@ -26,7 +26,7 @@ async function esperarAte(condicao, { ms = 10_000, tempoMs, passo = 25, rotulo =
 // Cópia isolada do projeto (sem players/ nem config.json); subprocessos resolvem dependências via NODE_PATH.
 function copiarProjeto() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rpg-teste-"));
-  for (const item of ["server.js", "personagem.js", "acesso.js", "campanha.js", "comandos.js", "entregas.js", "batalha.js", "rolagem.js", "dano.js", "index.html", "mestre", "JS", "catalogo"]) {
+  for (const item of ["server.js", "personagem.js", "acesso.js", "campanha.js", "figurantes.js", "comandos.js", "entregas.js", "batalha.js", "rolagem.js", "dano.js", "index.html", "login", "CSS", "mestre", "JS", "catalogo"]) {
     const origem = path.join(RAIZ, item);
     if (fs.existsSync(origem)) fs.cpSync(origem, path.join(dir, item), { recursive: true });
   }
@@ -130,6 +130,8 @@ async function abrirFicha(servidor, { player, nomePasta, token, esperarCarga = t
   w.sessionStorage.setItem("rpg_token", token);
   w.sessionStorage.setItem("rpg_character", JSON.stringify({ player, nomePasta }));
   w.fetch = (u, o) => fetch(new URL(u, servidor.url), o);
+  // Cenários antigos de inventário assumem confirmação positiva; a recusa é coberta no smoke de UX.
+  w.confirm = () => true;
   // `capturar` (array): guarda TODO evento que a ficha recebe do servidor, desde antes de conectar (auditoria de vazamento)
   w.io = (opcoes) => {
     const sock = clienteIo(servidor.url, { ...opcoes, transports: ["websocket"], forceNew: true });
@@ -180,6 +182,7 @@ async function abrirPaginaMestre(servidor, pagina = "index", { real = false, tok
   const dom = new JSDOM(html, { url: `${servidor.url}/mestre`, pretendToBeVisual: true, runScripts: "outside-only", virtualConsole: virtual });
   const w = dom.window;
   if (tokenInicial) w.sessionStorage.setItem("rpg_mestre_token", tokenInicial);
+  w.confirm = () => true;
   // jsdom não implementa innerText (a Mesa usa); espelha em textContent para ler a tela.
   Object.defineProperty(w.HTMLElement.prototype, "innerText", {
     get() { return this.textContent; },

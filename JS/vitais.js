@@ -36,6 +36,15 @@ function alterarVital(tipo, delta) {
   syncPlayerToServer();
 }
 
+function abrirAjusteVital(tipo) {
+  if (!personagemCarregado || (tipo === 'vigor' && !GLOBAL_CONFIG.AtivarMana)) return;
+  RPGUI.ajustarValor({
+    titulo: `Ajustar ${ROTULO_VITAL[tipo] || tipo}`,
+    ler: () => personagemCarregado && (tipo !== 'vigor' || GLOBAL_CONFIG.AtivarMana) ? STATE.vitals[tipo] : null,
+    aplicar: delta => alterarVital(tipo, delta),
+  });
+}
+
 /* Máximo de HP / Vigor / Sanidade: clique no número do máximo para editar (Enter confirma,
    Esc cancela). Se o vital estava cheio, continua cheio; senão o atual só é cortado no novo teto. */
 const MAX_VITAL_FICHA = 100000; // mesmo limite do servidor (MAX_VITAL)
@@ -76,6 +85,7 @@ function editarMaximoVital(tipo) {
   campo.max = String(MAX_VITAL_FICHA);
   campo.value = vital.max;
   campo.title = "Novo máximo (Enter confirma, Esc cancela)";
+  campo.setAttribute("aria-label", `Novo máximo de ${ROTULO_VITAL[tipo] || tipo}`);
   campo.className =
     "w-14 bg-dungeon-950 border border-amberGold-500 rounded text-center text-[11px] font-mono text-slate-100 focus:outline-none";
   botao.replaceWith(campo);
@@ -91,10 +101,14 @@ function editarMaximoVital(tipo) {
     delete botao.dataset.editando;
     if (confirmar) definirMaximoVital(tipo, valor);
     else atualizarBarras();
+    botao.focus();
   };
   campo.addEventListener("keydown", (evento) => {
-    if (evento.key === "Enter") concluir(true);
-    else if (evento.key === "Escape") concluir(false);
+    if (evento.key !== "Enter" && evento.key !== "Escape") return;
+    // O foco volta ao botão: não deixar o Enter ativá-lo e reabrir o editor.
+    evento.preventDefault();
+    evento.stopPropagation();
+    concluir(evento.key === "Enter");
   });
   campo.addEventListener("blur", () => concluir(true));
 }
@@ -110,6 +124,7 @@ function atualizarBarras() {
     if (valEl && maxEl && barEl && vital) {
       valEl.innerText = vital.current;
       maxEl.innerText = vital.max;
+      maxEl.setAttribute("aria-label", `Editar máximo de ${ROTULO_VITAL[tipo] || tipo}: ${vital.max}`);
 
       const pct = vital.max > 0 ? (vital.current / vital.max) * 100 : 0;
 

@@ -25,12 +25,8 @@ const PAGINAS_MESTRE = [
     descricao: "Rolar dados e aplicar dano nos alvos",
   },
   {
-    id: "inimigos", href: "/mestre/inimigos", rotulo: "Inimigos", icone: "fa-skull", pronta: true,
-    descricao: "Inimigos em batalha e criação de novos",
-  },
-  {
-    id: "npc", href: "/mestre/npc", rotulo: "NPCs", icone: "fa-masks-theater", pronta: true,
-    descricao: "NPCs com mini lore e status básicos",
+    id: "figurantes", href: "/mestre/figurantes", rotulo: "Inimigos / NPCs", icone: "fa-masks-theater", pronta: true,
+    descricao: "Figurantes, histórias, poderes e batalha",
   },
   {
     id: "loot", href: "/mestre/loot", rotulo: "Loot", icone: "fa-gem", pronta: true,
@@ -77,44 +73,39 @@ function montarCabecalho() {
 
   const links = PAGINAS_MESTRE.map((p) => {
     const ativa = p.id === atual.id;
-    const classes = ativa
-      ? "bg-dungeon-800 text-amberGold-400 border-amberGold-600/60"
-      : "text-slate-400 border-transparent hover:text-amber-200 hover:bg-dungeon-900";
+    const icones = { index: "shield", rolagem: "dice", figurantes: "book", loot: "bag", "habilidades-magias": "spark" };
+    const rotulosCurtos = { index: "Mesa", rolagem: "Rolagem", figurantes: "Figurantes", loot: "Loot", "habilidades-magias": "Poderes" };
     const emBreve = p.pronta
       ? ""
       : '<span class="ml-1 text-[9px] uppercase tracking-wider text-slate-500">em breve</span>';
     return `<a href="${p.href}" data-pagina-link="${p.id}" ${ativa ? 'aria-current="page"' : ""}
-        class="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono transition ${classes}">
-        <i class="fa-solid ${p.icone}"></i>${escaparHtml(p.rotulo)}${emBreve}
+        class="master-nav-link" aria-label="${escaparHtml(p.rotulo)}" title="${escaparHtml(p.descricao)}">
+        <svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#${icones[p.id]}"></use></svg>
+        <span class="master-nav-full">${escaparHtml(p.rotulo)}${emBreve}</span>
+        <span class="master-nav-short" aria-hidden="true">${rotulosCurtos[p.id]}</span>
       </a>`;
   }).join("");
 
-  cabecalho.className =
-    "w-full bg-dungeon-950 border-b border-dungeon-700/80 sticky top-0 z-40 backdrop-blur-md shadow-2xl px-6 pt-4 pb-3";
+  cabecalho.className = "master-header";
   cabecalho.innerHTML = `
-    <div class="max-w-7xl mx-auto space-y-3">
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <i class="fa-solid fa-crown text-2xl text-amberGold-400"></i>
-          <div>
-            <h1 class="font-cinzel font-black text-xl text-amber-100 tracking-wider">PAINEL DE CONTROLE DO MESTRE</h1>
-            <p class="text-xs text-slate-400 font-mono">${escaparHtml(atual.descricao)}</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2 bg-dungeon-900 border border-dungeon-700 px-3 py-1.5 rounded-lg text-xs font-mono">
-            <i class="fa-solid fa-key text-amberGold-500"></i>
-            <span class="text-slate-400">Token:</span>
-            <input type="password" id="master-token-input" autocomplete="current-password"
-              class="bg-transparent text-amber-200 focus:outline-none w-20 text-center border-b border-transparent focus:border-amberGold-500 font-bold"
-              title="Informe a chave configurada no servidor">
-          </div>
-          <div id="connection-status"></div>
-        </div>
+    <div class="master-header-inner">
+      <div class="master-heading">
+        <span class="rpg-sigil" aria-hidden="true"><svg class="rpg-icon"><use href="/CSS/icones.svg#shield"></use></svg></span>
+        <div><p class="rpg-eyebrow">Arquivo de campanha · Mestre</p><h1>${escaparHtml(atual.rotulo)}</h1></div>
       </div>
-
-      <nav class="flex gap-2 overflow-x-auto pb-1" aria-label="Páginas do painel do mestre">${links}</nav>
+      <div class="master-tools">
+        <div id="connection-status" role="status" aria-live="polite"></div>
+        <details class="master-credentials">
+          <summary>Chave do mestre</summary>
+          <div class="master-credentials-panel">
+            <label for="master-token-input">Chave configurada no servidor</label>
+            <input type="password" id="master-token-input" autocomplete="current-password" spellcheck="false" aria-describedby="master-key-hint">
+            <p id="master-key-hint">Mantida somente nesta aba do navegador. Conexão online não significa acesso autorizado.</p>
+          </div>
+        </details>
+      </div>
+      <nav class="master-nav" aria-label="Páginas do painel do mestre">${links}</nav>
+      <p id="master-context-notice" class="master-notice" role="status">Conectando ao servidor…</p>
     </div>`;
 
   const campoToken = document.getElementById("master-token-input");
@@ -124,6 +115,58 @@ function montarCabecalho() {
   campoToken.addEventListener("change", () => entrarNaSalaDoMestre({ silencioso: false }));
   definirStatusConexao("conectando");
 }
+
+// Feedback de acesso é distinto do transporte Socket.IO; não muda autenticação.
+function definirAvisoMestre(texto, estado = "info") {
+  const aviso = document.getElementById("master-context-notice");
+  if (!aviso) return;
+  aviso.textContent = texto;
+  aviso.dataset.estado = estado;
+}
+
+function focarChaveMestre() {
+  const input = document.getElementById('master-token-input');
+  const detalhes = input?.closest('details');
+  if (detalhes) detalhes.open = true;
+  input?.focus();
+}
+
+// Os editores não são forms: valide antes de converter números ou aplicar valores padrão.
+function validarCamposMestre(id, regras = {}) {
+  const area = document.getElementById(id);
+  let primeiro = null;
+  for (const input of area.querySelectorAll('input, select, textarea')) {
+    if (input.disabled) continue;
+    const texto = regras[input.id]?.(input.value.trim()) || (!input.validity.valid ? input.validationMessage : '');
+    const erroId = `${input.id}-erro`;
+    let erro = document.getElementById(erroId);
+    if (texto && !erro) {
+      erro = criar('span', 'master-field-error'); erro.id = erroId; erro.setAttribute('aria-live', 'polite');
+      input.insertAdjacentElement('afterend', erro);
+    }
+    if (erro) { erro.textContent = texto; erro.hidden = !texto; }
+    input.setAttribute('aria-invalid', String(Boolean(texto)));
+    const descricoes = new Set((input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+    if (texto) descricoes.add(erroId); else descricoes.delete(erroId);
+    if (descricoes.size) input.setAttribute('aria-describedby', [...descricoes].join(' '));
+    else input.removeAttribute('aria-describedby');
+    if (texto && !primeiro) primeiro = input;
+  }
+  primeiro?.focus();
+  return !primeiro;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#mestre-cabecalho, #mestre-conteudo').forEach(el => { el.dataset.modalBackground = ''; });
+  document.addEventListener('input', evento => {
+    const input = evento.target;
+    if (input.getAttribute('aria-invalid') !== 'true') return;
+    // Um novo envio valida novamente. Ao digitar, retire a mensagem antiga, não a nova entrada.
+    const erro = document.getElementById(`${input.id}-erro`);
+    if (erro) { erro.textContent = ''; erro.hidden = true; }
+    input.removeAttribute('aria-invalid');
+  });
+});
 
 /* ------------------------------ indicador de conexão ------------------------------ */
 const STATUS_CONEXAO = {
@@ -148,8 +191,10 @@ function definirStatusConexao(estado) {
   const el = document.getElementById("connection-status");
   if (!el) return;
   const s = STATUS_CONEXAO[estado];
-  el.className = `flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg border ${s.classes}`;
-  el.innerHTML = `<span class="w-2 h-2 rounded-full ${s.ponto}"></span> ${s.texto}`;
+  el.className = "master-connection";
+  el.dataset.estado = estado;
+  el.innerHTML = `<span class="master-connection-dot" aria-hidden="true"></span> ${s.texto}`;
+  if (estado === "offline") definirAvisoMestre("Sem conexão. As ações não serão enviadas até o servidor reconectar.", "error");
 }
 
 socket.on("connect", () => {
@@ -166,17 +211,116 @@ socket.on("connect_error", () => definirStatusConexao("offline"));
 //   muda: true  -> o pedido altera algo: ganha um `acaoId`. Se o servidor demorar e a página reenviar,
 //                  passe o MESMO acaoId (vem em erro.acaoId): o servidor não executa duas vezes.
 const TEMPO_LIMITE_PEDIDO_MS = 8000;
+const mutacoesEmAndamento = new Map();
+const editoresProtegidos = new Map();
+const camposBloqueadosEmEnvio = new Map();
+
+function bloquearCamposEnvioMestre(id, enviando) {
+  const area = document.getElementById(id);
+  if (!area) return;
+  if (enviando && !camposBloqueadosEmEnvio.has(id)) {
+    const controles = [...area.querySelectorAll("input, select, textarea, button")];
+    camposBloqueadosEmEnvio.set(id, controles.map(el => [el, el.disabled]));
+    controles.forEach(el => { el.disabled = true; });
+    area.setAttribute("aria-busy", "true");
+  } else if (!enviando) {
+    (camposBloqueadosEmEnvio.get(id) || []).forEach(([el, anterior]) => { el.disabled = anterior; });
+    camposBloqueadosEmEnvio.delete(id);
+    area.removeAttribute("aria-busy");
+  }
+}
+
+function assinaturaEditorMestre(id, extra = () => null) {
+  const area = document.getElementById(id);
+  return JSON.stringify([
+    [...(area?.querySelectorAll("input, select, textarea") || [])].map(el =>
+      [el.id || el.name, el.type === "checkbox" ? el.checked : el.value]),
+    extra(),
+  ]);
+}
+
+function protegerEditorMestre(id, extra = () => null) {
+  const area = document.getElementById(id);
+  area?.querySelectorAll('.master-field-error').forEach(el => { el.textContent = ''; el.hidden = true; });
+  area?.querySelectorAll('[aria-invalid]').forEach(input => {
+    input.removeAttribute('aria-invalid');
+    const descricoes = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(valor => valor && valor !== `${input.id}-erro`);
+    if (descricoes.length) input.setAttribute('aria-describedby', descricoes.join(' '));
+    else input.removeAttribute('aria-describedby');
+  });
+  editoresProtegidos.set(id, { extra, inicial: assinaturaEditorMestre(id, extra) });
+}
+
+function editorMestreAlterado(id) {
+  const registro = editoresProtegidos.get(id);
+  return Boolean(registro && registro.inicial !== assinaturaEditorMestre(id, registro.extra));
+}
+
+function podeDescartarEditorMestre(id) {
+  return !editorMestreAlterado(id) || window.confirm("Há alterações não salvas. Descartar o rascunho?\nCancelar mantém a edição aberta.");
+}
+
+function limparProtecaoEditorMestre(id) { editoresProtegidos.delete(id); }
+
+async function executarAcaoMestre(botao, rotulo, acao) {
+  if (botao?.dataset.enviando === "1") return;
+  const texto = botao?.textContent;
+  const desabilitado = botao?.disabled;
+  if (botao) {
+    botao.dataset.enviando = "1";
+    botao.disabled = true;
+    botao.setAttribute("aria-busy", "true");
+    botao.textContent = rotulo;
+  }
+  try { return await acao(); }
+  finally {
+    if (botao) {
+      delete botao.dataset.enviando;
+      botao.disabled = desabilitado;
+      botao.removeAttribute("aria-busy");
+      botao.textContent = texto;
+    }
+  }
+}
+
+// Falha de leitura não é uma lista vazia. Preserva os últimos dados, quando existirem.
+function mostrarEstadoLeituraMestre(area, { carregando, erro, carregou }, repetir) {
+  area.querySelector(":scope > .master-load-notice")?.remove();
+  if (!carregando && !erro && carregou) return true;
+  const aviso = criar("div", "master-empty master-load-notice");
+  aviso.setAttribute("role", erro ? "alert" : "status");
+  aviso.append(criar("p", "", carregando ? "Carregando dados…" : erro || "Informe a chave do mestre para carregar os dados."));
+  if (erro && repetir) {
+    const botao = botaoDeAcao("recarregar", "Tentar novamente");
+    botao.addEventListener("click", repetir);
+    aviso.append(botao);
+  }
+  if (!carregou) area.replaceChildren(aviso);
+  else {
+    aviso.append(criar("p", "rpg-hint", "Os dados anteriores continuam visíveis."));
+    area.prepend(aviso);
+  }
+  return carregou;
+}
+
+window.addEventListener("beforeunload", (evento) => {
+  if (![...editoresProtegidos.keys()].some(editorMestreAlterado) && !mutacoesEmAndamento.size) return;
+  evento.preventDefault();
+  evento.returnValue = "";
+});
 
 function novoAcaoId() {
   return `acao_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function pedirAoServidor(evento, dados = {}, { muda = false, acaoId = null, silencioso = false, tempoLimiteMs = TEMPO_LIMITE_PEDIDO_MS } = {}) {
+  const chave = JSON.stringify([evento, dados]);
+  if (muda && mutacoesEmAndamento.has(chave)) return mutacoesEmAndamento.get(chave);
   const corpo = { ...dados, token: tokenDoMestre() };
   const id = muda ? acaoId || novoAcaoId() : null;
   if (id) corpo.acaoId = id;
 
-  return new Promise((resolver, rejeitar) => {
+  const pedido = new Promise((resolver, rejeitar) => {
     const falhar = (codigo, mensagem) => {
       if (!silencioso) toast(mensagem, "error");
       const erro = new Error(mensagem);
@@ -189,21 +333,33 @@ function pedirAoServidor(evento, dados = {}, { muda = false, acaoId = null, sile
       return;
     }
     socket.timeout(tempoLimiteMs).emit(evento, corpo, (erro, resposta) => {
-      if (erro) return falhar("tempo_esgotado", "O servidor não respondeu a tempo.");
+      if (erro) return falhar("tempo_esgotado", muda
+        ? "Resultado ainda não confirmado. Atualize os dados antes de repetir: a ação pode ter sido concluída."
+        : "O servidor não respondeu a tempo.");
       if (!resposta?.ok) return falhar(resposta?.erro || "erro", resposta?.mensagem || "O servidor recusou o pedido.");
       resolver(resposta.dados);
     });
   });
+  if (!muda) return pedido;
+  const protegido = pedido.finally(() => mutacoesEmAndamento.delete(chave));
+  mutacoesEmAndamento.set(chave, protegido);
+  return protegido;
 }
 
 // Entra na sala que recebe os dados do mestre em tempo real. Devolve a resposta, ou null se não deu.
 async function entrarNaSalaDoMestre({ silencioso = true } = {}) {
-  if (!tokenDoMestre()) return null;
+  if (!tokenDoMestre()) {
+    definirAvisoMestre("Informe a chave do mestre para carregar e gerenciar os dados da campanha.");
+    return null;
+  }
+  definirAvisoMestre("Verificando acesso à campanha…");
   try {
     const resposta = await pedirAoServidor("master_entrar", {}, { silencioso });
+    definirAvisoMestre("Acesso autorizado · Dados da campanha sincronizados em tempo real.", "success");
     (resposta?.avisos || []).forEach((aviso) => toast(aviso, "error"));
     return resposta;
-  } catch {
+  } catch (erro) {
+    definirAvisoMestre(erro.message || "Não foi possível acessar a campanha. Confira a chave e a conexão.", "error");
     return null;
   }
 }
@@ -221,10 +377,22 @@ const semAcento = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036
 
 // Botão de ação de um cartão (<button type="button" data-acao="...">) no estilo padrão do painel.
 function botaoDeAcao(acao, texto, classes = "") {
-  const b = criar("button", `px-2 py-1 rounded text-[11px] font-mono border border-dungeon-700 ${classes}`, texto);
+  const b = criar("button", `master-action px-2 py-1 rounded text-[11px] font-mono border border-dungeon-700 ${classes}`, texto);
   b.type = "button";
   b.dataset.acao = acao;
   return b;
+}
+
+// Só apresentação: mantém o formulário e a resposta do servidor sob os mesmos contratos.
+function marcarEnvioMestre(id, enviando) {
+  const botao = campo(id);
+  if (!botao) return;
+  const editor = botao.closest("#habmag-editor, #loot-editor-item, #loot-editor-bau");
+  if (editor) bloquearCamposEnvioMestre(editor.id, enviando);
+  if (enviando) botao.dataset.rotuloOriginal = botao.textContent;
+  botao.disabled = enviando;
+  botao.setAttribute("aria-busy", String(enviando));
+  botao.textContent = enviando ? "Salvando…" : botao.dataset.rotuloOriginal || "Salvar";
 }
 
 // Ação destrutiva com confirmação no próprio botão: o 1º clique vira "Confirmar?" (volta ao normal em 4 s); o 2º executa.
@@ -261,25 +429,49 @@ function toast(mensagem, tipo = "info") {
   if (!container) {
     container = document.createElement("div");
     container.id = "toast-container";
-    container.className = "fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none";
+    container.className = "master-toasts";
     document.body.appendChild(container);
   }
   const toastEl = document.createElement("div");
-  const borderCol = tipo === "success" ? "border-emerald-500 text-emerald-300" : "border-rose-600 text-rose-300";
-  toastEl.className = `p-3 rounded-lg bg-dungeon-950 border-l-4 ${borderCol} shadow-2xl text-xs font-mono flex items-center gap-2 transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+  toastEl.className = "master-toast";
+  toastEl.dataset.tipo = tipo;
+  toastEl.setAttribute("role", tipo === "error" ? "alert" : "status");
   const texto = document.createElement("span");
   texto.textContent = mensagem;
   toastEl.appendChild(texto);
+  const fechar = criar("button", "master-toast-close", "×");
+  fechar.type = "button";
+  fechar.setAttribute("aria-label", "Dispensar aviso");
+  fechar.addEventListener("click", () => toastEl.remove());
+  toastEl.appendChild(fechar);
   container.appendChild(toastEl);
-  setTimeout(() => toastEl.classList.remove("translate-y-2", "opacity-0"), 10);
-  setTimeout(() => {
-    toastEl.classList.add("opacity-0", "-translate-y-2");
-    setTimeout(() => toastEl.remove(), 300);
-  }, 2400);
+  while (container.children.length > 4) container.firstElementChild.remove();
+  if (tipo !== "error") setTimeout(() => toastEl.remove(), 6000);
 }
 
 /* ------------------------------ início ------------------------------ */
 window.addEventListener("DOMContentLoaded", () => {
   montarCabecalho();
+  document.querySelectorAll('[role="tablist"]').forEach((lista) => {
+    const abas = [...lista.querySelectorAll("button")];
+    abas.forEach((aba) => aba.setAttribute("role", "tab"));
+    lista.addEventListener("keydown", (ev) => {
+      const indice = abas.indexOf(document.activeElement);
+      if (indice < 0 || !["ArrowRight", "ArrowLeft", "Home", "End"].includes(ev.key)) return;
+      ev.preventDefault();
+      const proximo = ev.key === "Home" ? 0 : ev.key === "End" ? abas.length - 1
+        : (indice + (ev.key === "ArrowRight" ? 1 : -1) + abas.length) % abas.length;
+      abas[proximo].focus();
+      abas[proximo].click();
+    });
+  });
+  document.querySelectorAll("i.fa-solid").forEach((icone) => icone.setAttribute("aria-hidden", "true"));
+  document.addEventListener("keydown", (ev) => {
+    const painelChave = document.querySelector(".master-credentials[open]");
+    if (ev.key === "Escape" && painelChave) {
+      painelChave.removeAttribute("open");
+      painelChave.querySelector("summary")?.focus();
+    }
+  });
   socket.connect(); // por último: a página (e o seu script) já registraram os eventos
 });

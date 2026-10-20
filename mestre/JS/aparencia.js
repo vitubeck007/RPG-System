@@ -1,0 +1,74 @@
+/* Seletores visuais dos editores. Os campos icon/color e os payloads continuam iguais. */
+const ICONES_APARENCIA_MESTRE = [
+  ['', 'Padrão'], ['fa-khanda', 'Arma'], ['fa-shield-halved', 'Defesa'],
+  ['fa-flask', 'Poção'], ['fa-fire', 'Fogo'], ['fa-bolt', 'Energia'],
+  ['fa-wand-magic-sparkles', 'Magia'], ['fa-book', 'Livro'], ['fa-gem', 'Tesouro'],
+  ['fa-leaf', 'Natureza'], ['fa-skull', 'Sombrio'], ['fa-bag-shopping', 'Bolsa'],
+];
+const CORES_APARENCIA_MESTRE = [
+  ['', 'Padrão', '#1c2836', '#141d28'],
+  ['from-slate-800 to-slate-900', 'Cinza ardósia', '#1e293b', '#0f172a'],
+  ['from-amber-900 to-amber-950', 'Âmbar', '#78350f', '#451a03'],
+  ['from-red-900 to-red-950', 'Vermelho', '#7f1d1d', '#450a0a'],
+  ['from-emerald-900 to-emerald-950', 'Verde', '#064e3b', '#022c22'],
+  ['from-sky-900 to-sky-950', 'Azul', '#0c4a6e', '#082f49'],
+  ['from-violet-900 to-violet-950', 'Violeta', '#4c1d95', '#2e1065'],
+];
+const editoresAparenciaMestre = new Map();
+
+function atualizarAparenciaMestre(prefixo) {
+  let atualizar = editoresAparenciaMestre.get(prefixo);
+  if (!atualizar) {
+    const area = document.getElementById(`${prefixo}-aparencia`);
+    if (!area) return;
+    const visual = area.querySelector('[data-aparencia-visual]');
+    const icone = document.getElementById(`${prefixo}-icon`);
+    const cor = document.getElementById(`${prefixo}-color`);
+    const nome = document.getElementById(prefixo === 'li' ? 'li-name' : 'hm-nome');
+    const pares = [];
+    const seletor = (campo, opcoes, rotulo, sufixo) => {
+      const label = criar('label', '', rotulo);
+      const select = criar('select'); select.id = `${prefixo}-${sufixo}`;
+      for (const [valor, texto] of opcoes) select.add(new Option(texto, valor));
+      select.add(new Option('Personalizado (Avançado)', '__personalizado__'));
+      select.addEventListener('change', () => {
+        if (select.value === '__personalizado__') {
+          area.querySelector('details').open = true; atualizar(); campo.focus();
+          return;
+        }
+        campo.value = select.value;
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      label.append(select); visual.append(label); pares.push({ campo, select, opcoes });
+      campo.addEventListener('input', () => atualizar());
+      return select;
+    };
+    const selectIcone = seletor(icone, ICONES_APARENCIA_MESTRE, 'Ícone', 'icone-visual');
+    if (cor) seletor(cor, CORES_APARENCIA_MESTRE, 'Cor da peça na mochila', 'cor-visual');
+    const previa = criar('div', 'master-appearance-preview');
+    previa.id = `${prefixo}-aparencia-previa`;
+    previa.setAttribute('role', 'img');
+    visual.append(previa);
+    atualizar = () => {
+      // Abrir uma entrada antiga nunca substitui automaticamente um valor personalizado.
+      for (const { campo, select, opcoes } of pares) {
+        select.value = opcoes.some(([valor]) => valor === campo.value) ? campo.value : '__personalizado__';
+      }
+      const corEscolhida = CORES_APARENCIA_MESTRE.find(([valor]) => valor === cor?.value);
+      const rotuloCor = cor ? (corEscolhida?.[1] || 'Personalizada (prévia neutra)') : '';
+      const rotuloIcone = ICONES_APARENCIA_MESTRE.find(([valor]) => valor === icone.value)?.[1] || 'Personalizado';
+      previa.style.background = corEscolhida ? `linear-gradient(135deg, ${corEscolhida[2]}, ${corEscolhida[3]})` : 'var(--rpg-bg)';
+      previa.replaceChildren();
+      const desenho = criar('i'); desenho.setAttribute('aria-hidden', 'true');
+      const classeIcone = /^[a-z0-9-]{1,40}$/i.test(icone.value) ? icone.value : (prefixo === 'li' ? 'fa-box-open' : 'fa-bolt');
+      desenho.className = `fa-solid ${classeIcone}`;
+      previa.append(desenho, criar('span', '', nome.value.trim() || 'Prévia'), criar('small', '', [rotuloIcone, rotuloCor].filter(Boolean).join(' · ')));
+      previa.setAttribute('aria-label', `Prévia de ${nome.value.trim() || 'nova entrada'}: ícone ${rotuloIcone}${cor ? `, cor ${rotuloCor}` : ''}`);
+      // O select já anuncia a escolha. A prévia não interrompe a digitação do nome.
+      selectIcone.title = `Ícone: ${rotuloIcone}`;
+    };
+    nome.addEventListener('input', atualizar);
+    editoresAparenciaMestre.set(prefixo, atualizar);
+  }
+  atualizar();
+}

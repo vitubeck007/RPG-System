@@ -71,7 +71,7 @@ if (!fs.existsSync(PLAYERS_PATH)) {
 }
 
 // Dados do mestre (inimigos, NPCs, baús, batalha): pasta campanha/, com backup ao ligar.
-const campanha = criarCampanha(path.join(__dirname, "campanha"), { pastaCatalogo: path.join(__dirname, "catalogo") });
+const campanha = criarCampanha(path.join(__dirname, "campanha"), { pastaCatalogo: path.join(__dirname, "catalogo"), pastaFigurantes: path.join(__dirname, "Figurante") });
 campanha.iniciar();
 // Convenção dos eventos master_* novos (token, formato, acaoId, resposta {ok, erro, dados}).
 const comandos = criarComandos({ senhaMestre: SENHA_MESTRE });
@@ -315,6 +315,42 @@ app.post("/api/personagens", (req, res) => {
   }
 });
 
+app.delete("/api/personagens/:nomePasta", (req, res) => {
+  const player = obterPlayerAutenticado(req);
+  if (!player) return res.status(401).json({ success: false, message: "Sessão inválida." });
+  const { nomePasta } = req.params;
+  if (!nomePastaValido(nomePasta)) {
+    return res.status(400).json({ success: false, message: "Pasta de personagem inválida." });
+  }
+  try {
+    // Resolve e confere o destino antes da remoção recursiva, inclusive links/junções no Windows.
+    const raiz = fs.realpathSync(PLAYERS_PATH);
+    const pastaJogador = path.resolve(raiz, player);
+    const alvo = path.resolve(pastaJogador, nomePasta);
+    if (path.dirname(pastaJogador) !== raiz || path.dirname(alvo) !== pastaJogador ||
+        fs.realpathSync(pastaJogador) !== pastaJogador ||
+        !fs.lstatSync(alvo).isDirectory() || fs.realpathSync(alvo) !== alvo) {
+      return res.status(400).json({ success: false, message: "Pasta de personagem inválida." });
+    }
+    fs.rmSync(alvo, { recursive: true, maxRetries: 3, retryDelay: 100 });
+    for (const socket of io.sockets.sockets.values()) {
+      if (socket.data.personagem?.player === player && socket.data.personagem.nomePasta === nomePasta) {
+        delete socket.data.personagem;
+        socket.emit("personagem_erro", { message: "Este personagem foi excluído." });
+        socket.disconnect(true);
+      }
+    }
+    console.log(`[PERSONAGEM] ${player} | Excluído: ${nomePasta} | Pasta removida.`);
+    return res.json({ success: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return res.status(404).json({ success: false, message: "Personagem não encontrado." });
+    }
+    console.error(`Erro ao excluir personagem de ${player}:`, error);
+    return res.status(500).json({ success: false, message: "Erro ao excluir personagem." });
+  }
+});
+
 //=============================== CATÁLOGO GLOBAL (Sprint 5) ==================================//
 // Arquivos catalogo/magias.json e catalogo/habilidades.json: { schemaVersion, items: [{ id, nome, ... }] }.
 // O catálogo é editado pelo mestre (Sprint 2) e vive no armazém (campanha.js). A ficha só enxerga as
@@ -535,12 +571,15 @@ for (const [rota, { arquivo, protegida }] of Object.entries(PAGINAS)) {
 const PAGINAS_MESTRE = {
   "/mestre": "index.html",
   "/mestre/rolagem": "rolagem.html",
-  "/mestre/inimigos": "inimigos.html",
-  "/mestre/npc": "npc.html",
+  "/mestre/figurantes": "figurantes.html",
+  "/mestre/inimigos": "figurantes.html",
+  "/mestre/npc": "figurantes.html",
   "/mestre/loot": "loot.html",
   "/mestre/habilidades-magias": "habilidades-magias.html",
 };
 app.use("/mestre", verificarAcessoMestre);
+app.get(["/mestre/inimigos.html", "/mestre/npc.html"], (req, res) =>
+  res.redirect(req.path.endsWith("/npc.html") ? "/mestre/npc" : "/mestre/figurantes"));
 for (const [rota, arquivo] of Object.entries(PAGINAS_MESTRE)) {
   app.get(rota, (req, res) => res.sendFile(path.join(__dirname, "mestre", arquivo)));
 }
@@ -1036,15 +1075,15 @@ io.on("connection", (socket) => {
   };
   // NPC: campos que o editor não enviou continuam como estão no servidor (uma aba com cópia velha não desfaz
   // o HP ajustado em outra aba).
-  const prepararNpc = (item) => {
+  const prepararFigurante = (tipo, item) => {
     if (!personagemModelo.ehObjeto(item) || !personagemModelo.ehIdSeguro(item.id)) return item;
-    const atual = campanha.ver("npcs").find((n) => n.id === item.id);
+    const atual = campanha.ver(tipo).find((n) => n.id === item.id);
     return atual ? { ...atual, ...item } : item;
   };
   comandos.registrar(
     socket,
     "master_campanha_salvar",
-    ({ tipo, item }) => campanha.salvarItem(tipo, tipo === "baus" ? prepararBau(item) : tipo === "npcs" ? prepararNpc(item) : item),
+    ({ tipo, item }) => campanha.salvarItem(tipo, tipo === "baus" ? prepararBau(item) : ["npcs", "inimigos"].includes(tipo) ? prepararFigurante(tipo, item) : item),
     { mudaEstado: true },
   );
 
@@ -1074,6 +1113,33 @@ io.on("connection", (socket) => {
     async ({ tipo, id }) => ({ removido: await campanha.removerItem(tipo, id) }),
     { mudaEstado: true },
   );
+
+  // Energia é controlada por delta na mesma fila do HP. Usar um poder cobra o custo que está no
+  // servidor, nunca o valor enviado pelo navegador; uma reserva insuficiente não é consumida.
+  const alterarEnergiaFigurante = async ({ tipo, id, delta, lista, indice, nome }, usarPoder = false) => {
+    if (!["npcs", "inimigos", "batalha"].includes(tipo) || !personagemModelo.ehIdSeguro(id)) {
+      throw new ErroCampanha("alvo_invalido", "Figurante inválido.");
+    }
+    let energia;
+    await campanha.atualizar(tipo, (dados) => {
+      const alvo = (tipo === "batalha" ? dados.combatentes : dados).find((x) => (tipo === "batalha" ? x.alvoId : x.id) === id);
+      if (!alvo) throw new ErroCampanha("alvo_inexistente", "Esse figurante não existe mais.");
+      if (usarPoder) {
+        if (!["habilidades", "magias"].includes(lista) || !Number.isInteger(indice)) throw new ErroCampanha("poder_invalido", "Poder inválido.");
+        const poder = alvo[lista]?.[indice];
+        if (!poder || poder.nome !== nome || poder.cost?.vital !== "vigor") throw new ErroCampanha("poder_invalido", "O poder mudou. Atualize a página.");
+        delta = -poder.cost.amount;
+      }
+      if (!Number.isInteger(delta) || Math.abs(delta) > MAX_VITAL) throw new ErroCampanha("valor_invalido", "Valor de energia inválido.");
+      if (usarPoder && alvo.energia.atual + delta < 0) throw new ErroCampanha("energia_insuficiente", "Energia insuficiente para usar esse poder.");
+      alvo.energia.atual = Math.max(0, Math.min(alvo.energia.max, alvo.energia.atual + delta));
+      energia = { ...alvo.energia };
+    });
+    console.log(`[FIGURANTE] ${tipo} | ${id} | Energia ${energia.atual}/${energia.max}${usarPoder ? ` | Usou: ${nome}` : ""}`);
+    return { energia };
+  };
+  comandos.registrar(socket, "master_figurante_energia", (dados) => alterarEnergiaFigurante(dados), { mudaEstado: true });
+  comandos.registrar(socket, "master_figurante_usar_poder", (dados) => alterarEnergiaFigurante(dados, true), { mudaEstado: true });
 
   // ---- Entregas (Sprint 2): o mestre deixa na caixa do personagem; a própria ficha aplica ----
   // A ficha pede as entregas pendentes DEPOIS de montar a tela (a partir daí recebe as novas na hora).

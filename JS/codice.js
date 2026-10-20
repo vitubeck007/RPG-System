@@ -58,11 +58,34 @@ const CODICE_TIPOS = {
 // Estado só da interface (não é salvo).
 const CODICE_UI = {
   tipo: "habilidades", // sub-aba aberta
+  filtro: "todos", // só apresentação; o tipo de criação continua explícito no editor
   modo: "catalogo", // modo do modal: "catalogo" | "criar"
   catalogo: { habilidades: null, magias: null }, // cache: lista ou null
   carregando: false,
   erroCatalogo: "",
+  rascunhos: {}, formularioTipo: null, editando: null,
 };
+const CAMPOS_RASCUNHO_CODICE = ["nome", "dados", "dano", "acao", "alcance", "desc", "custo-vital", "custo-valor", "icone"];
+function guardarRascunhoCodice() {
+  if (CODICE_UI.editando || CODICE_UI.modo !== "criar" || !CODICE_UI.formularioTipo) return;
+  CODICE_UI.rascunhos[CODICE_UI.formularioTipo] = Object.fromEntries(CAMPOS_RASCUNHO_CODICE.map(nome =>
+    [nome, document.getElementById(`codice-f-${nome}`)?.value || ""]));
+}
+function restaurarRascunhoCodice() {
+  limparFormularioCodice();
+  const rascunho = CODICE_UI.rascunhos[CODICE_UI.tipo];
+  if (rascunho) CAMPOS_RASCUNHO_CODICE.forEach(nome => {
+    const campo = document.getElementById(`codice-f-${nome}`);
+    if (campo) campo.value = rascunho[nome] ?? "";
+  });
+  CODICE_UI.formularioTipo = CODICE_UI.tipo;
+}
+function temRascunhoPoder() {
+  if (CODICE_UI.editando && CODICE_UI.editando.assinatura !== assinaturaFormularioCodice()) return true;
+  guardarRascunhoCodice();
+  return Object.values(CODICE_UI.rascunhos).some(r => r &&
+    (["nome", "dados", "dano", "acao", "alcance", "desc", "custo-vital"].some(nome => r[nome]?.trim()) || Number(r["custo-valor"]) > 0));
+}
 
 function ehEntradaCodice(entrada) {
   return entrada && typeof entrada === "object" && !Array.isArray(entrada);
@@ -96,25 +119,49 @@ function renderizarCodice() {
 
 function atualizarSubAbasCodice() {
   Object.entries(CODICE_TIPOS).forEach(([tipo, cfg]) => {
-    const ativo = tipo === CODICE_UI.tipo;
+    const ativo = tipo === CODICE_UI.filtro;
     const botao = document.getElementById(`codice-sub-${tipo}`);
     if (botao) {
       const total = listaCodice(tipo).filter(ehEntradaCodice).length;
       botao.textContent = `${cfg.plural} (${total})`;
-      botao.className = `px-3 py-1.5 text-xs font-cinzel font-bold rounded-lg border transition ${
-        ativo ? CLASSE_BOTAO_ATIVO : CLASSE_BOTAO_INATIVO
-      }`;
+      botao.className = "rpg-tab";
+      botao.setAttribute("aria-pressed", String(ativo));
     }
-    document.getElementById(cfg.container)?.classList.toggle("hidden", !ativo);
+    const visivel = ativo || CODICE_UI.filtro === "todos";
+    document.getElementById(cfg.container)?.classList.toggle("hidden", !visivel);
+    document.getElementById(`codice-secao-${tipo}`)?.classList.toggle("hidden", !visivel);
   });
+  const todos = document.getElementById("codice-sub-todos");
+  if (todos) {
+    todos.textContent = `Todos (${listaCodice("habilidades").length + listaCodice("magias").length})`;
+    todos.setAttribute("aria-pressed", String(CODICE_UI.filtro === "todos"));
+  }
   const rotuloCriar = document.getElementById("codice-btn-criar-rotulo");
-  if (rotuloCriar) rotuloCriar.textContent = CODICE_TIPOS[CODICE_UI.tipo].novaRotulo;
+  if (rotuloCriar) rotuloCriar.textContent = CODICE_UI.filtro === "todos" ? "Criar poder" : CODICE_TIPOS[CODICE_UI.tipo].novaRotulo;
 }
 
 function trocarSubAbaCodice(tipo) {
-  if (!CODICE_TIPOS[tipo]) return;
-  CODICE_UI.tipo = tipo;
+  if (tipo !== "todos" && !Object.hasOwn(CODICE_TIPOS, tipo)) return;
+  CODICE_UI.filtro = tipo;
+  if (tipo !== "todos") CODICE_UI.tipo = tipo;
   renderizarCodice();
+}
+
+function definirTipoEdicaoCodice(tipo) {
+  if (CODICE_UI.editando) return;
+  if (!Object.hasOwn(CODICE_TIPOS, tipo)) return;
+  guardarRascunhoCodice();
+  CODICE_UI.tipo = tipo;
+  const seletor = document.getElementById("codice-tipo-entrada");
+  if (seletor) seletor.value = tipo;
+  if (CODICE_UI.filtro !== "todos") CODICE_UI.filtro = tipo;
+  atualizarSubAbasCodice();
+  const cfg = CODICE_TIPOS[tipo];
+  const titulo = document.querySelector("#codice-modal-titulo span");
+  if (titulo) titulo.textContent = CODICE_UI.modo === "catalogo" ? `Catálogo de ${cfg.plural}` : cfg.novaRotulo;
+  // Trocar o tipo não limpa o texto que o jogador já digitou.
+  if (CODICE_UI.modo === "catalogo") carregarCatalogoCodice(tipo);
+  else CODICE_UI.formularioTipo = tipo;
 }
 
 function renderizarCartasCodice(tipo) {
@@ -148,6 +195,11 @@ function criarCartaCodice(tipo, hab) {
     "bg-dungeon-800/90 border border-dungeon-700 hover:border-amberGold-500/70 rounded-xl p-4 transition-all duration-200 flex flex-col justify-between shadow-lg group",
   );
   const conteudo = document.createElement("div");
+  card.classList.add("sheet-power-card");
+  card.dataset.tipo = tipo;
+  const identificador = elTexto("span", "sheet-power-tag", cfg.rotulo);
+  identificador.dataset.tipo = tipo;
+  conteudo.appendChild(identificador);
 
   const cabecalho = elTexto("div", "flex justify-between items-start gap-2");
   const titulo = elTexto(
@@ -155,6 +207,7 @@ function criarCartaCodice(tipo, hab) {
     "font-cinzel text-base font-bold text-amberGold-300 group-hover:text-amberGold-400 transition flex items-center gap-2",
   );
   const icone = document.createElement("i");
+  icone.setAttribute("aria-hidden", "true");
   const nomeIcone = /^[a-z0-9-]+$/i.test(hab.icon || "")
     ? hab.icon
     : cfg.iconePadrao;
@@ -213,6 +266,11 @@ function criarCartaCodice(tipo, hab) {
   );
 
   const acoes = elTexto("div", "flex items-center gap-2");
+  const editar = elTexto('button', 'rpg-btn rpg-btn--quiet', 'Editar');
+  editar.type = 'button';
+  editar.setAttribute('aria-label', `Editar ${nome} na sua ficha`);
+  editar.addEventListener('click', () => editarEntradaCodice(tipo, hab));
+  acoes.append(editar);
   acoes.appendChild(criarBotaoRemoverCodice(tipo, hab));
   if (hab.dice) {
     const botao = elTexto(
@@ -221,6 +279,7 @@ function criarCartaCodice(tipo, hab) {
     );
     botao.type = "button";
     const mais = document.createElement("i");
+    mais.setAttribute("aria-hidden", "true");
     mais.className = "fa-solid fa-plus-circle";
     botao.append(mais, document.createTextNode("Adicionar ao Combo"));
     botao.addEventListener("click", () =>
@@ -243,8 +302,10 @@ function criarBotaoRemoverCodice(tipo, hab) {
   const botao = elTexto("button", normal);
   botao.type = "button";
   botao.title = "Remover";
+  botao.setAttribute("aria-label", `Remover ${nomeDaEntradaCodice(hab, CODICE_TIPOS[tipo].rotulo)}`);
   const icone = document.createElement("i");
   icone.className = "fa-solid fa-trash";
+  icone.setAttribute("aria-hidden", "true");
   botao.append(icone);
 
   let timer = null;
@@ -326,18 +387,26 @@ function criarEntradaCodice() {
   if (dados && !CODICE_DADO.test(dados)) {
     return mostrarErro("Dados inválidos. Use o formato 2d6 ou 2d6+1.");
   }
-  if (codiceCheio(tipo)) return;
+  const edicao = CODICE_UI.editando;
+  if (!edicao && codiceCheio(tipo)) return;
+  const original = edicao && listaCodice(tipo).find(item => item === edicao.original || (item.uid && item.uid === edicao.original.uid));
+  if (edicao && !original) return mostrarErro('Esta entrada não está mais na ficha. Feche o editor e atualize.');
 
   const entrada = {
-    uid: novoUidCodice(),
+    ...(original || {}),
+    uid: original?.uid || novoUidCodice(),
     nome,
     icon: valor("codice-f-icone") || cfg.iconePadrao,
   };
+  // Só os campos expostos são substituídos; efeitos e metadados da cópia permanecem.
+  ['dice', 'tipoDano', 'acao', 'alcance', 'desc', 'descricao'].forEach(chave => delete entrada[chave]);
   if (dados) entrada.dice = dados;
   const dano = valor("codice-f-dano");
   if (dano) entrada.tipoDano = dano;
   const vital = valor("codice-f-custo-vital");
-  if (ROTULO_VITAL[vital]) {
+  const custoMudou = !edicao || edicao.custoInicial !== JSON.stringify([vital, valor('codice-f-custo-valor')]);
+  if (custoMudou) { delete entrada.cost; delete entrada.custo; }
+  if (custoMudou && ROTULO_VITAL[vital]) {
     const amount = Math.max(0, Math.min(999, Math.round(Number(valor("codice-f-custo-valor"))) || 0));
     entrada.cost = { vital, amount };
   }
@@ -348,28 +417,78 @@ function criarEntradaCodice() {
   const desc = valor("codice-f-desc");
   if (desc) entrada.desc = desc;
 
-  adicionarEntradaCodice(tipo, entrada);
+  if (edicao) {
+    cfg.definir(listaCodice(tipo).map(item => item === original ? entrada : item));
+    cfg.salvar(); renderizarCodice();
+    registrarNoTerminal(`${cfg.rotulo} editada na ficha`, { nome, uid: entrada.uid });
+    toast(`${cfg.rotulo} atualizada na sua ficha.`, 'info');
+  } else {
+    adicionarEntradaCodice(tipo, entrada);
+    delete CODICE_UI.rascunhos[tipo];
+  }
+  CODICE_UI.editando = null;
+  CODICE_UI.formularioTipo = null;
   fecharModalCodice();
 }
 
 /* ---------------------------------- modal ---------------------------------- */
+function assinaturaFormularioCodice() {
+  return JSON.stringify(CAMPOS_RASCUNHO_CODICE.map(nome => document.getElementById(`codice-f-${nome}`)?.value));
+}
+
+function editarEntradaCodice(tipo, entrada) {
+  if (!personagemCarregado) return;
+  guardarRascunhoCodice();
+  CODICE_UI.tipo = tipo;
+  abrirModalCodice('criar');
+  CODICE_UI.editando = { tipo, original: entrada };
+  const custo = custoDaEntrada(entrada);
+  const valores = { nome: nomeDaEntradaCodice(entrada, ''), dados: entrada.dice, dano: entrada.tipoDano,
+    acao: entrada.acao, alcance: entrada.alcance, desc: entrada.desc || entrada.descricao,
+    'custo-vital': custo.vital || '', 'custo-valor': entrada.cost?.amount || 0, icone: entrada.icon || CODICE_TIPOS[tipo].iconePadrao };
+  Object.entries(valores).forEach(([nome, valor]) => {
+    const campo = document.getElementById(`codice-f-${nome}`);
+    // Entradas legadas podem ter um ícone que não está entre as opções fixas.
+    if (campo.tagName === 'SELECT' && valor && ![...campo.options].some(o => o.value === String(valor))) campo.add(new Option(String(valor), String(valor)));
+    campo.value = valor ?? '';
+  });
+  CODICE_UI.editando.assinatura = assinaturaFormularioCodice();
+  CODICE_UI.editando.custoInicial = JSON.stringify([document.getElementById('codice-f-custo-vital').value, document.getElementById('codice-f-custo-valor').value]);
+  document.querySelector('#codice-modal-titulo span').textContent = `Editar ${CODICE_TIPOS[tipo].rotulo} da ficha`;
+  document.getElementById('codice-confirmar').textContent = 'Salvar alterações';
+  ['codice-tipo-entrada', 'codice-modo-catalogo', 'codice-modo-criar'].forEach(id => { document.getElementById(id).disabled = true; });
+}
+
 function abrirModalCodice(modo = "catalogo") {
   if (!personagemCarregado) {
     toast("Carregue um personagem antes de editar o grimório.", "error");
     return;
   }
   document.getElementById("codice-modal")?.classList.remove("hidden");
+  RPGUI.abrirModal("codice-modal", "codice-tipo-entrada");
   definirModoCodice(modo);
 }
 
 function fecharModalCodice() {
+  if (CODICE_UI.editando && CODICE_UI.editando.assinatura !== assinaturaFormularioCodice()
+    && !window.confirm('Descartar as alterações deste poder? Cancelar mantém a edição.')) return;
+  guardarRascunhoCodice();
+  if (CODICE_UI.editando) CODICE_UI.formularioTipo = null;
+  CODICE_UI.editando = null;
+  ['codice-tipo-entrada', 'codice-modo-catalogo', 'codice-modo-criar'].forEach(id => { document.getElementById(id).disabled = false; });
+  RPGUI.fecharModal("codice-modal");
   document.getElementById("codice-modal")?.classList.add("hidden");
 }
 
 function definirModoCodice(modo) {
+  if (CODICE_UI.editando) return;
+  guardarRascunhoCodice();
   CODICE_UI.modo = modo === "criar" ? "criar" : "catalogo";
   const cfg = CODICE_TIPOS[CODICE_UI.tipo];
   const noCatalogo = CODICE_UI.modo === "catalogo";
+  document.getElementById('codice-confirmar').textContent = 'Adicionar';
+  const tipoEntrada = document.getElementById("codice-tipo-entrada");
+  if (tipoEntrada) tipoEntrada.value = CODICE_UI.tipo;
 
   const titulo = document.querySelector("#codice-modal-titulo span");
   if (titulo) {
@@ -391,7 +510,7 @@ function definirModoCodice(modo) {
     renderizarResultadosCatalogo();
     setTimeout(() => document.getElementById("codice-busca")?.focus(), 0);
   } else {
-    limparFormularioCodice();
+    restaurarRascunhoCodice();
     setTimeout(() => document.getElementById("codice-f-nome")?.focus(), 0);
   }
 }

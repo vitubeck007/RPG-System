@@ -1,0 +1,201 @@
+/* Rodada visual 3: apresentação opt-in. Contratos, medidas da mochila e regras não mudam. */
+.master-app { background: var(--rpg-bg); color: var(--rpg-text); font-family: var(--rpg-font); }
+.master-app .hidden { display: none !important; }
+.master-app :where(main, section, article, form, fieldset, label, .grid, .flex) { min-width: 0; }
+.master-app .font-mono { font-family: var(--rpg-font); font-variant-numeric: tabular-nums; }
+.master-app .font-cinzel { font-family: var(--rpg-title); font-weight: 400; }
+.master-app :is(.text-xs, .text-\[11px\], .text-\[10px\]) { font-size: 13px; line-height: 1.55; }
+.master-app :is(.text-slate-500, .text-slate-600, .text-slate-400) { color: var(--rpg-muted); }
+.master-app :is(.text-amber-100, .text-amber-200, .text-amberGold-300, .text-amberGold-400) { color: var(--rpg-gold); }
+.master-app :is(.text-rose-300, .text-crimson-400) { color: var(--rpg-danger); }
+.master-app :is(.text-vigor-400) { color: var(--rpg-vigor); }
+.master-app :is(.text-sanity-400) { color: var(--rpg-sanity); }
+.master-app h2 { font-size: 25px; }
+.master-app h3 { font-size: 21px; }
+.master-app h4 { font-family: var(--rpg-title); font-size: 19px; font-weight: 400; line-height: 1.3; }
+.master-app :where(button, summary) { min-height: 44px; }
+.master-app button { border-radius: 8px; font-size: 14px; line-height: 1.4; padding: 9px 13px; transition: background .15s, border-color .15s; }
+.master-app button:not(:disabled):hover { border-color: var(--rpg-gold); }
+.master-app button.bg-amberGold-600, .master-app .fig-primario { background: var(--rpg-gold); color: var(--rpg-on-gold); border: 1px solid var(--rpg-gold); font-weight: 650; }
+.master-app button.fig-primario:hover, .master-app button.fig-primario:focus-visible,
+.master-app button.bg-amberGold-600:hover, .master-app button.bg-amberGold-600:focus-visible { background: #e1c88f; color: var(--rpg-on-gold); border-color: var(--rpg-gold); }
+.master-app .master-field-error { display: block; margin-top: 6px; color: var(--rpg-danger); font-size: 13px; line-height: 1.5; }
+.master-app [aria-invalid="true"] { border-color: var(--rpg-danger); }
+.master-appearance { padding: 12px; border: 1px solid var(--rpg-line); border-radius: 8px; }
+.master-appearance-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; align-items: start; }
+.master-appearance label { display: grid; gap: 6px; font-size: 14px; }
+.master-appearance-preview { grid-column: 1 / -1; min-height: 76px; padding: 12px; border: 1px solid var(--rpg-line); border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 12px; align-items: center; color: #f1f5f9; overflow-wrap: anywhere; }
+.master-appearance-preview > i { grid-row: span 2; font-size: 25px; text-align: center; }
+.master-appearance-preview > small { grid-column: 2; font-size: 13px; }
+.master-appearance details { margin-top: 10px; }
+.master-appearance summary { cursor: pointer; display: flex; align-items: center; color: var(--rpg-gold); }
+.master-appearance summary::after { content: '+'; margin-left: auto; padding-left: 8px; }
+.master-appearance details[open] > summary::after { content: '−'; }
+.master-appearance details[open] { display: grid; gap: 10px; }
+.master-target-label { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; grid-column: 1 / -1; }
+.master-app #atk-alvos > div[data-marcado="true"] { border-color: var(--rpg-gold); background: var(--rpg-gold-soft); }
+.master-app button.bg-rose-600 { color: var(--rpg-danger); background: var(--rpg-danger-soft); border: 1px solid #78505b; }
+.master-app button[aria-selected="true"] { color: var(--rpg-gold); background: var(--rpg-gold-soft); border-color: var(--rpg-gold); }
+.master-app :is(input:not([type="checkbox"]), select, textarea) { min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--rpg-line); border-radius: 8px; padding: 10px 12px; background: var(--rpg-bg); color: var(--rpg-text); font-size: 16px; line-height: 1.4; }
+.master-app :where(textarea) { resize: vertical; min-height: 90px; }
+.master-app :where(input, textarea)::placeholder { color: #899bac; opacity: 1; }
+.master-app input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--rpg-gold); margin: 0; }
+.master-app label:has(> input[type="checkbox"]) { min-height: 44px; }
+.master-app :where(label:not(:has(> input[type="checkbox"]))) { line-height: 1.5; }
+.master-app :where(.truncate) { white-space: normal; text-overflow: clip; overflow-wrap: anywhere; }
+.master-app :where(.shadow-xl, .shadow-2xl, .shadow-lg) { box-shadow: none; }
+.master-app :where(section.bg-dungeon-900) { background: var(--rpg-surface); border-color: var(--rpg-line); padding: 22px; border-radius: 12px; }
+.master-header { background: var(--rpg-surface); border-bottom: 1px solid var(--rpg-line); }
+.master-header-inner { max-width: 1280px; margin: auto; padding: 20px 32px 12px; display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; }
+.master-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.master-heading h1 { font-size: 29px; margin-top: 4px; }
+.master-heading .rpg-eyebrow { font-size: 10px; letter-spacing: .12em; }
+.master-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.master-connection { display: inline-flex; align-items: center; gap: 8px; color: var(--rpg-muted); font-size: 12px; }
+.master-connection-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rpg-gold); }
+.master-connection[data-estado="online"] { color: var(--rpg-success); }
+.master-connection[data-estado="online"] .master-connection-dot { background: var(--rpg-success); }
+.master-connection[data-estado="offline"] { color: var(--rpg-danger); }
+.master-connection[data-estado="offline"] .master-connection-dot { background: var(--rpg-danger); }
+.master-credentials { position: relative; }
+.master-credentials summary { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--rpg-line); border-radius: 8px; color: var(--rpg-text); font-size: 13px; cursor: pointer; list-style: none; }
+.master-credentials summary::after { content: "+"; color: var(--rpg-gold); font-size: 19px; }
+.master-credentials[open] summary::after { content: "−"; }
+.master-credentials-panel { position: absolute; top: calc(100% + 8px); right: 0; width: min(320px, calc(100vw - 32px)); padding: 20px; background: var(--rpg-raised); border: 1px solid var(--rpg-line); border-radius: 12px; z-index: 45; box-shadow: 0 12px 36px #0008; }
+.master-credentials-panel label { display: block; font-size: 13px; margin-bottom: 8px; }
+.master-credentials-panel input { width: 100%; }
+.master-credentials-panel p { font-size: 12px; color: var(--rpg-muted); margin-top: 10px; }
+.master-nav { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--rpg-line); }
+.master-nav-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 15px; color: var(--rpg-muted) !important; text-decoration: none; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+.master-nav-link:hover { background: var(--rpg-raised); color: var(--rpg-text) !important; }
+.master-nav-short { display: none; }
+.master-app .master-catalog-card h4 { font-size: 21px; }
+.master-nav-link[aria-current="page"] { background: var(--rpg-gold-soft); color: var(--rpg-gold) !important; box-shadow: inset 0 -2px var(--rpg-gold); }
+.master-notice { grid-column: 1 / -1; color: var(--rpg-muted); font-size: 12px; line-height: 1.5; }
+.master-notice[data-estado="error"] { color: var(--rpg-danger); border-left: 3px solid var(--rpg-danger); padding-left: 10px; }
+.master-notice[data-estado="success"] { color: var(--rpg-success); }
+.master-main { max-width: 1280px; width: 100%; margin: 28px auto 0; padding: 0 32px 48px; flex: 1; }
+.master-main > .master-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--rpg-line); }
+.master-main :where([role="tablist"]) { flex-wrap: wrap; }
+.master-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.master-filters input { flex: 1 1 220px; width: 100%; }
+.master-filters select { flex: 1 1 150px; width: 100%; }
+.master-filters button { flex: 0 0 auto; }
+.master-catalog-card { display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--rpg-bg); border: 1px solid var(--rpg-line); border-radius: 10px; }
+.master-catalog-card > :last-child { margin-top: auto; padding-top: 8px; }
+.master-catalog-card > :first-child { flex-wrap: wrap; }
+.master-empty { grid-column: 1 / -1; padding: 28px 16px; color: var(--rpg-muted); text-align: center; border: 1px dashed var(--rpg-line); border-radius: 10px; }
+.master-action[data-acao="excluir"], .master-action[data-acao="remover-linha"] { color: var(--rpg-danger); }
+.master-action[data-confirmar="1"] { background: var(--rpg-danger-soft); border-color: var(--rpg-danger); }
+.master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) { border-top: 3px solid var(--rpg-gold); }
+.master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) h3 { color: var(--rpg-gold); margin-bottom: 14px; }
+.master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) label > :where(input:not([type="checkbox"]), textarea, span, select) { margin-top: 6px; }
+.master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) > div:last-child { flex-wrap: wrap; gap: 10px; }
+.master-app #habmag-enviar { border-left: 3px solid var(--rpg-gold); }
+.master-app #habmag-enviar h3 { font-size: 21px; }
+.master-app #habmag-enviar select { width: 100%; }
+.master-app #habmag-enviar p { margin-top: 10px; }
+.master-app #hm-custo-vital { width: 100%; flex: 1; }
+.master-app #hm-custo-valor { width: 75px; flex: 0 0 75px; }
+.master-app #lb-item { width: 100%; flex: 1 1 100%; }
+.master-app #lb-item + input { flex: 1; }
+.master-app #loot-editor-bau > div.flex { flex-wrap: wrap; }
+.master-app #lb-linhas > div { display: grid; grid-template-columns: minmax(0, 1fr) 76px 44px; gap: 8px; }
+.master-app #lb-linhas button { padding: 8px; }
+.master-app #loot-baus > section:first-child > div:first-child { flex-wrap: wrap; gap: 14px; }
+.master-app #rol-componentes > div { display: grid; grid-template-columns: minmax(0, 1fr) 112px 44px; gap: 8px; }
+.master-app #rol-componentes input { width: 100%; padding: 10px 8px; }
+.master-app #rol-componentes button { padding: 8px; }
+.master-app #rol-resultado > :first-child { color: var(--rpg-gold); font-size: 30px; font-variant-numeric: tabular-nums; }
+.master-app #rol-historico, .master-app #atk-alvos, .master-app #rolls-feed-container { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.master-app #atk-alvos > div[data-alvo-id] { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 12px; }
+.master-app #atk-alvos [data-campo="mult"] { grid-column: 3; grid-row: 2; width: 78px; }
+.master-app #atk-alvos [data-previa] { grid-column: 1 / -1; white-space: normal; color: var(--rpg-gold); font-size: 13px; padding-top: 8px; border-top: 1px solid var(--rpg-line); }
+.master-app #players-cards-container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.master-app #players-cards-container > div { min-width: 0; }
+.master-app #players-cards-container h3 { max-width: none; font-size: 22px; }
+.master-player-vital > div:first-child { flex-wrap: wrap; gap: 6px; }
+.master-player-vital > div:first-child > span:last-child { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.master-app #players-cards-container .justify-end { flex-wrap: wrap; }
+.master-app .master-skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.master-skills > div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--rpg-line); padding: 8px 0; }
+.master-skills > div > span:last-child { font-size: 20px; }
+.master-app #rolls-feed-container > div { border-color: var(--rpg-line); }
+.master-app #rolls-feed-container .text-2xl { font-size: 30px; font-variant-numeric: tabular-nums; }
+.master-app #rolls-feed-container .text-right { flex-shrink: 0; }
+.master-toasts { position: fixed; top: 16px; right: 16px; z-index: 120; width: min(380px, calc(100vw - 32px)); display: grid; gap: 10px; pointer-events: none; }
+.master-toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px 14px 16px; border: 1px solid var(--rpg-line); border-left: 3px solid var(--rpg-gold); border-radius: 10px; background: var(--rpg-raised); color: var(--rpg-text); box-shadow: 0 12px 32px #0006; font-size: 14px; }
+.master-toast > span { flex: 1; padding-top: 4px; }
+.master-toast[data-tipo="error"] { border-left-color: var(--rpg-danger); }
+.master-toast[data-tipo="success"] { border-left-color: var(--rpg-success); }
+.master-app .master-toast-close { min-width: 44px; background: transparent; color: var(--rpg-muted); border: 1px solid var(--rpg-line); padding: 6px; font-size: 22px; }
+
+/* Os três diálogos de Figurantes mantêm layout, empilhamento e lógica aprovados. */
+.master-app :where(.fig-eyebrow) { color: var(--rpg-gold); }
+.master-app :where(.fig-discreto, .fig-status small) { color: var(--rpg-muted); font-size: 13px; }
+.master-app :is(.fig-pagina label, .fig-overlay label, .fig-legado summary) { font-size: 14px; color: var(--rpg-text); }
+.master-app :where(.fig-cartao, .fig-janela, .fig-status fieldset, .fig-legado, .fig-catalogo-item, .fig-poder-linha) { border-color: var(--rpg-line); background: var(--rpg-surface); }
+.master-app :where(.fig-janela-topo, .fig-rodape) { background: var(--rpg-raised); border-color: var(--rpg-line); flex-shrink: 0; }
+.master-app :where(.fig-cartao h3, .fig-janela h2, .fig-janela h3) { color: var(--rpg-gold); font-family: var(--rpg-title); font-weight: 400; }
+.master-app .fig-cartao h3 { font-size: 23px; color: var(--rpg-gold); }
+.master-app .fig-janela h2 { font-size: 25px; color: var(--rpg-gold); }
+.master-app .fig-janela h3 { font-size: 21px; color: var(--rpg-gold); }
+.master-recipient { color: var(--rpg-gold); padding: 10px 12px; background: var(--rpg-bg); border-radius: 8px; font-size: 13px; }
+.master-app :where(.fig-pagina button, .fig-overlay button) { font-family: var(--rpg-font); font-size: 14px; }
+.master-app :where(.fig-medidores span) { font-size: 20px; font-variant-numeric: tabular-nums; }
+.master-app :where(.fig-poder-linha strong, .fig-catalogo-item strong) { font-size: 16px; color: var(--rpg-gold); }
+.master-app .fig-grade { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); }
+.master-app .fig-retrato { border-color: var(--rpg-line); color: var(--rpg-gold); background: var(--rpg-bg); }
+.master-app .fig-abas [aria-selected="true"] { background: var(--rpg-gold-soft); color: var(--rpg-gold); border-color: var(--rpg-gold); }
+.master-app .fig-corpo { min-height: 0; overscroll-behavior: contain; }
+.master-app .fig-checkbox input { max-width: 20px; }
+.master-app :where(.fig-pagina input:focus, .fig-overlay input:focus, .fig-overlay textarea:focus, .fig-overlay select:focus) { outline-color: var(--rpg-gold); }
+
+@media (max-width: 1100px) {
+  .master-app #loot-itens, .master-app #loot-baus, .master-main:has(#habmag-catalogo) > .grid { grid-template-columns: minmax(0, 1fr); }
+  .master-app :where(#loot-itens, #loot-baus) > section, .master-app #habmag-catalogo { grid-column: auto; }
+  .master-app #loot-editor-item, .master-app #loot-editor-bau, .master-app #habmag-editor { scroll-margin-top: 20px; }
+}
+@media (max-width: 800px) {
+  .master-header-inner { padding: 16px 20px 12px; gap: 14px; }
+  .master-main { padding: 0 20px 36px; margin-top: 22px; }
+  .master-heading h1 { font-size: 26px; }
+  .master-heading .rpg-sigil { display: none; }
+  .master-tools { justify-content: flex-end; gap: 8px; }
+  .master-nav-link { padding: 9px 12px; }
+  .master-app .master-mesa { grid-template-columns: minmax(0, 1fr); }
+  .master-app .master-mesa > section { grid-column: auto; }
+}
+@media (max-width: 600px) {
+  .master-header-inner { grid-template-columns: minmax(0, 1fr) auto; padding: 16px 16px 12px; gap: 12px; }
+  .master-heading h1 { font-size: 27px; }
+  .master-tools { flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; }
+  .master-heading .rpg-eyebrow { max-width: 180px; font-size: 9px; }
+  .master-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+  .master-nav-link { flex-direction: column; gap: 5px; font-size: 11px; padding: 8px 2px; text-align: center; }
+  .master-nav-full { display: none; }
+  .master-nav-short { display: block; }
+  .master-main { padding: 0 16px 32px; }
+  .master-app :where(section.bg-dungeon-900) { padding: 16px; }
+  .master-app #players-cards-container { grid-template-columns: minmax(0, 1fr); }
+  .master-app .master-skills { grid-template-columns: minmax(0, 1fr); }
+  .master-app #rol-componentes > div { grid-template-columns: minmax(0, 1fr) 44px; }
+  .master-app #rol-componentes input:first-child { grid-column: 1 / -1; }
+  .master-app #rol-componentes input:nth-child(2) { grid-column: 1; }
+  .master-app #rol-componentes button { grid-column: 2; }
+  .master-app #hm-custo-vital { padding: 10px 6px; }
+  .master-app #hm-custo-valor { width: 62px; flex-basis: 62px; padding: 10px 6px; }
+  .master-app #hm-custo-vital { min-width: 0; }
+  .master-app #habmag-editor > .grid { grid-template-columns: minmax(0, 1fr); }
+  .master-app #habmag-editor > .grid > label { grid-column: auto; }
+  .master-app .fig-toolbar { margin: 20px 0; gap: 12px; }
+  .master-app .fig-busca { min-width: 0; max-width: none; flex: 1 1 100%; order: 3; }
+  .master-app .fig-topo { align-items: flex-start; }
+  .master-app .fig-rodape { gap: 12px; }
+  .master-app .fig-rodape > .fig-acoes { width: 100%; justify-content: flex-end; }
+  .master-app .fig-janela-topo { padding: 16px; }
+  .master-app .fig-janela-topo h2 { font-size: 23px; }
+  .master-app .fig-topo:has(> .fig-acoes) { flex-wrap: wrap; }
+  .master-app .fig-topo > .fig-acoes { flex-wrap: wrap; }
+  .master-app #rolls-feed-container { max-height: 480px; }
+}

@@ -931,7 +931,7 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
     pastas.b = (await s.api("/api/personagens", { nome: "Beta" }, tokens.e1)).personagem.nomePasta;
     pastas.c = (await s.api("/api/personagens", { nome: "Gama" }, tokens.e2)).personagem.nomePasta;
     // páginas de login/seleção de mentira (o projeto real tem as suas em login/)
-    fs.mkdirSync(path.join(s.dir, "login"));
+    fs.mkdirSync(path.join(s.dir, "login"), { recursive: true });
     fs.writeFileSync(path.join(s.dir, "login", "entrar.html"), "<h1>entrar</h1>");
     fs.writeFileSync(path.join(s.dir, "login", "login.html"), "<h1>selecao</h1>");
   });
@@ -1234,16 +1234,16 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
   });
 });
 
-describe("Painel do mestre em páginas (Mesa pronta, demais preparadas)", { concurrency: false }, () => {
+describe("Painel do mestre em páginas (cinco áreas e aliases de figurantes)", { concurrency: false }, () => {
   const fs = require("node:fs");
   const path = require("node:path");
   const ROTAS = {
-    index: "/mestre", rolagem: "/mestre/rolagem", inimigos: "/mestre/inimigos",
-    npc: "/mestre/npc", loot: "/mestre/loot", "habilidades-magias": "/mestre/habilidades-magias",
+    index: "/mestre", rolagem: "/mestre/rolagem", figurantes: "/mestre/figurantes",
+    loot: "/mestre/loot", "habilidades-magias": "/mestre/habilidades-magias",
   };
   const PREPARADAS = [];
   // Páginas com script próprio (cada sprint da Fase 2 move uma página da lista acima para cá).
-  const COM_SCRIPT = ["habilidades-magias", "loot", "npc", "inimigos", "rolagem"];
+  const COM_SCRIPT = ["habilidades-magias", "loot", "figurantes", "rolagem"];
   // Únicos scripts que as páginas preparadas podem carregar (infraestrutura comum, sem lógica própria).
   const PERMITIDOS = ["https://cdn.tailwindcss.com", "/mestre/JS/tailwind-config.js", "/socket.io/socket.io.js", "/JS/regras.js", "/mestre/JS/comum.js"];
   let s, token, pasta;
@@ -1259,12 +1259,17 @@ describe("Painel do mestre em páginas (Mesa pronta, demais preparadas)", { conc
   const arquivoDaPagina = (id) => fs.readFileSync(path.join(s.dir, "mestre", `${id}.html`), "utf8");
   const srcs = (html, tag, atributo) => [...html.replace(/<!--[\s\S]*?-->/g, "").matchAll(new RegExp(`<${tag}[^>]*?${atributo}="([^"]+)"`, "g"))].map((m) => m[1]);
 
-  it("as seis páginas abrem e cada uma sabe quem ela é", async () => {
+  it("as cinco áreas abrem e os caminhos antigos usam a página unificada", async () => {
     for (const [id, rota] of Object.entries(ROTAS)) {
       const r = await baixar(rota);
       assert.equal(r.status, 200, rota);
       assert.match(r.tipo, /text\/html/);
       assert.match(r.corpo, new RegExp(`<header id="mestre-cabecalho" data-pagina="${id}">`), `${rota} declara a sua página`);
+    }
+    for (const alias of ["/mestre/inimigos", "/mestre/npc"]) {
+      const r = await baixar(alias);
+      assert.equal(r.status, 200, alias);
+      assert.match(r.corpo, /data-pagina="figurantes"/, `${alias} usa a área unificada`);
     }
   });
 
@@ -1291,7 +1296,7 @@ describe("Painel do mestre em páginas (Mesa pronta, demais preparadas)", { conc
     }
   });
 
-  it("menu: as seis páginas aparecem, a atual fica marcada e as que não existem ainda dizem 'em breve'", async () => {
+  it("menu: as cinco áreas aparecem, a atual fica marcada e não há destinos duplicados", async () => {
     for (const id of Object.keys(ROTAS)) {
       const m = await abrirPaginaMestre(s, id);
       try {

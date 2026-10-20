@@ -168,7 +168,7 @@ function atualizarInterfaceCombo() {
   container.innerHTML = "";
   let formulas = [];
 
-  STATE.combo.forEach((c) => {
+  STATE.combo.forEach((c, indice) => {
     formulas.push(`${c.formula}`);
 
     const chip = document.createElement("div");
@@ -176,10 +176,25 @@ function atualizarInterfaceCombo() {
       "flex items-center gap-1.5 px-2.5 py-1 bg-dungeon-800 border border-amberGold-600/50 rounded-full text-xs text-slate-200";
     const rotuloChip = elTexto("span", "font-bold text-amberGold-400 font-cinzel", c.nome);
     const formulaChip = elTexto("span", "text-slate-400 font-mono", `(${c.formula})`);
-    const remover = elTexto("button", "text-slate-400 hover:text-crimson-400 ml-1 text-xs");
+    const remover = elTexto("button", "sheet-combo-remove text-slate-400 hover:text-crimson-400 ml-1 text-xs");
     remover.type = "button";
-    remover.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-    remover.addEventListener("click", () => removerDoCombo(c.id));
+    const rotuloRemover = `Remover ${c.nome} (${c.formula}) do combo`;
+    remover.setAttribute('aria-label', rotuloRemover);
+    remover.title = rotuloRemover;
+    remover.dataset.removerCombo = String(c.id);
+    const iconeRemover = elTexto('span', '', '×');
+    iconeRemover.setAttribute('aria-hidden', 'true');
+    const dica = elTexto('span', 'sheet-combo-remove-hint', rotuloRemover);
+    dica.setAttribute('aria-hidden', 'true');
+    remover.append(iconeRemover, dica);
+    remover.addEventListener("click", () => {
+      const devolverFoco = document.activeElement === remover;
+      removerDoCombo(c.id);
+      if (devolverFoco) {
+        const restantes = [...container.querySelectorAll('[data-remover-combo]')];
+        (restantes[Math.min(indice, restantes.length - 1)] || document.getElementById('btn-roll-combo'))?.focus();
+      }
+    });
     chip.append(rotuloChip, formulaChip, remover);
     container.appendChild(chip);
   });

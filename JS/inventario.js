@@ -137,6 +137,7 @@ function desequiparSlot(slotKey) {
        ALTERAÇÃO 3: RENDERIZAR MOCHILA AJUSTADA AOS SLOTS
        ========================================================================= */
 let itemPopoverAtual = null;
+let itemPopoverOrigemId = null;
 
 /* =========================================================================
    INVENTÁRIO (Sprint 3): identidade (uid), pilhas (quantity/maxStack) e capacidade
@@ -440,6 +441,23 @@ function atualizarPopoverQuantidade(item) {
   const rotulo = document.getElementById("popover-qty-label");
   if (rotulo)
     rotulo.innerText = `${quantidadeDoItem(item)}/${limiteDaPilha(item)}`;
+  const descarte = document.getElementById("popover-discard-qty");
+  if (descarte) {
+    descarte.max = String(quantidadeDoItem(item));
+    descarte.value = String(Math.min(quantidadeDoItem(item), Math.max(1, Number(descarte.value) || 1)));
+  }
+  atualizarBotaoDescarte();
+}
+
+function atualizarBotaoDescarte() {
+  const item = itemPopoverAtual;
+  const botao = document.getElementById("popover-discard-button");
+  const campo = document.getElementById("popover-discard-qty");
+  if (!item || !botao || !campo) return;
+  const quantidade = Number(campo.value);
+  const valida = Number.isInteger(quantidade) && quantidade >= 1 && quantidade <= quantidadeDoItem(item);
+  botao.disabled = !valida;
+  botao.textContent = valida ? `Descartar ${quantidade} × ${item.name}…` : "Informe uma quantidade válida";
 }
 
 function enviarSlotParaCombo(slotKey) {
@@ -460,6 +478,7 @@ function renderizarMochilaGrid() {
   const dimLabel = document.getElementById("grid-dimensions-label");
   const blocksCountEl = document.getElementById("grid-blocks-count");
   if (!gridContainer || !config) return;
+  const focoAnterior = document.activeElement?.id;
 
   // Tamanho maior para usabilidade confortável
   const cellSize = 60;
@@ -506,6 +525,16 @@ function renderizarMochilaGrid() {
     const itemEl = document.createElement("div");
     itemEl.id = `item-node-${item.uid || item.id}`;
     itemEl.className = `absolute z-10 p-2 rounded-lg border shadow-lg cursor-pointer bg-gradient-to-br ${escaparHtml(item.color)} flex flex-col justify-between hover:scale-[1.02] active:scale-95 transition-all ${semEspaco ? "ring-2 ring-rose-500 opacity-80" : ""}`;
+    itemEl.classList.add("inventory-item");
+    itemEl.tabIndex = 0;
+    itemEl.setAttribute("role", "button");
+    itemEl.setAttribute("aria-label", `Ver detalhes de ${item.name}${semEspaco ? "; sem espaço na mochila" : ""}`);
+    itemEl.addEventListener("keydown", (evento) => {
+      if (evento.key !== "Enter" && evento.key !== " ") return;
+      evento.preventDefault();
+      evento.stopPropagation();
+      abrirItemPopover(item, itemEl);
+    });
 
     itemEl.style.left = `${(col - 1) * (cellSize + gap)}px`;
     itemEl.style.top = `${(row - 1) * (cellSize + gap)}px`;
@@ -535,6 +564,62 @@ function renderizarMochilaGrid() {
   dimLabel.innerText = config.label;
   blocksCountEl.innerText = `Grade: ${celulasUsadas}/${totalCells} slots ocupados`;
   atualizarRotuloCarga();
+  renderizarListaMochila();
+  if (focoAnterior?.startsWith("item-node-")) {
+    (document.getElementById(focoAnterior) || document.querySelector(".sheet-grid-scroll"))?.focus({ preventScroll: true });
+  }
+}
+
+function chaveItemMochila(item) { return String(item.uid || item.id); }
+
+function renderizarListaMochila() {
+  const lista = document.getElementById('backpack-item-list');
+  if (!lista) return;
+  const foco = lista.contains(document.activeElement) ? document.activeElement.dataset.itemDetalhes : null;
+  lista.replaceChildren();
+  for (const item of STATE.backpackItems) {
+    const linha = elTexto('li', 'sheet-backpack-row');
+    linha.dataset.itemMochila = chaveItemMochila(item);
+    const info = elTexto('div', 'sheet-backpack-copy');
+    info.append(elTexto('strong', '', item.name), elTexto('span', 'rpg-hint',
+      `${quantidadeDoItem(item)} un. · ${item.type || 'Item'}${itensSemEspaco.has(item.uid) ? ' · Sem espaço na grade' : ''}`));
+    const detalhes = elTexto('button', 'rpg-btn', 'Detalhes');
+    detalhes.id = `item-details-${chaveItemMochila(item)}`;
+    detalhes.type = 'button'; detalhes.dataset.itemDetalhes = chaveItemMochila(item);
+    detalhes.setAttribute('aria-label', `Ver detalhes de ${item.name}, ${quantidadeDoItem(item)} unidade(s)`);
+    detalhes.addEventListener('click', evento => {
+      evento.stopPropagation(); // O fechamento por clique fora não pode consumir a abertura.
+      abrirItemPopover(item, detalhes);
+    });
+    linha.append(info, detalhes); lista.append(linha);
+  }
+  filtrarItensMochila();
+  if (foco) {
+    const botao = [...lista.querySelectorAll('[data-item-detalhes]')].find(el => el.dataset.itemDetalhes === foco);
+    (botao || document.getElementById('backpack-search'))?.focus({ preventScroll: true });
+  }
+}
+
+function filtrarItensMochila() {
+  const normalizar = texto => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const termo = normalizar(document.getElementById('backpack-search')?.value).trim();
+  const encontrados = new Set(STATE.backpackItems.filter(item =>
+    termo.split(/\s+/).every(parte => normalizar(`${item.name} ${item.type || ''}`).includes(parte))).map(chaveItemMochila));
+  document.querySelectorAll('#backpack-item-list [data-item-mochila]').forEach(linha => {
+    linha.hidden = !encontrados.has(linha.dataset.itemMochila);
+  });
+  for (const item of STATE.backpackItems) {
+    const elemento = document.getElementById(`item-node-${item.uid || item.id}`);
+    elemento?.classList.toggle('inventory-item--dimmed', Boolean(termo) && !encontrados.has(chaveItemMochila(item)));
+    elemento?.classList.toggle('inventory-item--match', Boolean(termo) && encontrados.has(chaveItemMochila(item)));
+  }
+  const status = document.getElementById('backpack-search-result');
+  if (status) status.textContent = termo ? `${encontrados.size} de ${STATE.backpackItems.length} pilha(s) encontrada(s). A grade mantém todos os itens.` : `${STATE.backpackItems.length} pilha(s) na mochila.`;
+  const vazio = document.getElementById('backpack-list-empty');
+  if (vazio) {
+    vazio.hidden = encontrados.size > 0;
+    vazio.textContent = STATE.backpackItems.length ? 'Nenhum item corresponde à busca. Tente outro nome ou limpe o campo.' : 'Nenhum item na mochila.';
+  }
 }
 
 /* =========================================================================
@@ -542,6 +627,9 @@ function renderizarMochilaGrid() {
        ========================================================================= */
 function abrirItemPopover(item, el) {
   itemPopoverAtual = item;
+  itemPopoverOrigemId = el?.id || null;
+  const descarte = document.getElementById("popover-discard-qty");
+  if (descarte) descarte.value = "1";
   const popover = document.getElementById("item-popover");
 
   document.getElementById("popover-title").innerText = item.name;
@@ -590,6 +678,11 @@ function abrirItemPopover(item, el) {
 
   popover.classList.remove("hidden");
 
+  if (popover.classList.contains("rpg-modal")) {
+    RPGUI.abrirModal("item-popover", "item-close");
+    return;
+  }
+
   // Posicionamento flutuante inteligente
   const itemRect = el.getBoundingClientRect();
   const parentRect = el.parentElement.getBoundingClientRect();
@@ -607,8 +700,13 @@ function abrirItemPopover(item, el) {
 }
 
 function fecharItemPopover() {
+  const origem = itemPopoverOrigemId;
+  RPGUI.fecharModal("item-popover");
   document.getElementById("item-popover").classList.add("hidden");
   itemPopoverAtual = null;
+  itemPopoverOrigemId = null;
+  // Quantidade/configuração pode ter redesenhado a lista enquanto os detalhes estavam abertos.
+  if (origem) document.getElementById(origem)?.focus({ preventScroll: true });
 }
 
 function equiparItemAtual(slotDestino) {
@@ -685,18 +783,28 @@ function enviarItemAtualParaCombo() {
 function descartarItemAtual() {
   const item = itemPopoverAtual;
   if (!item) return;
-  // Remove o item inteiro (a pilha toda); para tirar só algumas unidades use − no balão.
-  STATE.backpackItems = STATE.backpackItems.filter((i) => !mesmoItem(i, item));
-  itensSemEspaco.delete(item.uid);
+  const campo = document.getElementById("popover-discard-qty");
+  const quantidade = campo ? Number(campo.value) : quantidadeDoItem(item);
+  if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > quantidadeDoItem(item)) {
+    toast("Informe uma quantidade válida para descartar.", "error");
+    return;
+  }
+  if (!window.confirm(`Descartar ${quantidade} × ${item.name}?\nEssa quantidade será removida da ficha.`)) return;
+  const restante = quantidadeDoItem(item) - quantidade;
+  if (restante > 0) item.quantity = restante;
+  else {
+    STATE.backpackItems = STATE.backpackItems.filter((i) => !mesmoItem(i, item));
+    itensSemEspaco.delete(item.uid);
+  }
   registrarNoTerminal("Item descartado", {
     item: item.name,
-    quantidade: quantidadeDoItem(item),
+    quantidade,
   });
   fecharItemPopover();
   renderizarSlotsEquipados();
   renderizarMochilaGrid();
   salvarInventario();
-  toast("Item descartado.", "info");
+  toast(`${quantidade} × ${item.name} descartado(s).`, "info");
 }
 
 document.addEventListener("click", (e) => {

@@ -1,0 +1,76 @@
+/* A ficha e as janelas sobrepostas não dependem do CDN para layout ou limites da tela. */
+body { background: #090b10; color: #e2e8f0; margin: 0; font-family: Inter, sans-serif; }
+.fig-pagina { max-width: 1180px; margin: 32px auto; padding: 0 24px 48px; }
+.fig-pagina h1 { font: 700 28px Cinzel, serif; color: #fde5ac; margin: 6px 0 10px; }
+.fig-topo, .fig-toolbar, .fig-acoes, .fig-janela-topo, .fig-rodape { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fig-eyebrow { color: #d9a54b; font-size: 10px; letter-spacing: .2em; font-weight: 700; margin: 0 0 5px; }
+.fig-discreto { color: #8b98af; font-size: 12px; line-height: 1.6; }
+.fig-toolbar { margin: 28px 0 20px; padding-bottom: 20px; border-bottom: 1px solid #232d42; flex-wrap: wrap; }
+.fig-pagina label, .fig-overlay label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #bac7dc; }
+.fig-pagina input, .fig-pagina select, .fig-overlay input, .fig-overlay select, .fig-overlay textarea { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border-radius: 7px; border: 1px solid #32405d; background: #0b101b; color: #eef2fa; font: inherit; }
+.fig-overlay textarea { resize: vertical; line-height: 1.6; }
+.fig-pagina button, .fig-overlay button { cursor: pointer; padding: 9px 13px; border-radius: 7px; border: 1px solid #344058; background: #182030; color: #cbd5e1; font: 500 12px Inter, sans-serif; }
+.fig-pagina button:hover, .fig-overlay button:hover { border-color: #d6a44c; color: #fff1cf; }
+.fig-pagina button:disabled, .fig-overlay button:disabled { opacity: .5; cursor: wait; }
+.fig-pagina .fig-primario, .fig-overlay .fig-primario { background: #b7791c; border-color: #d6a44c; color: #fff5dd; }
+.fig-pagina .fig-perigo, .fig-overlay .fig-perigo { color: #fda4af; }
+.fig-busca { flex: 1; min-width: 180px; max-width: 500px; }
+.fig-abas { display: flex; gap: 6px; }
+.fig-abas [aria-selected="true"] { color: #f5c875; border-color: #b7791c; background: #312516; }
+.fig-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; margin-top: 14px; }
+.fig-cartao { border: 1px solid #29354b; border-radius: 12px; background: linear-gradient(135deg, #151d2b, #101620); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.fig-cartao h3 { font: 600 18px Cinzel, serif; color: #f7dfb0; overflow-wrap: anywhere; margin: 0; }
+.fig-cartao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fig-cartao .fig-acoes { flex-wrap: wrap; justify-content: flex-start; margin-top: auto; }
+.fig-cartao img { width: 50px; height: 60px; border-radius: 7px; object-fit: cover; }
+.fig-medidores { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.fig-medidores span { padding: 6px 9px; background: #0c111a; border-radius: 5px; color: #fda4af; }
+.fig-medidores span + span { color: #8ccce9; }
+.fig-overlay { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: center; padding: 24px; background: #02050bd9; backdrop-filter: blur(6px); box-sizing: border-box; }
+.fig-sobreposta { z-index: 70; background: #02050bbd; }
+.fig-overlay.hidden, .fig-pagina .hidden, .fig-overlay .hidden { display: none !important; }
+.fig-janela { width: 100%; max-width: 720px; max-height: calc(100dvh - 48px); background: #121a28; border: 1px solid #6c5330; border-radius: 16px; box-shadow: 0 32px 100px #000a; display: flex; flex-direction: column; overflow: hidden; margin: 0; }
+.fig-ficha { max-width: 820px; }
+.fig-janela-topo { padding: 21px 26px; border-bottom: 1px solid #2a3446; background: linear-gradient(110deg, #222438, #161b28); }
+.fig-janela h2 { color: #f8e3ba; font: 600 21px Cinzel, serif; margin: 0; }
+.fig-janela h3 { font-size: 14px; color: #e9d4ac; margin: 0; }
+.fig-corpo { overflow-y: auto; padding: 24px 26px; display: flex; flex-direction: column; gap: 18px; }
+.fig-rodape { padding: 16px 26px; border-top: 1px solid #29354b; background: #101723; }
+.fig-dois, .fig-status, .fig-tres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.fig-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fig-identidade { display: flex; gap: 18px; align-items: stretch; }
+.fig-identidade-campos { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fig-retrato { width: 108px; min-height: 130px; flex-shrink: 0; display: grid; place-items: center; background: #0c111b; border: 1px solid #69502c; border-radius: 9px; font-size: 32px; color: #bd8f47; overflow: hidden; }
+.fig-retrato img { width: 100%; height: 100%; object-fit: cover; }
+.fig-status fieldset { border: 1px solid #424056; padding: 12px; border-radius: 8px; min-width: 0; }
+.fig-status fieldset + fieldset { border-color: #28465a; }
+.fig-status legend { font-size: 13px; color: #e9afba; padding: 0 5px; }
+.fig-status fieldset + fieldset legend { color: #8ccce9; }
+.fig-status small { display: block; color: #8492a8; font-size: 10px; margin-top: 9px; }
+.fig-legado { padding: 14px; border: 1px solid #2c374c; border-radius: 8px; }
+.fig-legado summary { cursor: pointer; color: #a8b7cc; font-size: 12px; }
+.fig-legado label { margin-top: 12px; }
+.fig-atributos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.fig-atributos input { padding: 8px; }
+.fig-poderes { padding-top: 18px; border-top: 1px solid #29354b; }
+.fig-poder-linha, .fig-catalogo-item { padding: 12px; border: 1px solid #29354b; border-radius: 8px; margin-top: 10px; }
+.fig-poder-linha p, .fig-catalogo-item p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fig-poder-linha strong, .fig-catalogo-item strong { color: #e5d7b9; font-size: 13px; }
+.fig-extra { display: grid; grid-template-columns: 1fr 1fr 2fr auto; gap: 7px; margin-top: 9px; align-items: end; }
+.fig-overlay .fig-checkbox { flex-direction: row; align-items: center; }
+.fig-checkbox input { width: auto; }
+.fig-vazio { border: 1px dashed #344058; border-radius: 12px; padding: 36px 20px; text-align: center; grid-column: 1 / -1; color: #94a3b8; font-size: 13px; }
+.fig-overlay input:focus, .fig-overlay textarea:focus, .fig-overlay select:focus, .fig-pagina input:focus { outline: 2px solid #b7791c; outline-offset: 2px; }
+body.fig-modal-aberto { overflow: hidden; }
+#toast-container { z-index: 100; }
+@media (max-width: 640px) {
+  .fig-pagina { padding: 0 16px 32px; margin-top: 22px; }
+  .fig-topo, .fig-rodape { flex-wrap: wrap; }
+  .fig-overlay { padding: 8px; }
+  .fig-janela { max-height: calc(100dvh - 16px); }
+  .fig-janela-topo, .fig-corpo, .fig-rodape { padding: 16px; }
+  .fig-status, .fig-tres { grid-template-columns: 1fr; }
+  .fig-retrato { width: 66px; min-height: 96px; }
+  .fig-extra { grid-template-columns: 1fr 1fr; }
+  .fig-atributos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

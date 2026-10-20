@@ -17,16 +17,19 @@ function criarLinhaDeComponente(nome = "", formula = "") {
   const linha = criar("div", "flex gap-1 items-center");
   const n = criar("input", `flex-1 ${estiloInput}`);
   n.placeholder = "Nome (opcional)";
+  n.setAttribute("aria-label", "Nome do componente da rolagem (opcional)");
   n.maxLength = 40;
   n.dataset.campo = "nome";
   n.value = nome;
   const f = criar("input", `w-28 ${estiloInput}`);
   f.placeholder = "2d6+3";
+  f.setAttribute("aria-label", "Fórmula do componente da rolagem");
   f.maxLength = 30;
   f.dataset.campo = "formula";
   f.value = formula;
   const x = criar("button", "px-2 py-1 rounded text-xs border border-dungeon-700 text-rose-300", "✕");
   x.type = "button";
+  x.setAttribute("aria-label", "Remover componente da rolagem");
   x.dataset.acao = "remover-componente";
   x.addEventListener("click", () => {
     if (campo("rol-componentes").children.length > 1) linha.remove();
@@ -120,26 +123,33 @@ function criarLinhaDeAlvo(a) {
   const estado = rol.marcados.get(a.alvoId) || { marcado: false, mult: 1 };
   const linha = criar("div", `flex items-center gap-2 text-xs font-mono border border-dungeon-800 rounded px-2 py-1 ${a.derrotado ? "opacity-50" : ""}`);
   linha.dataset.alvoId = a.alvoId;
+  linha.dataset.uiChave = a.alvoId;
+  linha.dataset.marcado = String(estado.marcado);
   const caixa = criar("input");
   caixa.type = "checkbox";
+  caixa.setAttribute("aria-label", `Selecionar ${a.nome} como alvo`);
   caixa.checked = estado.marcado;
   caixa.dataset.campo = "marcado";
   const nome = criar("span", "flex-1 min-w-0 break-words", a.nome);
+  const selecao = criar('label', 'master-target-label');
+  selecao.append(caixa, nome);
   const tipo = criar("span", "px-1 rounded border border-slate-600 text-[10px] text-slate-400", ROTULO_TIPO[a.tipo] || a.tipo);
   const hp = criar("span", "text-rose-300 whitespace-nowrap", `HP ${a.hp.atual}/${a.hp.max}`);
   const mult = criar("select", estiloInput);
   mult.dataset.campo = "mult";
+  mult.setAttribute("aria-label", `Multiplicador de dano para ${a.nome}`);
   [1, 0.5, 2].forEach((m) => mult.append(new Option(MULT_ROTULO[m], String(m))));
   mult.value = String(estado.mult);
   const previa = criar("span", "text-amber-200 whitespace-nowrap");
   previa.dataset.previa = "1";
   const mudou = () => {
     rol.marcados.set(a.alvoId, { marcado: caixa.checked, mult: Number(mult.value) });
+    linha.dataset.marcado = String(caixa.checked);
     atualizarPrevias();
   };
   caixa.addEventListener("change", mudou);
   mult.addEventListener("change", mudou);
-  linha.append(caixa, nome, tipo, hp, mult, previa);
+  linha.append(selecao, tipo, hp, mult, previa);
   return linha;
 }
 
@@ -162,9 +172,11 @@ function atualizarPrevias() {
 
 function renderizarAlvos() {
   const area = campo("atk-alvos");
-  area.replaceChildren();
-  if (!rol.alvos.length) area.append(criar("p", "text-xs text-slate-500 italic", "Nenhum alvo: abra fichas, crie NPCs ou ponha inimigos em batalha."));
-  rol.alvos.forEach((a) => area.append(criarLinhaDeAlvo(a)));
+  RPGUI.preservarInteracao(area, () => {
+    area.replaceChildren();
+    if (!rol.alvos.length) area.append(criar("p", "text-xs text-slate-500 italic", "Nenhum alvo: abra fichas, crie NPCs ou ponha inimigos em batalha."));
+    rol.alvos.forEach((a) => area.append(criarLinhaDeAlvo(a)));
+  });
   atualizarPrevias();
 }
 
@@ -277,8 +289,8 @@ document.addEventListener("DOMContentLoaded", () => {
   campo("atk-todos").addEventListener("click", () => marcarTodos(true));
   campo("atk-nenhum").addEventListener("click", () => marcarTodos(false));
   campo("atk-atualizar").addEventListener("click", carregarAlvos);
-  campo("atk-aplicar").addEventListener("click", aplicarDano);
-  campo("atk-desfazer").addEventListener("click", desfazerDano);
+  campo("atk-aplicar").addEventListener("click", () => executarAcaoMestre(campo("atk-aplicar"), "Aplicando…", aplicarDano));
+  campo("atk-desfazer").addEventListener("click", () => executarAcaoMestre(campo("atk-desfazer"), "Desfazendo…", desfazerDano));
   campo("master-token-input")?.addEventListener("change", () => setTimeout(carregarAlvos, 50));
   renderizarHistorico();
   renderizarFontes();

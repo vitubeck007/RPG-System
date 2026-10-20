@@ -1,46 +1,30 @@
-/* =========================================================================
-   INTERFACE COMUM
-   Pequenos auxiliares de tela usados por vários arquivos: aviso (toast), troca de aba e elTexto().
-   ========================================================================= */
-
-function trocarAba(abaNum) {
-  document
-    .querySelectorAll(".tab-content")
-    .forEach((el) => el.classList.add("hidden"));
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.classList.remove(
-      "bg-dungeon-800",
-      "text-amberGold-400",
-      "border",
-      "border-amberGold-500/40",
-      "shadow",
-    );
-    btn.classList.add("text-slate-400");
-  });
-
+/* Interface da ficha: navegação, avisos e acessibilidade. Sem persistência de dados do personagem. */
+function trocarAba(abaNum, voltarAoTopo = true) {
   const abaAtiva = document.getElementById(`aba-${abaNum}`);
   const btnAtivo = document.getElementById(`tab-btn-${abaNum}`);
-
-  if (abaAtiva) abaAtiva.classList.remove("hidden");
-  if (btnAtivo) {
-    btnAtivo.classList.remove("text-slate-400");
-    btnAtivo.classList.add(
-      "bg-dungeon-800",
-      "text-amberGold-400",
-      "border",
-      "border-amberGold-500/40",
-      "shadow",
-    );
-  }
-
+  if (!abaAtiva || !btnAtivo) return;
+  document.querySelectorAll(".tab-content").forEach((el) => {
+    const ativa = el === abaAtiva;
+    el.classList.toggle("hidden", !ativa);
+  });
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const ativa = btn === btnAtivo;
+    btn.setAttribute("aria-selected", String(ativa));
+    btn.tabIndex = ativa ? 0 : -1;
+  });
+  if (CHARACTER) sessionStorage.setItem(`rpg_ficha_aba:${CHARACTER.player}/${CHARACTER.nomePasta}`, String(abaNum));
   if (abaNum === 3) {
     renderizarSlotsEquipados();
     renderizarMochilaGrid();
   }
+  if (abaNum === 4) renderizarCodice();
+  if (voltarAoTopo) document.querySelector(".sheet-header")?.scrollIntoView({ block: "start" });
+}
 
-  if (abaNum === 4) {
-    renderizarCodice();
-  }
+function atualizarIdentidadeVisual() {
+  const titulo = document.getElementById("sheet-character-name");
+  const nome = document.getElementById("char-name-input")?.value.trim() || STATE.name;
+  if (titulo) { titulo.textContent = nome; titulo.title = nome; }
 }
 
 function elTexto(tag, classe, texto) {
@@ -53,31 +37,60 @@ function elTexto(tag, classe, texto) {
 function toast(mensagem, tipo = "info") {
   const container = document.getElementById("toast-container");
   if (!container) return;
-
-  const toastEl = document.createElement("div");
-  let borderCol = "border-amberGold-500";
-  let icon = "fa-circle-info";
-
-  if (tipo === "combat") {
-    borderCol = "border-crimson-500 text-amber-200";
-    icon = "fa-crosshairs";
-  } else if (tipo === "error") {
-    borderCol = "border-rose-600 text-rose-300";
-    icon = "fa-triangle-exclamation";
-  }
-
-  toastEl.className = `p-3 rounded-lg bg-dungeon-950 border-l-4 ${borderCol} shadow-2xl text-xs font-cinzel text-slate-100 flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
-  const iconeEl = document.createElement("i");
-  iconeEl.className = `fa-solid ${icon}`;
-  const textoEl = document.createElement("span");
-  textoEl.textContent = mensagem;
-  toastEl.append(iconeEl, " ", textoEl);
-
-  container.appendChild(toastEl);
-
-  setTimeout(() => toastEl.classList.remove("translate-y-2", "opacity-0"), 10);
-  setTimeout(() => {
-    toastEl.classList.add("opacity-0", "-translate-y-2");
-    setTimeout(() => toastEl.remove(), 300);
-  }, 2400);
+  const aviso = document.createElement("div");
+  aviso.className = "sheet-toast";
+  aviso.dataset.tipo = tipo;
+  aviso.setAttribute("role", tipo === "error" ? "alert" : "status");
+  const texto = elTexto("span", "", mensagem);
+  const fechar = elTexto("button", "", "×");
+  fechar.type = "button";
+  fechar.setAttribute("aria-label", "Dispensar notificação");
+  fechar.addEventListener("click", () => aviso.remove());
+  aviso.append(texto, fechar);
+  container.appendChild(aviso);
+  while (container.children.length > 4) container.firstElementChild.remove();
+  // Erros exigem leitura/decisão: permanecem até serem dispensados.
+  if (tipo !== "error") setTimeout(() => aviso.remove(), 5000);
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("i.fa-solid").forEach((icone) => icone.setAttribute("aria-hidden", "true"));
+  atualizarIdentidadeVisual();
+  const faixa = document.getElementById("estado-ficha");
+  if (faixa) {
+    const ajustarFaixa = () => document.body.style.setProperty("--sheet-notice-height", `${faixa.getBoundingClientRect().height}px`);
+    new MutationObserver(ajustarFaixa).observe(faixa, { attributes: true, childList: true, subtree: true });
+    window.addEventListener("resize", ajustarFaixa);
+    ajustarFaixa();
+  }
+  const atributos = document.getElementById("sheet-attributes-details");
+  if (atributos && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 660px)").matches) atributos.open = false;
+  const salva = CHARACTER && Number(sessionStorage.getItem(`rpg_ficha_aba:${CHARACTER.player}/${CHARACTER.nomePasta}`));
+  trocarAba(salva >= 1 && salva <= 5 ? salva : 1, false);
+  document.querySelectorAll(".tab-btn").forEach((btn, indice, botoes) => {
+    btn.addEventListener("keydown", (evento) => {
+      let destino;
+      if (evento.key === "ArrowRight") destino = (indice + 1) % botoes.length;
+      if (evento.key === "ArrowLeft") destino = (indice + botoes.length - 1) % botoes.length;
+      if (evento.key === "Home") destino = 0;
+      if (evento.key === "End") destino = botoes.length - 1;
+      if (destino === undefined) return;
+      evento.preventDefault();
+      trocarAba(destino + 1);
+      botoes[destino].focus();
+    });
+  });
+  document.getElementById("skills-search")?.addEventListener("input", filtrarPericias);
+  document.querySelector('.sheet-session a[href="/selecao"]')?.addEventListener("click", (evento) => {
+    if (!arquivosSujos.size && totalEmVoo() === 0 && !arquivosComErro.size) return;
+    evento.preventDefault();
+    enviarSalvamentosPendentes();
+    const mensagem = !socket.connected ? "Sem conexão. Aguarde salvar suas alterações antes de trocar de personagem."
+      : arquivosComErro.size ? "Há um erro de salvamento. Confira a mensagem antes de trocar de personagem."
+        : "Aguarde a confirmação do salvamento antes de trocar de personagem.";
+    toast(mensagem, !socket.connected || arquivosComErro.size ? "error" : "info");
+  });
+  document.getElementById("avatar-modal")?.addEventListener("rpg:cancelar", closeAvatarModal);
+  document.getElementById("codice-modal")?.addEventListener("rpg:cancelar", fecharModalCodice);
+  document.getElementById("item-popover")?.addEventListener("rpg:cancelar", fecharItemPopover);
+});

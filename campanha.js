@@ -1,7 +1,8 @@
 /* =========================================================================
    CAMPANHA: ARMAZÉM DOS DADOS DO MESTRE
    Guarda o que é do mestre e não da ficha de um jogador: inimigos, NPCs, baús e a batalha em curso.
-   Tudo fica em campanha/<tipo>.json (pasta criada pelo servidor, como players/).
+   A referência fica em campanha/<tipo>.json. NPCs e inimigos têm também JSONs individuais
+   organizados em Figurante/ quando pastaFigurantes está configurada pelo servidor.
 
    Garantias (regras R6 e R7 do Sprint "Fase 2"):
      - todo dado passa por um normalizador antes de ser aceito ou gravado: tipos, tamanhos e listas
@@ -43,6 +44,7 @@ const {
   trocarArquivo,
 } = require("./personagem.js");
 const { urlDeImagem } = require("./JS/regras.js");
+const { sincronizarFigurantes } = require("./figurantes.js");
 
 const SCHEMA_VERSION = 1;
 const MAX_BACKUPS = 7;
@@ -125,9 +127,13 @@ function normalizarNpc(bruto) {
     ...baseDe(bruto, "npc", "NPC"),
     retrato: urlDeImagem(bruto.retrato),
     papel: texto(bruto.papel, 80).trim(),
-    lore: texto(bruto.lore, 500), // mini lore
+    descricao: texto(bruto.descricao, 2000),
+    lore: texto(bruto.lore, 4000),
     segredo: texto(bruto.segredo, 2000), // só do mestre: nunca sai para os jogadores
     hp: vitalDe(bruto.hp, 10),
+    energia: vitalDe(bruto.energia, 10),
+    habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
+    magias: listaDe(bruto.magias, 20, normalizarHabilidadeResumida),
     atributos: atributosOpcionais(bruto.atributos),
     notas: texto(bruto.notas, 2000),
     ...datasDe(bruto),
@@ -151,6 +157,27 @@ function normalizarHabilidadeResumida(bruto) {
   return {
     nome: texto(bruto.nome, 60).trim() || "Habilidade",
     nota: texto(bruto.nota, 200),
+    ...camposDePoder(bruto),
+  };
+}
+
+// Os mesmos campos servem para poderes do catálogo e cópias anexadas ao figurante.
+function camposDePoder(bruto) {
+  const dado = texto(bruto.dice, 30).trim();
+  return {
+    ...(ehIdSeguro(bruto.catalogId) ? { catalogId: bruto.catalogId } : {}),
+    desc: texto(bruto.desc, 2000),
+    efeito: texto(bruto.efeito || [bruto.descLonga, ...(Array.isArray(bruto.efeitos) ? bruto.efeitos : [])].filter((x) => typeof x === "string").join("\n"), 4000),
+    dice: DADO_VALIDO.test(dado) ? dado : "",
+    canalizacao: texto(bruto.canalizacao, 100),
+    alcance: texto(bruto.alcance, 60),
+    duracao: texto(bruto.duracao, 60),
+    cost: { vital: VITAL_TYPES.includes(bruto.cost?.vital) ? bruto.cost.vital : "vigor", amount: inteiro(bruto.cost?.amount, 0, MAX_VITAL, 0) },
+    danosExtras: listaDe(bruto.danosExtras, 10, (d) => {
+      if (!ehObjeto(d)) return null;
+      const dadoExtra = texto(d.dado, 30).trim();
+      return { tipo: texto(d.tipo, 40), dado: DADO_VALIDO.test(dadoExtra) ? dadoExtra : "", efeito: texto(d.efeito, 200) };
+    }),
   };
 }
 
@@ -160,9 +187,13 @@ function normalizarInimigo(bruto) {
     ...baseDe(bruto, "ini", "Inimigo"),
     imagem: urlDeImagem(bruto.imagem),
     hpMax: inteiro(bruto.hpMax, 1, MAX_VITAL, 10),
+    descricao: texto(bruto.descricao, 2000),
+    lore: texto(bruto.lore, 4000),
+    energia: vitalDe(bruto.energia, 10),
     atributos: atributosOpcionais(bruto.atributos),
     ataques: listaDe(bruto.ataques, 20, normalizarAtaque),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
+    magias: listaDe(bruto.magias, 20, normalizarHabilidadeResumida),
     nota: texto(bruto.nota, 2000),
     ...datasDe(bruto),
   };
@@ -256,10 +287,12 @@ function normalizarCombatente(bruto) {
     nome: texto(bruto.nome, 80).trim() || "Combatente",
     imagem: urlDeImagem(bruto.imagem),
     hp: vitalDe(bruto.hp, 10),
+    energia: vitalDe(bruto.energia, 10),
     derrotado: bruto.derrotado === true,
     atributos: atributosOpcionais(bruto.atributos),
     ataques: listaDe(bruto.ataques, 20, normalizarAtaque),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
+    magias: listaDe(bruto.magias, 20, normalizarHabilidadeResumida),
     nota: texto(bruto.nota, 2000),
   };
 }
@@ -290,6 +323,10 @@ function normalizarEntradaCatalogo(prefixo) {
     saida.descLonga = texto(bruto.descLonga, 4000);
     saida.efeitos = listaDe(bruto.efeitos, 10, (e) => (typeof e === "string" && e.trim() ? e.trim().slice(0, 200) : null));
     saida.publico = bruto.publico === true;
+    // O editor antigo continua compatível; os novos campos opcionais não alteram entradas antigas.
+    for (const campo of ["efeito", "canalizacao", "danosExtras"]) {
+      if (Object.hasOwn(bruto, campo)) saida[campo] = camposDePoder(bruto)[campo];
+    }
     return { ...saida, ...datasDe(bruto) };
   };
 }
@@ -328,6 +365,7 @@ const copiaDosAninhados = (e) => ({
   ...e,
   ...(e.cost ? { cost: { ...e.cost } } : {}),
   ...(Array.isArray(e.efeitos) ? { efeitos: [...e.efeitos] } : {}),
+  ...(Array.isArray(e.danosExtras) ? { danosExtras: e.danosExtras.map((d) => ({ ...d })) } : {}),
 });
 
 // Como a entrada vai para a ficha (copia independente; catalogId liga a cópia à origem).
@@ -378,12 +416,16 @@ const arquivoDe = (tipo, visao) =>
   tipo === "batalha" ? { schemaVersion: SCHEMA_VERSION, ...visao } : { schemaVersion: SCHEMA_VERSION, items: visao };
 
 /* ------------------------------ armazém ------------------------------ */
-function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCatalogo = dir } = {}) {
+function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCatalogo = dir, pastaFigurantes = null } = {}) {
   const pastaBackups = path.join(dir, "_backup");
   const pastaCorrompidos = path.join(dir, "_corrompidos");
   const caminhoDe = (tipo) => path.join(ARQUIVOS_NO_CATALOGO.includes(tipo) ? pastaCatalogo : dir, `${tipo}.json`);
+  const organizar = (tipo, arquivo) => {
+    if (pastaFigurantes && ["npcs", "inimigos"].includes(tipo)) sincronizarFigurantes(pastaFigurantes, tipo, arquivo.items);
+  };
 
   const cache = {};
+  const tiposCorrompidos = new Set();
   let fila = Promise.resolve();
   const campanha = { avisos: [], aoMudar: null };
 
@@ -450,6 +492,7 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
 
   /* ---- carga ---- */
   function carregarArquivo(tipo, { reescrever = true } = {}) {
+    tiposCorrompidos.delete(tipo);
     const caminho = caminhoDe(tipo);
     if (!fs.existsSync(caminho)) {
       cache[tipo] = arquivoPadrao(tipo);
@@ -470,6 +513,7 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
       normalizado = null;
     }
     if (!normalizado) {
+      tiposCorrompidos.add(tipo);
       // Não sobrescreve: guarda o arquivo estragado à parte e começa vazio, avisando.
       fs.mkdirSync(pastaCorrompidos, { recursive: true });
       const destino = path.join(pastaCorrompidos, `${tipo}_${carimbo()}.json`);
@@ -493,6 +537,7 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
     fs.mkdirSync(dir, { recursive: true });
     campanha.avisos = [];
     for (const tipo of TIPOS) carregarArquivo(tipo);
+    for (const tipo of ["npcs", "inimigos"]) if (!tiposCorrompidos.has(tipo)) organizar(tipo, cache[tipo]);
     // Com arquivo corrompido o estado atual está INCOMPLETO: não vira backup (senão empurraria o backup bom
     // para fora da rotação de 7). Os backups existentes ficam intactos para a restauração.
     if (campanha.avisos.length === 0) campanha.backup("inicio");
@@ -528,7 +573,16 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
       if (!arquivo) throw new ErroCampanha("dados_invalidos", "Dados inválidos.");
       fs.mkdirSync(path.dirname(caminhoDe(tipo)), { recursive: true });
       gravarJson(caminhoDe(tipo), arquivo);
+      try {
+        organizar(tipo, arquivo);
+      } catch (erro) {
+        // Só confirma quando ambos os formatos estão gravados; desfaz a alteração se a organização falhar.
+        gravarJson(caminhoDe(tipo), cache[tipo]);
+        try { organizar(tipo, cache[tipo]); } catch (recuperacao) { log.error("[FIGURANTE] Falha ao reconstruir pastas:", recuperacao); }
+        throw erro;
+      }
       cache[tipo] = arquivo;
+      if (pastaFigurantes && ["npcs", "inimigos"].includes(tipo)) log.log(`[FIGURANTE] ${tipo}: ${arquivo.items.length} registro(s) salvos e pastas sincronizadas.`);
       const dados = clonar(visaoDe(tipo, arquivo));
       campanha.aoMudar?.(tipo, dados);
       return dados;
@@ -637,6 +691,7 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
         }
       }
       for (const tipo of TIPOS) carregarArquivo(tipo, { reescrever: false });
+      for (const tipo of ["npcs", "inimigos"]) if (!tiposCorrompidos.has(tipo)) organizar(tipo, cache[tipo]);
       for (const tipo of TIPOS) campanha.aoMudar?.(tipo, clonar(visaoDe(tipo, cache[tipo])));
       log.log(`[CAMPANHA] Restaurado o backup ${nome}.`);
     });
@@ -650,7 +705,7 @@ if (require.main === module) {
   const pasta = process.env.CAMPANHA_DIR || path.join(__dirname, "campanha");
   const pastaDoCatalogo = process.env.CATALOGO_DIR || path.join(__dirname, "catalogo"); // habilidades, magias e itens
   const [comando, argumento] = process.argv.slice(2);
-  const c = criarCampanha(pasta, { pastaCatalogo: pastaDoCatalogo });
+  const c = criarCampanha(pasta, { pastaCatalogo: pastaDoCatalogo, pastaFigurantes: process.env.FIGURANTES_DIR || path.join(path.dirname(pasta), "Figurante") });
   c.iniciar();
   if (comando === "backups") {
     const lista = c.listarBackups();

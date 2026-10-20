@@ -4,18 +4,18 @@ tailwind.config = {
   theme: {
     extend: {
       colors: {
-        void: '#090b10',
+        void: '#0b1118',
         dungeon: {
-          950: '#0c0f16',
-          900: '#111622',
-          800: '#182030',
-          700: '#232d42',
-          600: '#32405d',
+          950: '#0b1118',
+          900: '#141d28',
+          800: '#1c2836',
+          700: '#354555',
+          600: '#54687c',
         },
         amberGold: {
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
+          400: '#d1b77c',
+          500: '#c4a86a',
+          600: '#d1b77c',
         },
         crimson: {
           400: '#f87171',
@@ -32,8 +32,8 @@ tailwind.config = {
         },
       },
       fontFamily: {
-        cinzel: ['"Cinzel"', 'serif'],
-        sans: ['"Inter"', 'sans-serif'],
+        cinzel: ['Georgia', '"Times New Roman"', 'serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '"Segoe UI"', 'sans-serif'],
       },
     },
   },

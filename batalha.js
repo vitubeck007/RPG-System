@@ -53,10 +53,12 @@ function adicionar(batalha, inimigo, quantidade) {
       nome: `${base} ${primeiro + i}`,
       imagem: inimigo.imagem,
       hp: { atual: inimigo.hpMax, max: inimigo.hpMax },
+      energia: clonar(inimigo.energia || { atual: 10, max: 10 }),
       derrotado: false,
       atributos: clonar(inimigo.atributos),
       ataques: clonar(inimigo.ataques),
       habilidades: clonar(inimigo.habilidades),
+      magias: clonar(inimigo.magias || []),
       nota: inimigo.nota,
     });
   }

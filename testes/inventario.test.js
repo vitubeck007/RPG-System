@@ -18,6 +18,7 @@ const scripts = [...htmlOriginal.matchAll(/<script src="(JS\/[^"]+)"/g)].map((m)
 function ficha(inventario, extra = {}) {
   const dom = new JSDOM(html, { virtualConsole: vc, runScripts: "outside-only", url: "http://localhost/", pretendToBeVisual: true });
   const w = dom.window;
+  w.confirm = () => true;
   w.sessionStorage.setItem("rpg_character", JSON.stringify({ player: "bia", nomePasta: "A_1" }));
   w.sessionStorage.setItem("rpg_token", "t");
   const h = {}, em = [];

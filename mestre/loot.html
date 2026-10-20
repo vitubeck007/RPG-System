@@ -15,37 +15,35 @@
     <!-- Regras compartilhadas com a ficha (catálogo de perícias, modificadores, escape de HTML...) -->
     <script src="/JS/regras.js"></script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;600;700&display=swap"
-        rel="stylesheet">
+    <link rel="stylesheet" href="/CSS/rpg-ui.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/mestre/CSS/mestre.css">
+    <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
 </head>
 
 <body
-    class="bg-void text-slate-200 font-sans min-h-screen flex flex-col pb-10 selection:bg-amberGold-600 selection:text-white">
+    class="rpg-app master-app flex flex-col">
+    <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
 
     <!-- Menu, token e conexão: montados pelo comum.js -->
     <header id="mestre-cabecalho" data-pagina="loot"></header>
 
-    <main class="max-w-7xl mx-auto px-6 mt-6 flex-1 w-full space-y-6">
+    <main id="mestre-conteudo" tabindex="-1" class="master-main space-y-6">
 
-        <div class="flex flex-wrap justify-between items-center gap-3 pb-2 border-b border-dungeon-800">
+        <div class="master-section-heading">
             <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2"><i class="fa-solid fa-gem"></i> Loot</h2>
-            <div class="flex gap-2" role="tablist">
-                <button id="loot-aba-itens" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Itens</button>
-                <button id="loot-aba-baus" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Baús</button>
+            <div class="flex gap-2" role="tablist" aria-label="Catálogo de loot">
+                <button id="loot-aba-itens" type="button" role="tab" aria-controls="loot-itens" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Itens</button>
+                <button id="loot-aba-baus" type="button" role="tab" aria-controls="loot-baus" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Baús</button>
             </div>
         </div>
 
         <!-- Catálogo de itens -->
-        <div id="loot-itens" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div id="loot-itens" role="tabpanel" aria-labelledby="loot-aba-itens" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
-                <div class="flex gap-2">
-                    <input id="loot-busca-item" type="text" maxlength="80" placeholder="Buscar item…" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
-                    <select id="loot-filtro-tipo" class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono"><option value="">Todos os tipos</option></select>
+                <div class="master-filters">
+                    <input id="loot-busca-item" aria-label="Buscar itens" type="search" maxlength="80" placeholder="Buscar item…" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
+                    <select id="loot-filtro-tipo" aria-label="Filtrar por tipo de item" class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono"><option value="">Todos os tipos</option></select>
                     <button id="loot-novo-item" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo</button>
                 </div>
                 <div id="loot-lista-itens" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
@@ -55,9 +53,15 @@
                 <div class="grid grid-cols-2 gap-2 text-xs font-mono">
                     <label class="col-span-2">Nome<input id="li-name"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                     <label class="">Tipo<input id="li-type"   maxlength="40" placeholder="Arma, Poção…" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Ícone<input id="li-icon"   maxlength="40" placeholder="fa-flask" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                     <label class="">Dado<input id="li-dice"   maxlength="30" placeholder="1d6+2" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Cor<input id="li-color"   maxlength="40" placeholder="text-amber-400" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <div id="li-aparencia" class="col-span-2 master-appearance">
+                        <div class="master-appearance-fields" data-aparencia-visual></div>
+                        <details><summary>Avançado: ícone e cor personalizados</summary>
+                            <p class="rpg-hint">Opcional. Valores existentes são mantidos até você alterá-los.</p>
+                            <label>Classe do ícone<input id="li-icon" maxlength="40" placeholder="Ex.: fa-flask" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                            <label>Classes de cor<input id="li-color" maxlength="40" placeholder="Ex.: from-slate-800 to-slate-900" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                        </details>
+                    </div>
                     <label class="">Peso<input id="li-weight"   type="number" min="0" step="0.01" value="0" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                     <label class="">Pilha máx.<input id="li-maxStack"   type="number" min="1" max="999" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                     <label class="">Largura<input id="li-w"   type="number" min="1" max="10" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
@@ -73,7 +77,7 @@
         </div>
 
         <!-- Baús -->
-        <div id="loot-baus" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div id="loot-baus" role="tabpanel" aria-labelledby="loot-aba-baus" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
                 <div class="flex justify-between items-center">
                     <p class="text-[11px] text-slate-500">Liberar mostra o baú aos jogadores conectados; recolher o esconde. Baú liberado não se edita.</p>
@@ -86,8 +90,8 @@
                 <label class="text-xs font-mono block">Nome do baú<input id="lb-nome"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                 <div id="lb-linhas" class="space-y-1"></div>
                 <div class="flex gap-2 text-xs font-mono">
-                    <select id="lb-item" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
-                    <input id="lb-qtd" type="number" min="1" max="999" value="1" class="w-16 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1">
+                    <select id="lb-item" aria-label="Item a adicionar ao baú" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
+                    <input id="lb-qtd" aria-label="Quantidade a adicionar" type="number" min="1" max="999" value="1" class="w-16 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1">
                     <button id="lb-add" type="button" class="px-2 py-1 rounded border border-dungeon-700">Adicionar</button>
                 </div>
                 <div class="flex gap-2 pt-1">
@@ -99,6 +103,8 @@
 
     </main>
 
+    <script src="/JS/interface.js"></script>
+    <script src="/mestre/JS/aparencia.js"></script>
     <script src="/mestre/JS/comum.js"></script>
     <script src="/mestre/JS/loot.js"></script>
 </body>

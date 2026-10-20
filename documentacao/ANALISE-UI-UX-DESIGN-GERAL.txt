@@ -1,0 +1,548 @@
+ANÁLISE GERAL DE DESIGN, USABILIDADE E UI/UX — RPG SYSTEM
+Diagnóstico original: 19/10/2026
+Consolidação documental: 20/10/2026
+Projeto: C:\Users\Vitor\Desktop\Projetos\RPG System
+
+COMO LER ESTE DOCUMENTO
+O diagnóstico abaixo descreve a interface ANTES da remodelação. Medidas,
+capturas mencionadas, problemas e recomendações são daquele momento, não
+uma nova inspeção do estado atual. As capturas antigas foram removidas.
+As três rodadas visuais e os 21 ajustes posteriores têm implementação;
+isso não significa que todo o conjunto foi validado em produção.
+
+Consulte PATCH-LOG-REMODELACAO-VISUAL.md para as mudanças implementadas e
+INFORMACOES-IMPORTANTES.md para estrutura, comandos, recuperação e testes.
+Os antigos relatórios de sprints/etapas foram consolidados nesses arquivos.
+
+DIRETRIZES ATUAIS APROVADAS PELO USUÁRIO
+- Usabilidade entre amigos: praticidade e conforto acima de ornamentação.
+- Manter azul-escuro, dourado suave, títulos serifados, botões legíveis e
+  organização visual; o segundo preview é referência, não cópia obrigatória.
+- Cabeçalho compacto: nome e nível não devem tomar a área útil da partida.
+- Perícias em duas colunas quando houver espaço, com totais em destaque;
+  consulta compacta e edição de bônus explícita. Uma coluna em tela pequena.
+- Grimório com filtros Todos / Habilidades / Magias, sem confundir categorias.
+- Preservar a mochila tetris; busca/lista complementam, não substituem a grade.
+- Preservar as regras, o backend e a identidade do personagem selecionado.
+- Navegação por teclado, foco, mensagens claras e adaptação móvel continuam
+  critérios de manutenção. Elementos narrativos do login são opcionais.
+
+PENDÊNCIAS DE AVALIAÇÃO
+Validar a versão acumulada com servidor real, sessão entre amigos, aparelhos
+móveis físicos, teclado virtual, nomes/listas longas e leitor de tela.
+Dependências CDN ainda existem em partes da ficha e do mestre. Não atribuir
+falhas de desempenho sem medição nem declarar acessibilidade certificada.
+
+REGISTRO HISTÓRICO ORIGINAL — DIAGNÓSTICO ANTERIOR À REMODELAÇÃO
+
+======================================================================
+1. CONCLUSÃO PRINCIPAL
+======================================================================
+
+O sistema já tem uma direção reconhecível: fantasia sombria, fundo azul quase
+preto, dourado, títulos com aparência de grimório e informações organizadas
+em fichas. Não falta um tema; falta transformar esse tema em uma identidade
+própria e em um conjunto consistente de componentes.
+
+Hoje, boa parte da personalidade vem de fontes, ícones e bordas douradas.
+Isso comunica "RPG", mas aproxima o produto de um painel genérico com tema
+medieval. As características mais interessantes do próprio sistema — seis
+atributos, combinação de rolagens, mochila espacial e relação mestre/jogador
+— têm mais potencial de identidade do que acrescentar ornamentos.
+
+A prioridade recomendada é tornar a interface mais legível, previsível e
+confortável no celular. A identidade visual deve acompanhar essa melhora.
+Uma simples troca de cores deixaria os principais problemas de uso intactos.
+
+É viável reformular a apresentação usando o HTML, CSS e JavaScript atuais,
+preservando os contratos de comunicação e os formatos de dados existentes.
+
+======================================================================
+2. ESCOPO, MÉTODO E LIMITES DA ANÁLISE
+======================================================================
+
+Foram examinados os arquivos de login, seleção, ficha do jogador, componentes
+de interface e páginas do mestre: Mesa, Rolagem, Loot, Habilidades/Magias e
+a nova página unificada de Figurantes.
+
+Além da leitura do código, houve inspeção no navegador de uma cópia
+temporária do projeto, com uma conta e personagens fictícios:
+
+- Desktop: viewport de 1280 x 720 pixels.
+- Tela móvel simulada: 390 x 844 pixels.
+- Verificação adicional de Loot: 360 x 800 pixels.
+- Fluxos observados: entrada, seleção, navegação da ficha, atributos,
+  mochila, abertura de editor do catálogo e abertura da ficha de figurante.
+- Mesa e Rolagem foram analisadas estruturalmente pelo código; não houve
+  simulação de uma sessão de combate completa nesta etapa.
+
+Os tamanhos abaixo são pixels CSS medidos no navegador, não dimensões
+físicas de um aparelho. Na cópia temporária, Vigor estava oculto pela
+configuração padrão de teste; isso não representa a configuração da mesa
+real, cujo arquivo atual habilita Mana/Vigor.
+
+Não houve teste em celular físico, Safari/iOS, teclado virtual, leitor de
+tela real ou validação completa com zoom. Também não houve auditoria formal
+de acessibilidade, medição de desempenho ou pesquisa com jogadores.
+Problemas dependentes dessas condições estão identificados como riscos.
+
+Nenhuma suíte automática de funcionalidades foi executada nesta etapa.
+Esta análise não substitui o teste funcional dos novos Inimigos/NPCs.
+Nenhum arquivo de execução ou dado da mesa real foi alterado nesta análise.
+
+======================================================================
+3. PONTOS POSITIVOS QUE VALE PRESERVAR
+======================================================================
+
+- Separação clara entre ficha do jogador e ferramentas do mestre.
+- Organização da ficha por temas, em vez de um formulário único gigantesco.
+- Cores diferentes para vida, vigor e sanidade.
+- Retrato e nome do personagem como elementos de reconhecimento.
+- Mochila espacial e combinação de dados: recursos com personalidade.
+- Estados de conexão, confirmação de salvamento e mensagens de erro já
+  existentes. Há uma base funcional para comunicar o que está acontecendo.
+- Grids que já mudam de colunas conforme a largura e menus com rolagem
+  horizontal localizada. A responsividade existe, embora seja incompleta.
+- Na nova ficha de figurantes: janela central, cabeçalho/rodapé separados,
+  conteúdo rolável, foco controlado, Escape e bloqueio do fundo.
+- Indicação de público/privado e confirmação de exclusão no mestre.
+
+======================================================================
+4. ACHADOS PRIORIZADOS
+======================================================================
+
+Prioridades usadas:
+P1 = afeta ações frequentes, acesso a controles ou segurança de uso.
+P2 = prejudica compreensão, consistência ou identidade visual.
+P3 = refinamento após resolver os pontos anteriores.
+
+4.1. P1 — A BARRA DE LOOT ULTRAPASSA A LARGURA DO CELULAR
+
+Observado: em 390 px, o documento de Loot chegou a 402 px e o limite direito
+do botão "+ Novo" também chegou a 402 px. Em 360 px, o documento continuou
+com 402 px. A parte direita do botão ficou cortada na inspeção visual.
+
+Causa visível no front-end: busca, seletor de tipo e botão dividem uma linha
+flexível sem tratamento suficiente para o tamanho mínimo dos campos.
+Referência: mestre/loot.html, controles loot-busca-item, loot-filtro-tipo
+e loot-novo-item.
+
+Recomendação: empilhar ou reorganizar esses controles no breakpoint móvel;
+usar min-width: 0 nos elementos flexíveis e dimensionar o botão de forma
+previsível. A rolagem horizontal deve ficar reservada a regiões que realmente
+precisem dela, como uma grade espacial, e não à página inteira.
+
+4.2. P1 — ALVOS DE TOQUE PEQUENOS
+
+Observado na ficha móvel: os botões -1/+1 dos vitais tinham cerca de 20 px de
+altura. O botão do máximo, quando exibia "0", tinha aproximadamente 6 x 16 px.
+Na seleção, Excluir/Sair tinham 30 px de altura na medição desktop. O Salvar
+do catálogo tinha 30 px; o da nova ficha de figurantes, aproximadamente 35 px.
+
+Impacto: aumenta a chance de toque errado, especialmente ao editar números
+próximos. Mudar uma ficha exige precisão demais para uma ação recorrente.
+
+Recomendação de projeto: área interativa próxima de 44 x 44 px nas ações
+móveis frequentes, mesmo que o ícone desenhado seja menor. Esse valor é uma
+meta de conforto adotada nesta proposta, não uma certificação normativa.
+Também separar melhor as ações de aumentar, diminuir e editar o máximo.
+
+4.3. P1 — CABEÇALHO FIXO OCUPA MUITO ESPAÇO ÚTIL
+
+Observado: a ficha ocupou aproximadamente 242 px de cabeçalho em 390 x 844,
+com o conteúdo principal começando em torno de 266 px. O mestre ocupou
+cerca de 200 px nessa largura; em Loot a 360 x 800, chegou a 231 px.
+
+Isso reserva aproximadamente um quarto a quase um terço da altura para
+informações fixas. O teclado virtual, ainda não testado, tende a reduzir
+mais o espaço disponível para campos e botões.
+
+Recomendação: versão compacta do cabeçalho no celular. Manter nome curto,
+resumo dos vitais e acesso à navegação; abrir detalhes de perfil, token e
+outras informações em um painel de expansão. O nome completo precisa de
+um caminho claro de consulta, pois ficou visualmente truncado no exemplo.
+
+4.4. P1 — CRIAÇÃO E EDIÇÃO TÊM COMPORTAMENTOS DIFERENTES
+
+No catálogo de habilidades, o editor aparece depois da biblioteca e da
+seção "Adicionar à ficha" no layout móvel. Na amostra vazia, a parte de cima
+do editor estava em torno de 617 px e o campo Nome em 678 px. O botão Salvar
+fica mais abaixo, seguindo o restante do formulário.
+
+Em uma biblioteca maior, a posição pode variar ainda mais. Loot também usa
+editor lateral que se transforma em conteúdo abaixo da lista. Figurantes
+usa janela central; a ficha tem outros modais e edição direta nos campos.
+
+Recomendação: um padrão compartilhado de edição. Em desktop, janela ou
+painel lateral quando ajudar a manter contexto; no celular, uma superfície
+de edição que ocupe quase toda a tela, com título, fechar/voltar e ações
+principais sempre localizáveis. O formulário deve receber foco e anunciar
+claramente o que está sendo editado.
+
+4.5. P1 — OS ESTADOS IMPORTANTES TÊM POUCO DESTAQUE
+
+O indicador de salvamento da ficha usa texto de 10 px. Os avisos temporários
+de JS/ui.js e mestre/JS/comum.js começam a desaparecer após 2,4 segundos.
+Essa duração pode servir para confirmações simples, mas é curta para erros
+que exigem leitura, decisão ou nova tentativa.
+
+No mestre, "Servidor Online" indica a conexão; isso não garante que o token
+foi aceito. Um usuário pode interpretar conexão como acesso autorizado.
+No login, o texto muda para "Conectando...", mas a função não desabilita os
+botões durante o pedido.
+
+Recomendação: diferenciar visualmente carregando, conectado, autorizado,
+salvando, salvo, pendente e erro. Exibir problemas persistentes junto à ação
+afetada, com orientação de recuperação. Bloquear reenvios involuntários
+enquanto uma operação estiver em andamento. Usar as respostas já existentes.
+
+A fila de alterações da ficha está em memória da página. A apresentação
+não deve prometer salvamento offline durável após fechar/recarregar o site.
+
+4.6. P2 — HIERARQUIA VISUAL MUITO UNIFORME
+
+Quase todos os blocos recebem fundo escuro, borda, cantos arredondados,
+sombra e títulos em dourado. Botões, divisores, molduras e dados relevantes
+acabam disputando o mesmo nível de atenção.
+
+Recomendação: três níveis de superfície e três níveis de ação bem definidos.
+A ação principal precisa ser reconhecível mesmo sem ler todos os botões.
+Reservar a moldura temática para regiões de identidade, e usar divisores
+mais discretos em formulários e listas extensas.
+
+4.7. P2 — TIPOGRAFIA DENSA E EXCESSO DE LETRAS DECORATIVAS
+
+Há uso recorrente de textos de 9, 10 e 11 px, botões de 10/12 px e fonte
+monoespaçada em instruções inteiras. Cinzel aparece também em controles
+pequenos, além dos títulos. O resultado exige atenção contínua para leitura.
+
+Recomendação: corpo de leitura entre 14 e 16 px como ponto de partida;
+16 px nos campos móveis; metadados menores com uso restrito. Usar Cinzel
+em títulos curtos, Inter em instruções e formulários, e números tabulares
+ou monoespaçados em valores, rolagens e fórmulas.
+
+Campos pequenos também podem provocar zoom automático em alguns navegadores
+móveis; esse comportamento precisa de teste específico em iOS.
+
+4.8. P2 — A IDENTIDADE AINDA DEPENDE DE ELEMENTOS GENÉRICOS
+
+Os nomes "Grimório RPG", "Grimório & Ficha de RPG" e "Painel de Controle do
+Mestre" não constroem sozinhos uma assinatura visual consistente. Os ícones
+do Font Awesome comunicam funções, mas não funcionam como símbolo próprio.
+O retrato padrão exibido no teste era uma natureza-morta floral, carregada
+da URL padrão do Unsplash presente no HTML, sem relação direta com o herói.
+
+Recomendação: manter "Grimório" como referência de linguagem enquanto o nome
+definitivo não for escolhido; criar uma pequena insígnia própria e um
+tratamento consistente para retratos, títulos e resumos. Um motivo inspirado
+nas seis marcas dos atributos pode dar identidade ao produto. O retrato
+vazio pode usar silhueta, iniciais ou selo, sem exigir imagem externa.
+
+4.9. P2 — NAVEGAÇÃO PRINCIPAL PARCIALMENTE ESCONDIDA
+
+Na ficha a 390 px, os botões da navegação se estendiam até cerca de 713 px
+no espaço de rolagem horizontal. Isso não causou transbordamento da página,
+mas parte das áreas importantes, incluindo Dados, ficou fora da primeira
+visão. No mestre, os últimos destinos também exigem rolar o menu.
+
+Recomendação: nomes mais curtos e navegação adequada ao papel. Para jogador,
+considerar Ficha, Perícias, Mochila, Grimório e Dados; para mestre, um seletor
+de áreas ou menu compacto. A barra horizontal pode continuar existindo se
+houver indicação clara de conteúdo lateral e estado ativo evidente.
+
+Na ficha não foi encontrado um comando próprio visível para "Trocar
+personagem". Um menu de perfil pode apontar para a seleção já existente.
+JS/ui.js também não registra a aba ativa entre recarregamentos. Preservar
+essa preferência de interface reduziria a repetição de passos.
+
+4.10. P2 — O USO DURANTE A PARTIDA NÃO TEM DESTAQUE SUFICIENTE
+
+A ficha abre em Biografia. No celular, um retrato de 192 x 256 px e os dados
+do perfil tomam grande parte da primeira tela de conteúdo. O histórico do
+personagem tem valor, mas compete com ações de consulta rápida durante jogo.
+
+Recomendação: planejar um resumo de sessão, ou lembrar a última área usada,
+priorizando vitais, testes e equipamentos. Manter a biografia em uma área
+própria e a edição de perfil claramente identificada. Essa reorganização
+deve consumir os dados já carregados, sem inventar novas regras.
+
+Nas perícias há botões "+" para editar bônus e outro "+" para adicionar ao
+Combo. São ações diferentes com apresentação parecida. Rótulos contextuais
+e agrupamento visual devem distinguir "editar bônus" de "usar na rolagem".
+
+4.11. P2 — CONFIGURAÇÕES TÉCNICAS APARECEM COMO CAMPOS DE PRODUTO
+
+O editor de itens pede classes como "fa-flask" e "text-amber-400" em campos
+de ícone e cor. Isso exige que o mestre conheça a implementação da interface.
+
+Recomendação: seletor visual de ícones e amostras de cores com nomes simples.
+Internamente, continuar enviando exatamente os valores aceitos pelo sistema.
+Da mesma forma, Vida/HP, Vigor/Mana e Energia precisam de uma convenção
+visível. Não unificar recursos diferentes por causa do redesenho: explicar
+os rótulos e manter as chaves e regras existentes.
+
+4.12. P2 — ENTREGA DE PODERES PODE PERDER CONTEXTO NO CELULAR
+
+No catálogo do mestre, o destinatário fica em um bloco separado e cada
+cartão apresenta "Adicionar". Ao rolar uma lista, o personagem selecionado
+pode sair da visão. Isso cria risco de dúvida sobre quem receberá o poder;
+não foi constatada uma entrega incorreta nesta análise.
+
+Recomendação: indicar o destinatário junto ao comando, por exemplo,
+"Enviar para Lyra", ou manter um resumo compacto desse contexto. Preservar
+a distinção entre publicar no catálogo e entregar a um personagem.
+
+4.13. P2 — ACESSIBILIDADE NÃO É CONSISTENTE ENTRE OS COMPONENTES
+
+Na seleção, os personagens são divs com evento de clique, sem o comportamento
+de teclado de um botão/link. O avatar também usa um contêiner clicável.
+As abas principais da ficha trocam classes, mas não expõem seleção e
+relacionamento com os painéis como um componente de abas completo.
+Botões repetidos de "+" e "-" precisam de nomes que incluam o contexto.
+
+A nova ficha de figurantes já tem práticas que podem servir de referência:
+role de diálogo, identificação por título, controle de foco, Escape e fundo
+inativo. Os modais de retrato/seleção e outros editores não usam todos esses
+recursos de forma equivalente. Não foi encontrada regra global para reduzir
+animações conforme a preferência do usuário.
+
+Recomendação: elementos semânticos nativos, foco visível, ordem de teclado
+previsível, nomes acessíveis e mensagens de estado anunciadas. Validar com
+teclado e leitor de tela; o exame do código não comprova acessibilidade plena.
+
+4.14. P2 — A MOCHILA PRECISA DE UMA EXPERIÊNCIA MÓVEL PRÓPRIA
+
+O modelo espacial é interessante e deve ser preservado. A grade usa células
+de 60 px com intervalo de 3 px. Uma grade de 10 colunas exige 627 px antes
+das margens externas. Os bolsos 3 x 3 observados tinham 186 px e couberam.
+Portanto, o risco está nas configurações maiores, não em toda mochila.
+
+Os itens são contêineres clicáveis e o popover tem largura de 288 px.
+Há rolagem horizontal localizada, mas a combinação de rolagem da grade,
+posição do popover e teclado/toque precisa de verificação em aparelho real.
+
+Recomendação: oferecer uma visão em lista no celular usando os mesmos itens,
+com Equipar, Usar e Detalhes acessíveis por toque/teclado. A grade pode ser
+uma visualização alternativa, sem alterar capacidade, peso, empilhamento,
+posição, UIDs ou regras de equipamento. Não presumir suporte a arrastar:
+o fluxo atual examinado abre ações por clique.
+
+4.15. P3 — DEPENDÊNCIAS VISUAIS E CUSTO DOS EFEITOS
+
+O layout principal depende do Tailwind carregado por CDN. Fontes, ícones e
+o retrato padrão também dependem de recursos externos. CSS/index.css tem
+principalmente detalhes decorativos e a grade; mestre/CSS/mestre.css contém
+basicamente a barra de rolagem. A ficha nova tem CSS próprio mais completo.
+
+As paletas estão repetidas entre o HTML da ficha, login/seleção, configuração
+Tailwind do mestre e CSS dos figurantes, com variações entre elas.
+
+Recomendação: um conjunto compartilhado de variáveis/componentes e estilos
+estáticos preparados localmente para o front-end, com fontes de fallback.
+Isso permite uma aparência mais previsível em conexões instáveis. Blur,
+sombras e animações devem ser moderados e respeitar redução de movimento.
+Não foi medido travamento: o possível custo desses efeitos é um risco,
+não uma falha de desempenho comprovada.
+
+======================================================================
+5. DIREÇÃO PROPOSTA PARA O NOVO DESIGN
+======================================================================
+
+Conceito de trabalho: "Grimório de campo / gabinete do mestre".
+
+Uma interface de fantasia sombria com a clareza de um instrumento de mesa.
+A identidade entra em títulos, retratos, insígnia e poucos detalhes de
+moldura. A leitura e as operações numéricas recebem tratamento simples.
+
+Características sugeridas:
+- Fundo de tinta azul-escura, superfícies diferenciadas e dourado envelhecido.
+- Cabeçalhos editoriais com uma assinatura própria, sem ornamentar tudo.
+- Uma mesma linguagem para ficha do jogador e ficha do figurante.
+- Jogador: foco no personagem e nas ações do turno.
+- Mestre: foco em consulta, destinatários, alvos e organização da sessão.
+- Ícones funcionais acompanhados de texto nas ações menos óbvias.
+- Estados vazios com próximo passo claro, e não apenas ausência de registros.
+
+Paleta candidata — proposta para prototipação, não aplicada nem certificada:
+
+Fundo principal:      #0B1017
+Superfície:          #141D29
+Superfície elevada:  #1D2938
+Borda:               #35465B
+Texto principal:     #EEF1F5
+Texto secundário:    #B0BDCD
+Identidade/destaque:  #C6A665
+Texto sobre dourado: #16130D
+Vida:                #E17B86
+Energia/Vigor:       #75B9D8
+Sanidade:            #B49ADF
+Confirmação:         #7BC69B
+Aviso:               #E2BF7B
+Erro/destruição:     #E88B92
+
+Cada combinação final precisa ser medida no tamanho e estado reais do
+componente, incluindo desabilitado e foco. A proposta não equivale a uma
+auditoria de contraste. Cor deve acompanhar texto, ícone ou forma, sem ser
+o único meio de transmitir informação.
+
+Estrutura visual recomendada:
+- Escala de espaçamento baseada em 4/8 px, com respiro entre grupos.
+- Textos de leitura em 14–16 px; títulos de painel em 18–24 px como referência.
+- Botões primários preenchidos; secundários discretos; destrutivos separados.
+- Uma família de campos, cards, abas, notificações e janelas compartilhadas.
+- Cabeçalho compacto e formulários de uma coluna no celular quando necessário.
+- Janelas móveis próximas da tela inteira, com rolagem interna controlada.
+- Caminhos claros para cancelar, salvar, voltar e consultar detalhes.
+
+======================================================================
+6. RECOMENDAÇÕES POR ÁREA
+======================================================================
+
+LOGIN
+Preservar a simplicidade. Reforçar identidade com insígnia e composição,
+melhorar estados de envio e validar os dois caminhos, Entrar/Criar conta,
+de modo consistente. Não apresentar recuperação de senha sem suporte real.
+
+SELEÇÃO DE PERSONAGENS
+Cards com foco/teclado, símbolo ou iniciais e ação "Jogar" mais explícita.
+Separar a exclusão da ação principal e manter confirmação com nome do alvo.
+A API atual da lista entrega nome e nomePasta; retrato, classe e nível não
+devem ser prometidos nessa tela sem verificar os dados realmente disponíveis.
+
+FICHA DO JOGADOR
+Reduzir o topo fixo, tornar edição de máximos/perfil descobrível, dar acesso
+rápido aos testes, distinguir edição de bônus e composição de rolagens,
+e manter o estado de salvamento legível. Retrato grande deve ser opcional
+durante o uso de sessão, especialmente no celular.
+
+MESA DO MESTRE
+Dar destaque a jogadores e mudanças relevantes, com histórico consultável.
+No celular, separar a consulta de jogadores do histórico longo por abas ou
+expansão; preservar a atualização em tempo real e a privacidade existente.
+
+ROLAGEM E DANO
+Organizar visualmente o fluxo existente: escolher fórmula/fonte, conferir
+alvos e multiplicadores, aplicar e revisar resultado. Dar contexto ao
+Desfazer e manter confirmação visual do que já foi aplicado. Não modificar
+o cálculo nem criar botões com efeitos que o servidor não oferece.
+
+LOOT E CATÁLOGOS
+Corrigir primeiro a barra móvel que transborda. Padronizar editor e seleção
+de destinatário, substituir classes técnicas por seletores visuais e
+distinguir as ações Editar, Publicar, Entregar, Liberar e Recolher.
+
+INIMIGOS / NPCs
+Usar a nova ficha como referência de agrupamento e sobreposição, ajustando
+tipografia, áreas de toque e cores à linguagem geral. O comportamento com
+teclado virtual e uso prolongado ainda precisa de teste em aparelho real.
+
+======================================================================
+7. LIMITES PARA UMA FUTURA IMPLEMENTAÇÃO SÓ DE FRONT-END
+======================================================================
+
+Podem ser reformulados: composição das telas, CSS, tipografia, ícones,
+textos de interface, responsividade, semântica, foco, navegação visual,
+formulários, estados de envio e apresentação dos dados já disponíveis.
+
+Devem ser preservados:
+- Rotas e contratos HTTP/Socket.IO existentes.
+- CHARACTER.player e CHARACTER.nomePasta como identidade do personagem.
+- Autenticação e separação das conexões de jogador e mestre.
+- Chaves e funcionamento das configurações globais.
+- STATE, limites, cálculos e conversões de dados da ficha.
+- Persistência, formatos JSON, backups e regras do servidor.
+- Regras de energia, vitais, inventário, entregas e combate.
+- Privacidade: uma mudança visual não autoriza expor dados do mestre.
+
+Os scripts atuais dependem de IDs, atributos data-campo e eventos do DOM.
+Uma substituição de marcação precisa manter esses pontos de integração ou
+adaptar os manipuladores de interface de forma controlada. Não basta
+trocar o HTML e presumir que todos os botões continuarão ligados.
+
+Uma aparência unificada não exige uma única conexão entre mestre e jogador,
+nem elimina automaticamente as reconexões ao navegar entre páginas do mestre.
+Essa questão não deve ser confundida com o redesenho visual.
+
+======================================================================
+8. ORDEM DE TRABALHO RECOMENDADA
+======================================================================
+
+1) Definir a linguagem visual e os componentes básicos: cores, texto,
+   espaçamento, botões, campos, foco e estados.
+2) Desenhar primeiro a ficha e o catálogo de itens em larguras móveis.
+   Resolver alvos pequenos, cabeçalho e transbordamento.
+3) Padronizar os editores e a navegação, preservando os fluxos existentes.
+4) Aplicar o mesmo sistema visual ao login, seleção, mestre e figurantes.
+5) Refinar identidade, imagens, microinterações e desempenho percebido.
+6) Fazer validação funcional e de acessibilidade antes da adoção completa.
+
+O trabalho deve ser incremental. Cada área redesenhada precisa continuar
+realizando as mesmas operações antes de a mudança avançar para outra.
+
+======================================================================
+9. CRITÉRIOS SUGERIDOS PARA VALIDAR O FUTURO FRONT-END
+======================================================================
+
+- Navegar em 360, 390, 768, 1024 e 1280 px sem cortar ações essenciais.
+- Ausência de rolagem horizontal da página; exceções localizadas identificadas.
+- Usar as ações principais com uma mão e testar com teclado virtual aberto.
+- Editar vida, perícia, item e poder sem depender de tooltip ou hover.
+- Percorrer login, seleção, abas e modais apenas pelo teclado.
+- Verificar foco visível, retorno de foco e saída por Escape onde aplicável.
+- Testar nomes longos, listas cheias, descrições grandes e mochila ampla.
+- Distinguir conectado/autorizado e salvando/salvo/erro sem depender só de cor.
+- Saber qual personagem receberá uma entrega antes de confirmar.
+- Recarregar, reconectar e trocar de tela mantendo os dados coerentes.
+- Repetir os testes atuais de persistência, inventário, combate e acesso.
+- Validar em pelo menos um Android e um iPhone reais, sem presumir que a
+  simulação por largura representa teclado, toque e comportamento do sistema.
+
+======================================================================
+10. REFERÊNCIAS LOCAIS DA INSPEÇÃO
+======================================================================
+
+As referências abaixo apontam os componentes analisados, não arquivos
+alterados por esta entrega:
+
+C:\Users\Vitor\Desktop\Projetos\RPG System\index.html
+  Cabeçalho, vitais, abas, formulários, retratos e modais da ficha.
+C:\Users\Vitor\Desktop\Projetos\RPG System\CSS\index.css
+  Molduras, brilhos, grade da mochila e animações.
+C:\Users\Vitor\Desktop\Projetos\RPG System\login\entrar.html
+  Entrada/criação de conta e comunicação de carregamento.
+C:\Users\Vitor\Desktop\Projetos\RPG System\login\login.html
+  Seleção de personagem, criação e exclusão.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\ui.js
+  Troca de abas e notificações temporárias.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\salvamento.js
+  Estados de salvamento que o novo visual precisa comunicar.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\vitais.js
+  Edição do máximo e ajuste dos recursos.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\pericias.js
+  Botões de bônus e composição do Combo.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\inventario.js
+  Dimensões da grade, itens clicáveis e popover.
+C:\Users\Vitor\Desktop\Projetos\RPG System\JS\codice.js
+  Catálogo e criação de poderes na ficha.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\JS\comum.js
+  Cabeçalho, navegação, token, conexão, confirmação e avisos.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\JS\tailwind-config.js
+  Paleta e fontes atuais do mestre.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\CSS\mestre.css
+  Estilos globais atuais do mestre.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\index.html
+  Mesa de jogadores e histórico de rolagens.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\rolagem.html
+  Fluxo de rolagem, escolha de alvos e aplicação de dano.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\loot.html
+  Biblioteca, filtros, criação de itens e baús.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\habilidades-magias.html
+  Catálogo, destinatário e editor de poderes.
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\figurantes.html
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\CSS\figurantes.css
+C:\Users\Vitor\Desktop\Projetos\RPG System\mestre\JS\figurantes.js
+  Novo padrão de ficha central e janelas sobrepostas.
+
+ENTREGA DESTA ETAPA
+Somente este relatório TXT. As recomendações são propostas para uma próxima
+etapa; nenhuma delas foi aplicada ao front-end ou ao backend nesta análise.

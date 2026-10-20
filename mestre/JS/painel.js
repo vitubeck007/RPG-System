@@ -82,6 +82,8 @@ socket.on('master_feedback', (fb) => {
 
 function renderizarCardsJogadores() {
     const container = document.getElementById('players-cards-container');
+    const acaoFocada = container.contains(document.activeElement)
+        ? document.activeElement.getAttribute('onclick') : null;
     const countEl = document.getElementById('connected-count');
     const playerIds = Object.keys(players);
 
@@ -122,7 +124,7 @@ function renderizarCardsJogadores() {
 
             <div class="space-y-3">
               <!-- HP -->
-              <div>
+              <div class="master-player-vital" data-vital="hp">
                 <div class="flex justify-between text-xs font-mono mb-1">
                   <span class="text-crimson-400 font-bold flex items-center gap-1"><i class="fa-solid fa-heart-pulse"></i> HP</span>
                   <span class="text-slate-300 font-bold">${v.hp.current}/${v.hp.max} (${hpPct}%)</span>
@@ -139,7 +141,7 @@ function renderizarCardsJogadores() {
               </div>
 
               <!-- VIGOR -->
-              <div data-vigor-vital>
+              <div data-vigor-vital class="master-player-vital" data-vital="vigor">
                 <div class="flex justify-between text-xs font-mono mb-1">
                   <span class="text-vigor-400 font-bold flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Vigor</span>
                   <span class="text-slate-300 font-bold">${v.vigor.current}/${v.vigor.max}</span>
@@ -154,7 +156,7 @@ function renderizarCardsJogadores() {
               </div>
 
               <!-- SANIDADE -->
-              <div>
+              <div class="master-player-vital" data-vital="sanity">
                 <div class="flex justify-between text-xs font-mono mb-1">
                   <span class="text-sanity-400 font-bold flex items-center gap-1"><i class="fa-solid fa-brain"></i> Sanidade</span>
                   <span class="text-slate-300 font-bold">${v.sanity.current}/${v.sanity.max}</span>
@@ -180,8 +182,23 @@ function renderizarCardsJogadores() {
         if (!systemConfig.AtivarMana) {
             card.querySelector('[data-vigor-vital]')?.remove();
         }
+        const rotulosVitais = { hp: 'vida', vigor: 'vigor', sanity: 'sanidade' };
+        card.querySelectorAll('[data-vital]').forEach(area => {
+            const tipo = area.dataset.vital;
+            const botao = document.createElement('button');
+            botao.type = 'button'; botao.textContent = 'Ajustar…';
+            botao.setAttribute('onclick', `abrirAjusteVitalMestre('${id}', '${tipo}')`);
+            area.querySelector('button')?.parentElement.append(botao);
+        });
+        card.querySelectorAll('[data-vital] button').forEach(botao => {
+            const vital = rotulosVitais[botao.closest('[data-vital]').dataset.vital];
+            botao.setAttribute('aria-label', `${botao.textContent} em ${vital} de ${p.name || 'personagem'}`);
+        });
+        card.querySelectorAll('i.fa-solid').forEach(icone => icone.setAttribute('aria-hidden', 'true'));
         container.appendChild(card);
     });
+    if (acaoFocada) [...container.querySelectorAll('button[onclick]')]
+        .find(botao => botao.getAttribute('onclick') === acaoFocada)?.focus();
 }
 
 function alternarFicha(charId) {
@@ -252,7 +269,7 @@ function htmlPericias(f) {
           <span class="text-amberGold-400 font-bold">${formatarBonus(modAttr + bonus)}</span>
         </div>`;
     }).join('');
-    return secao('Perícias (total)', `<div class="grid grid-cols-1 gap-0.5">${linhas}</div>`);
+    return secao('Perícias (total)', `<div class="master-skills">${linhas}</div>`);
 }
 
 function htmlInventario(inv) {
@@ -290,12 +307,26 @@ function htmlCodice(titulo, dados) {
 
 function ajustarVital(charId, type, delta) {
     if (type === 'vigor' && !systemConfig.AtivarMana) return;
+    if (!socket.connected) return toast('Sem conexão. Reconecte antes de ajustar o vital.', 'error');
     const token = tokenDoMestre();
     socket.emit('master_adjust_vital', {
         token: token,
         charId: charId,
         type: type,
         delta: delta
+    });
+}
+
+function abrirAjusteVitalMestre(charId, tipo) {
+    const rotulos = { hp: 'Vida', vigor: 'Vigor', sanity: 'Sanidade' };
+    RPGUI.ajustarValor({
+        titulo: `${players[charId]?.name || 'Personagem'} · ${rotulos[tipo]}`,
+        ler: () => (tipo !== 'vigor' || systemConfig.AtivarMana) ? players[charId]?.vitals?.[tipo] : null,
+        aplicar: delta => {
+            if (!socket.connected) throw new Error('Sem conexão. Reconecte antes de ajustar o vital.');
+            ajustarVital(charId, tipo, delta);
+            toast('Ajuste enviado. Aguarde a confirmação do servidor.', 'info');
+        },
     });
 }
 

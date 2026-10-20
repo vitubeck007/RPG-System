@@ -33,7 +33,7 @@ socket.on("sync_config", (config) => {
   registrarNoTerminal("Configuração recebida do servidor", config);
 });
 
-socket.on("personagem_carregado", (personagem) => {
+function aplicarPersonagemCarregado(personagem, arquivosRecuperados = []) {
   jaCarregouAntes = true;
   if (
     !CHARACTER ||
@@ -46,6 +46,7 @@ socket.on("personagem_carregado", (personagem) => {
     });
     return;
   }
+  oferecerRecuperacaoFicha(personagem);
 
   // O servidor entrega todos os arquivos já no formato oficial (ver personagem.js).
   // Arquivo com alteração local ainda não enviada (ex.: reconexão) mantém a versão
@@ -147,12 +148,15 @@ socket.on("personagem_carregado", (personagem) => {
     player: CHARACTER.player,
     nomePasta: CHARACTER.nomePasta,
   });
+  arquivosRecuperados.forEach(arquivo => arquivosSujos.add(arquivo));
+  if (arquivosRecuperados.length) atualizarIndicadorSalvamento();
   syncPlayerToServer();
   enviarSalvamentosPendentes();
   pedirEntregasPendentes();
   enviarRolagensPendentes();
   atualizarEstadoFicha();
-});
+}
+socket.on("personagem_carregado", personagem => aplicarPersonagemCarregado(personagem));
 
 /* Faixa no topo que explica o que está acontecendo: conectando, carregando, sem conexão, sessão expirada. */
 let erroDeConexao = false;
@@ -268,8 +272,7 @@ function aplicarConfiguracaoGlobal(config) {
     .getElementById("popover-equip-backpack")
     ?.classList.toggle("hidden", !backpackEnabled);
   if (!backpackEnabled && itemPopoverAtual?.isBackpackItem) {
-    document.getElementById("item-popover")?.classList.add("hidden");
-    itemPopoverAtual = null;
+    fecharItemPopover();
   }
 
   const manaEnabled = GLOBAL_CONFIG.AtivarMana;

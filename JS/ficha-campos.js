@@ -34,6 +34,7 @@ function preencherCamposFicha() {
     }
     el.value = FICHA[arquivo]?.[chave] ?? "";
   });
+  atualizarIdentidadeVisual();
 }
 
 function alterarCampoFicha(el) {
@@ -60,6 +61,7 @@ function alterarCampoFicha(el) {
     if (nome) {
       STATE.name = nome;
       sessionStorage.setItem("rpg_character_name", nome);
+      atualizarIdentidadeVisual();
     }
   }
   marcarAlterado(arquivo);
@@ -173,6 +175,7 @@ function toggleRiquezas() {
     body.classList.remove("hidden");
     icon.classList.add("rotate-180");
   }
+  document.querySelector('#riches-section > button')?.setAttribute('aria-expanded', String(!isOpen));
 }
 
 // Ao digitar nas moedas: corrige o valor, redesenha o resumo, registra e salva.
@@ -195,9 +198,11 @@ function openAvatarModal() {
   // Abre com o link atual: salvar com o campo vazio significa "remover o retrato".
   document.getElementById("avatar-url-input").value = FICHA.perfil?.avatar || "";
   document.getElementById("avatar-modal").classList.remove("hidden");
+  RPGUI.abrirModal("avatar-modal", "avatar-url-input");
 }
 
 function closeAvatarModal() {
+  RPGUI.fecharModal("avatar-modal");
   document.getElementById("avatar-modal").classList.add("hidden");
 }
 

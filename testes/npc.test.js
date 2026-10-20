@@ -20,14 +20,14 @@ const novaPasta = () => {
 after(() => pastas.forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
 
 describe("Modelo do NPC (armazém)", () => {
-  it("limites: nome, papel, lore 500, segredo 2000, notas 2000; atributos opcionais; retrato validado", () => {
+  it("limites: nome, papel, lore 4000, segredo 2000, notas 2000; atributos opcionais; retrato validado", () => {
     const n = normalizarNpc({
-      nome: "  Brenna  ", papel: "p".repeat(200), lore: "l".repeat(900), segredo: "s".repeat(3000), notas: "n".repeat(3000),
+      nome: "  Brenna  ", papel: "p".repeat(200), lore: "l".repeat(5000), segredo: "s".repeat(3000), notas: "n".repeat(3000),
       retrato: "javascript:alert(1)", atributos: { FOR: "12", DES: "", INT: "abc", SAB: -4, PRE: 5000, VON: null, XXX: 9 }, hp: { atual: 50, max: 20 },
     });
     assert.equal(n.nome, "Brenna");
     assert.equal(n.papel.length, 80);
-    assert.equal(n.lore.length, 500);
+    assert.equal(n.lore.length, 4000);
     assert.equal(n.segredo.length, 2000);
     assert.equal(n.notas.length, 2000);
     assert.equal(n.retrato, "");
@@ -102,7 +102,7 @@ describe("NPCs com o servidor real", { concurrency: false }, () => {
     assert.equal((await listar(m)).filter((n) => n.id === a.id).length, 1);
     const hostil = await salvar(m, { nome: "<img src=x onerror=alert(1)>", retrato: "javascript:alert(1)", lore: "x".repeat(900), __proto__: { admin: 1 }, hp: { atual: "abc", max: 99999999 } });
     assert.equal(hostil.retrato, "");
-    assert.equal(hostil.lore.length, 500);
+    assert.equal(hostil.lore.length, 900);
     assert.equal(hostil.admin, undefined);
     assert.ok(hostil.hp.max <= 100000);
     const r = await cmd(m, "master_campanha_remover", { tipo: "npcs", id: a.id });
