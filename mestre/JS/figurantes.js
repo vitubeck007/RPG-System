@@ -3,6 +3,7 @@ const figurantes = {
   tipo: location.pathname.endsWith("/npc") ? "npcs" : "inimigos", aba: "biblioteca",
   inimigos: [], npcs: [], habilidades: [], magias: [], batalha: { ativa: false, combatentes: [] },
   editando: null, poderes: { habilidades: [], magias: [] }, ocupada: false, carregou: false,
+  selecionados: { inimigos: null, npcs: null },
 };
 const DADO_FIGURANTE = /^\d{0,3}d\d{1,4}\s*([+-]\s*\d{1,4})?$/i;
 const copiarFigurante = (v) => JSON.parse(JSON.stringify(v));
@@ -44,6 +45,11 @@ function previaFigurante() {
   if (img) previa.append(img); else previa.textContent = "✦";
 }
 
+function atualizarArmaEditorFig() {
+  campo("fig-arma-campos").disabled = !campo("fig-tem-arma").checked;
+  campo("fig-arma-previa").replaceChildren(iconeCartaoFig(campo("fig-arma-icone").value));
+}
+
 let validandoAberturaFig = false;
 async function abrirFichaFigurante(item = null) {
   if (figurantes.ocupada || validandoAberturaFig || janelasFig.length) return;
@@ -57,13 +63,17 @@ async function abrirFichaFigurante(item = null) {
   campo('fig-novo').disabled = true;
   campo('fig-novo').setAttribute('aria-busy', 'true');
   definirAvisoMestre('Validando acesso antes de abrir a ficha…');
-  let autorizado = false;
-  try { autorizado = Boolean(await entrarNaSalaDoMestre({ silencioso: false })); }
+  let acesso = null;
+  try { acesso = await entrarNaSalaDoMestre({ silencioso: false }); }
   finally {
     validandoAberturaFig = false; campo('fig-novo').disabled = false;
     campo('fig-novo').removeAttribute('aria-busy');
   }
-  if (!autorizado) { focarChaveMestre(); return; }
+  if (!acesso) { focarChaveMestre(); return; }
+  if (!acesso.recursos?.armaFigurante) {
+    const aviso = "Servidor desatualizado: reinicie node server.js e recarregue a página antes de editar figurantes. Esta versão do servidor não confirma o salvamento de armas.";
+    definirAvisoMestre(aviso, "error"); toast(aviso, "error"); return;
+  }
   // Uma resposta atrasada não deve abrir o editor em outro contexto.
   if (chave !== tokenDoMestre() || tipo !== figurantes.tipo || figurantes.aba !== 'biblioteca') return;
   if (!podeDescartarEditorMestre('fig-editor')) return;
@@ -81,6 +91,9 @@ async function abrirFichaFigurante(item = null) {
   campo("fig-vida-ajuda").textContent = tipo === "npcs" ? "A vida atual acompanha o NPC na mesa." : "Cópias entram em batalha com a vida cheia.";
   campo("fig-energia-atual").value = item?.energia?.atual ?? 10;
   campo("fig-energia-max").value = item?.energia?.max ?? 10;
+  campo("fig-tem-arma").checked = Boolean(item?.arma);
+  for (const [chave, padrao] of Object.entries({ nome: "", icone: "sword", alcance: "", dano: "", categoria: "media" })) campo(`fig-arma-${chave}`).value = item?.arma?.[chave] ?? padrao;
+  atualizarArmaEditorFig();
   for (const attr of ["FOR", "DES", "INT", "SAB", "PRE", "VON"]) campo(`fig-attr-${attr}`).value = item?.atributos?.[attr] ?? "";
   campo("fig-papel-label").classList.toggle("hidden", tipo !== "npcs");
   campo("fig-segredo-label").classList.toggle("hidden", tipo !== "npcs");
@@ -111,6 +124,9 @@ async function salvarFichaFigurante(event) {
   if (!nome) return toast("Dê um nome ao figurante.", "error");
   const imagem = campo("fig-imagem").value.trim();
   if (imagem && !urlDeImagem(imagem)) return toast("Retrato inválido. Use http/https ou um caminho /…", "error");
+  const arma = campo("fig-tem-arma").checked ? Object.fromEntries(["nome", "icone", "alcance", "dano", "categoria"].map(chave => [chave, campo(`fig-arma-${chave}`).value.trim()])) : null;
+  if (arma && !arma.nome) return toast("Dê um nome à arma ou desmarque Possui arma.", "error");
+  if (arma?.dano && !DADO_FIGURANTE.test(arma.dano) && !/^\d{1,5}$/.test(arma.dano)) return toast("Dano da arma inválido. Use 1d8+3, 2d6 ou um valor fixo como 5.", "error");
   const atributos = {};
   for (const attr of ["FOR", "DES", "INT", "SAB", "PRE", "VON"]) {
     const valor = campo(`fig-attr-${attr}`).value;
@@ -119,13 +135,15 @@ async function salvarFichaFigurante(event) {
   const item = {
     ...(original?.id ? { id: original.id } : {}), nome, descricao: campo("fig-descricao").value,
     lore: campo("fig-lore").value, energia: lerVitalFig("energia"), atributos,
-    habilidades: figurantes.poderes.habilidades, magias: figurantes.poderes.magias,
+    habilidades: figurantes.poderes.habilidades, magias: figurantes.poderes.magias, arma,
   };
   if (original && JSON.stringify(item.energia) === JSON.stringify(original.energia)) delete item.energia;
+  if (original && JSON.stringify(arma) === JSON.stringify(original.arma ?? null)) delete item.arma;
   if (tipo === "npcs") {
     Object.assign(item, { retrato: imagem, hp: lerVitalFig("hp"), notas: campo("fig-notas").value, papel: campo("fig-papel").value, segredo: campo("fig-segredo").value });
     if (original && JSON.stringify(item.hp) === JSON.stringify(original.hp)) delete item.hp;
   } else Object.assign(item, { imagem, hpMax: Number(campo("fig-hp-max").value), nota: campo("fig-notas").value, ataques: original?.ataques || [] });
+  if (original && tipo === "inimigos" && item.hpMax === original.hpMax) delete item.hpMax;
   bloquearCamposEnvioMestre("fig-form", true);
   figurantes.ocupada = true;
   campo("fig-salvar").disabled = true;
@@ -133,6 +151,12 @@ async function salvarFichaFigurante(event) {
   try {
     const salvo = await pedirAoServidor("master_campanha_salvar", { tipo, item }, { muda: true });
     atualizarItemFig(tipo, salvo);
+    if (Object.hasOwn(item, "arma") && !armasIguaisFig(arma, salvo.arma)) {
+      // O registro pode ter sido criado: mantenha seu id para a tentativa não gerar outra cópia.
+      figurantes.editando.original = copiarFigurante(salvo);
+      toast("O servidor não confirmou a arma. Seu formulário foi preservado. Reinicie node server.js, recarregue os dados e confira antes de tentar novamente.", "error");
+      return;
+    }
     figurantes.ocupada = false;
     fecharJanelaFig("fig-editor", true);
     toast(`${salvo.nome} salvo em Figurante/${tipo === "npcs" ? "NPCs" : "Inimigos"}/.`, "success");
@@ -267,79 +291,12 @@ async function salvarPoderFig(event) {
   finally { bloquearCamposEnvioMestre("fig-poder-form", false); figurantes.ocupada = false; campo("fig-poder-salvar").disabled = false; }
 }
 
-function medidoresFig(item, tipo) {
-  const linha = criar("div", "fig-medidores");
-  const hp = item.hp || { atual: item.hpMax, max: item.hpMax };
-  linha.append(criar("span", "", `Vida ${hp.atual}/${hp.max}`), criar("span", "", `Energia ${item.energia?.atual ?? 10}/${item.energia?.max ?? 10}`));
-  return linha;
-}
-
-function cartaoFigurante(item, tipo, batalha = false) {
-  const card = criar("article", "fig-cartao"); card.dataset.id = batalha ? item.alvoId : item.id;
-  card.dataset.uiChave = JSON.stringify([tipo, card.dataset.id]);
-  const topo = criar("div", "fig-topo"); const imagem = miniaturaDeImagem(item.imagem || item.retrato);
-  topo.append(criar("h3", "", item.nome)); if (imagem) topo.append(imagem); card.append(topo, medidoresFig(item, tipo));
-  if (item.descricao) card.append(criar("p", "fig-discreto", item.descricao.slice(0, 200)));
-  if (batalha && item.derrotado) card.append(criar("p", "fig-discreto", "Derrotado"));
-  const qtdPoderes = (item.habilidades?.length || 0) + (item.magias?.length || 0);
-  card.append(criar("p", "fig-discreto", `${qtdPoderes} poder(es) · ${(item.ataques || []).length} ataque(s) anterior(es)`));
-  const acao = (rotulo, tratar, classe = "") => { const b = botaoDeAcao(rotulo, rotulo, classe); b.addEventListener("click", () => tratar(b)); return b; };
-  const acoes = criar("div", "fig-acoes");
-  if (!batalha) {
-    acoes.append(acao("Abrir ficha", () => abrirFichaFigurante(item)), acao("Duplicar", async () => {
-      const copia = copiarFigurante(item); delete copia.id; copia.nome = `${copia.nome} (cópia)`.slice(0, 80);
-      try { atualizarItemFig(tipo, await pedirAoServidor("master_campanha_salvar", { tipo, item: copia }, { muda: true })); } catch { /* aviso comum */ }
-    }), acao("Excluir", (b) => confirmarNoBotao(b, async () => {
-      try { await pedirAoServidor("master_campanha_remover", { tipo, id: item.id }, { muda: true }); } catch { /* aviso comum */ }
-    }), "fig-perigo"));
-    if (tipo === "inimigos") {
-      const quantidade = criar("input"); quantidade.type = "number"; quantidade.value = "1"; quantidade.min = "1"; quantidade.max = "20"; quantidade.style.width = "65px"; quantidade.setAttribute("aria-label", "Cópias na batalha");
-      quantidade.dataset.preservar = 'copias';
-      acoes.append(quantidade, acao("Colocar em batalha", async () => { if (!quantidade.reportValidity()) return; try { await pedirAoServidor("master_batalha_adicionar", { modeloId: item.id, quantidade: Number(quantidade.value) }, { muda: true }); toast("Inimigo adicionado à batalha.", "success"); } catch { /* aviso comum */ } }));
-    }
-  }
-  if (batalha || tipo === "npcs") {
-    for (const delta of [-5, -1, 1, 5]) acoes.append(acao(`${delta > 0 ? "+" : ""}${delta} vida`, async () => {
-      try { await pedirAoServidor(batalha ? "master_batalha_hp" : "master_npc_hp", batalha ? { alvoId: item.alvoId, delta } : { id: item.id, delta }, { muda: true }); } catch { /* aviso comum */ }
-    }));
-  }
-  for (const delta of [-1, 1]) acoes.append(acao(`${delta > 0 ? "+" : ""}${delta} energia`, () => ajustarEnergiaFig(tipo, item, delta, batalha)));
-  for (const recurso of (batalha || tipo === 'npcs' ? ['hp', 'energia'] : ['energia'])) {
-    const atual = () => {
-      const lista = batalha ? figurantes.batalha.combatentes : figurantes[tipo];
-      const vivo = lista.find(x => (batalha ? x.alvoId : x.id) === (batalha ? item.alvoId : item.id));
-      const v = vivo?.[recurso];
-      return v ? { current: v.atual, max: v.max } : null;
-    };
-    acoes.append(acao(`Ajustar ${recurso === 'hp' ? 'vida' : 'energia'}…`, () => RPGUI.ajustarValor({
-      titulo: `${item.nome} · ${recurso === 'hp' ? 'Vida' : 'Energia'}`, ler: atual,
-      aplicar: delta => recurso === 'energia'
-        ? pedirAoServidor('master_figurante_energia', { tipo: batalha ? 'batalha' : tipo, id: item.alvoId || item.id, delta }, { muda: true })
-        : pedirAoServidor(batalha ? 'master_batalha_hp' : 'master_npc_hp', batalha ? { alvoId: item.alvoId, delta } : { id: item.id, delta }, { muda: true }),
-    })));
-  }
-  for (const lista of ["habilidades", "magias"]) (item[lista] || []).forEach((p, indice) => {
-    const linha = criar("details", "fig-poder-linha"); linha.append(criar("summary", "fig-discreto", p.nome), criar("p", "fig-discreto", textoPoderFig(p)), criar("p", "fig-discreto", p.desc || p.nota || ""), criar("p", "fig-discreto", p.efeito || ""));
-    linha.dataset.detalhe = JSON.stringify([lista, p.uid || p.id || `${p.catalogId || p.nome}:${indice}`]);
-    for (const d of p.danosExtras || []) linha.append(criar("p", "fig-discreto", `${d.tipo} · ${d.dado} · ${d.efeito}`));
-    if (p.cost?.vital === "vigor" && p.cost.amount > 0) linha.append(acao(`Usar (${p.cost.amount} energia)`, async () => {
-      try { await pedirAoServidor("master_figurante_usar_poder", { tipo: batalha ? "batalha" : tipo, id: item.alvoId || item.id, lista, indice, nome: p.nome }, { muda: true }); toast("Energia consumida. Aplique o efeito conforme as regras da mesa.", "success"); } catch { /* aviso comum */ }
-    }));
-    card.append(linha);
-  });
-  if (batalha) acoes.append(acao(item.derrotado ? "Reerguer" : "Derrotado", async () => {
-    try { await pedirAoServidor("master_batalha_derrotado", { alvoId: item.alvoId, derrotado: !item.derrotado }, { muda: true }); } catch { /* aviso comum */ }
-  }), acao("Remover da batalha", async () => { try { await pedirAoServidor("master_batalha_remover", { alvoId: item.alvoId }, { muda: true }); } catch { /* aviso comum */ } }, "fig-perigo"));
-  card.append(acoes); return card;
-}
-
-async function ajustarEnergiaFig(tipo, item, delta, batalha = false) {
-  try { await pedirAoServidor("master_figurante_energia", { tipo: batalha ? "batalha" : tipo, id: item.alvoId || item.id, delta }, { muda: true }); } catch { /* aviso comum */ }
-}
-
 function renderizarFigurantes() {
   const tipo = figurantes.tipo;
   const termo = semAcento(campo("fig-busca").value);
+  document.body.classList.toggle("fig-modo-batalha", figurantes.aba === "batalha");
+  campo("fig-titulo").textContent = tipo === "npcs" ? "NPCs" : "Inimigos";
+  document.querySelectorAll("[data-fig-tipo]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.figTipo === tipo)));
   campo("fig-novo").textContent = `+ Novo ${rotuloFigurante()}`;
   for (const aba of ["biblioteca", "batalha"]) {
     campo(`fig-${aba}`).classList.toggle("hidden", figurantes.aba !== aba);
@@ -349,7 +306,7 @@ function renderizarFigurantes() {
     campo(`fig-${aba}`).setAttribute("role", "tabpanel");
     campo(`fig-${aba}`).setAttribute("aria-labelledby", `fig-aba-${aba}`);
   }
-  campo("fig-busca").disabled = figurantes.aba !== "biblioteca";
+  campo("fig-busca").placeholder = figurantes.aba === "biblioteca" ? "Buscar por nome, descrição ou história…" : "Buscar combatente por nome ou notas…";
   campo("fig-novo").classList.toggle("hidden", figurantes.aba !== "biblioteca");
   const area = campo("fig-cartoes");
   const lista = figurantes[tipo].filter((x) => !termo || semAcento(`${x.nome} ${x.descricao} ${x.lore} ${x.papel || ""} ${x.notas || x.nota || ""}`).includes(termo)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -360,12 +317,26 @@ function renderizarFigurantes() {
     if (!lista.length) area.append(criar("p", "fig-vazio", figurantes.carregou ? "Nenhum figurante encontrado. Crie o primeiro para dar vida à sua história." : "Digite o token do mestre para carregar a biblioteca."));
   });
   const batalha = campo("fig-combatentes");
+  const combatentes = figurantes.batalha.combatentes.filter(x => (x.tipo === "npc" ? "npcs" : "inimigos") === tipo);
+  const visiveis = combatentes.filter(x => !termo || semAcento(`${x.nome} ${x.notasCombate || ""} ${x.nota || ""}`).includes(termo));
+  const selecionado = visiveis.find(x => x.alvoId === figurantes.selecionados[tipo]) || visiveis[0];
+  if (selecionado) figurantes.selecionados[tipo] = selecionado.alvoId;
+  else if (!combatentes.some(x => x.alvoId === figurantes.selecionados[tipo])) figurantes.selecionados[tipo] = null;
   RPGUI.preservarInteracao(batalha, () => {
     batalha.replaceChildren();
-    figurantes.batalha.combatentes.forEach((x) => batalha.append(cartaoFigurante(x, "batalha", true)));
-    if (!batalha.children.length) batalha.append(criar("p", "fig-vazio", "A batalha está vazia. Adicione cópias de um inimigo da biblioteca."));
+    batalha.dataset.rolavel = String(visiveis.length > 5);
+    visiveis.forEach(x => batalha.append(resumoCombatenteFig(x, x.alvoId === selecionado?.alvoId)));
+    if (!visiveis.length) batalha.append(criar("li", "fig-vazio", combatentes.length ? "Nenhum combatente corresponde à busca." : `Nenhum ${tipo === "npcs" ? "NPC" : "inimigo"} em batalha. Adicione uma cópia pela Biblioteca.`));
   });
-  campo("fig-batalha-resumo").textContent = `${figurantes.batalha.combatentes.filter((x) => !x.derrotado).length} em pé / ${figurantes.batalha.combatentes.length} combatentes`;
+  const ficha = campo("fig-selecionado");
+  campo("fig-selecionado-titulo").textContent = selecionado ? `Ficha do selecionado · ${selecionado.nome}` : "Ficha do selecionado";
+  RPGUI.preservarInteracao(ficha, () => {
+    ficha.replaceChildren();
+    if (selecionado) ficha.append(cartaoFigurante(selecionado, "batalha", true));
+    else ficha.append(criar("p", "fig-vazio", "A ficha aparecerá aqui ao selecionar um combatente."));
+  });
+  campo("fig-batalha-resumo").textContent = `${combatentes.filter(x => !x.derrotado).length} em pé / ${combatentes.length} ${tipo === "npcs" ? "NPCs" : "inimigos"} em combate${termo ? ` · ${visiveis.length} na busca` : ""}`;
+  campo("fig-limpar").disabled = !figurantes.batalha.combatentes.length;
 }
 
 async function carregarFigurantes() {
@@ -373,13 +344,14 @@ async function carregarFigurantes() {
   try {
     const dados = await pedirAoServidor("master_campanha_ler", {}, { silencioso: true });
     for (const tipo of ["npcs", "inimigos", "habilidades", "magias", "batalha"]) figurantes[tipo] = dados[tipo];
-    figurantes.carregou = true; renderizarFigurantes();
+    figurantes.carregou = true; sincronizarRascunhosCombateFig(); renderizarFigurantes();
   } catch { toast("Não foi possível carregar. Confira a conexão e o token do mestre.", "error"); }
 }
 
 socket.on("campanha_atualizada", ({ tipo, dados } = {}) => {
   if (!["npcs", "inimigos", "habilidades", "magias", "batalha"].includes(tipo)) return;
   figurantes[tipo] = dados;
+  if (tipo === "batalha") sincronizarRascunhosCombateFig();
   renderizarFigurantes();
   if (!campo("fig-catalogo").classList.contains("hidden")) renderizarCatalogoFig();
 });
@@ -387,8 +359,17 @@ socket.on("connect", () => setTimeout(carregarFigurantes, 0));
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["fig-hp-atual", "fig-hp-max", "fig-energia-atual", "fig-energia-max", "fig-poder-custo"]) campo(id).max = "100000";
-  campo("fig-tipo").value = figurantes.tipo;
-  campo("fig-tipo").addEventListener("change", (ev) => { figurantes.tipo = ev.target.value; figurantes.aba = "biblioteca"; renderizarFigurantes(); });
+  document.querySelectorAll("[data-fig-tipo]").forEach(b => b.addEventListener("click", () => { figurantes.tipo = b.dataset.figTipo; renderizarFigurantes(); }));
+  campo("fig-combatentes").addEventListener("keydown", ev => {
+    if (!ev.target.matches(".fig-resumo-selecionar") || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) return;
+    ev.preventDefault();
+    const botoes = [...campo("fig-combatentes").querySelectorAll(".fig-resumo-selecionar")], indice = botoes.indexOf(ev.target);
+    const proximo = ev.key === "Home" ? 0 : ev.key === "End" ? botoes.length - 1 : (indice + (["ArrowDown", "ArrowRight"].includes(ev.key) ? 1 : -1) + botoes.length) % botoes.length;
+    const alvoId = botoes[proximo].closest("[data-id]").dataset.id;
+    selecionarCombatenteFig(alvoId);
+    const destino = [...campo("fig-combatentes").querySelectorAll(".fig-resumo-selecionar")][proximo];
+    destino?.focus({ preventScroll: true }); destino?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  });
   for (const a of ["FOR", "DES", "INT", "SAB", "PRE", "VON"]) {
     const label = criar("label", "", a); const input = criar("input"); input.id = `fig-attr-${a}`; input.type = "number"; input.min = "0"; input.max = "999"; input.placeholder = "—"; label.append(input); campo("fig-atributos").append(label);
   }
@@ -396,6 +377,8 @@ document.addEventListener("DOMContentLoaded", () => {
   campo("fig-busca").addEventListener("input", renderizarFigurantes);
   campo("fig-novo").addEventListener("click", () => abrirFichaFigurante());
   campo("fig-imagem").addEventListener("input", previaFigurante);
+  campo("fig-tem-arma").addEventListener("change", atualizarArmaEditorFig);
+  campo("fig-arma-icone").addEventListener("change", atualizarArmaEditorFig);
   campo("fig-form").addEventListener("submit", salvarFichaFigurante);
   campo("fig-adicionar-poder").addEventListener("click", abrirCatalogoFig);
   campo("fig-criar-poder").addEventListener("click", () => abrirCriacaoPoderFig());
@@ -415,6 +398,9 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (!ev.shiftKey && document.activeElement === ultimo) { ev.preventDefault(); primeiro?.focus(); }
     }
   });
-  campo("master-token-input")?.addEventListener("change", () => setTimeout(carregarFigurantes, 50));
+  // O cabeçalho é criado depois deste listener; delegar evita exigir F5 após informar a chave.
+  document.addEventListener("change", ev => {
+    if (ev.target.id === "master-token-input") setTimeout(carregarFigurantes, 50);
+  });
   renderizarFigurantes();
 });

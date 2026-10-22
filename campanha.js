@@ -121,6 +121,20 @@ function datasDe(bruto) {
   return { criadoEm: dataIso(bruto.criadoEm), atualizadoEm: dataIso(bruto.atualizadoEm) };
 }
 
+function normalizarArma(bruto) {
+  if (!ehObjeto(bruto)) return null;
+  const nome = texto(bruto.nome, 80).trim();
+  if (!nome) return null;
+  const dano = texto(bruto.dano, 30).trim();
+  return {
+    nome,
+    icone: ["sword", "axe", "bow", "staff", "dagger"].includes(bruto.icone) ? bruto.icone : "sword",
+    alcance: texto(bruto.alcance, 60).trim(),
+    dano: DADO_VALIDO.test(dano) || /^\d{1,5}$/.test(dano) ? dano : "",
+    categoria: ["leve", "media", "pesada", "natural", "outra"].includes(bruto.categoria) ? bruto.categoria : "outra",
+  };
+}
+
 function normalizarNpc(bruto) {
   if (!ehObjeto(bruto)) return null;
   return {
@@ -132,6 +146,7 @@ function normalizarNpc(bruto) {
     segredo: texto(bruto.segredo, 2000), // só do mestre: nunca sai para os jogadores
     hp: vitalDe(bruto.hp, 10),
     energia: vitalDe(bruto.energia, 10),
+    arma: normalizarArma(bruto.arma),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
     magias: listaDe(bruto.magias, 20, normalizarHabilidadeResumida),
     atributos: atributosOpcionais(bruto.atributos),
@@ -190,6 +205,7 @@ function normalizarInimigo(bruto) {
     descricao: texto(bruto.descricao, 2000),
     lore: texto(bruto.lore, 4000),
     energia: vitalDe(bruto.energia, 10),
+    arma: normalizarArma(bruto.arma),
     atributos: atributosOpcionais(bruto.atributos),
     ataques: listaDe(bruto.ataques, 20, normalizarAtaque),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
@@ -288,12 +304,14 @@ function normalizarCombatente(bruto) {
     imagem: urlDeImagem(bruto.imagem),
     hp: vitalDe(bruto.hp, 10),
     energia: vitalDe(bruto.energia, 10),
+    arma: normalizarArma(bruto.arma),
     derrotado: bruto.derrotado === true,
     atributos: atributosOpcionais(bruto.atributos),
     ataques: listaDe(bruto.ataques, 20, normalizarAtaque),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
     magias: listaDe(bruto.magias, 20, normalizarHabilidadeResumida),
     nota: texto(bruto.nota, 2000),
+    notasCombate: texto(bruto.notasCombate, 2000),
   };
 }
 

@@ -1057,7 +1057,7 @@ io.on("connection", (socket) => {
   // Entra na sala que recebe os dados do mestre. Sem o token, não entra.
   comandos.registrar(socket, "master_entrar", () => {
     socket.join(SALA_MESTRES);
-    return { sala: SALA_MESTRES, avisos: campanha.avisos };
+    return { sala: SALA_MESTRES, avisos: campanha.avisos, recursos: { armaFigurante: true } };
   });
 
   // Sem `tipo`: devolve tudo (inimigos, npcs, baus, batalha).
@@ -1091,14 +1091,15 @@ io.on("connection", (socket) => {
   comandos.registrar(
     socket,
     "master_npc_hp",
-    async ({ id, delta }) => {
+    async ({ id, delta, atual }) => {
       if (!personagemModelo.ehIdSeguro(id)) throw new ErroCampanha("id_invalido", "Id inválido.");
-      if (!Number.isInteger(delta) || Math.abs(delta) > MAX_VITAL) throw new ErroCampanha("formato_invalido", "Valor de HP inválido.");
+      const valor = delta === undefined ? atual : delta;
+      if ((delta !== undefined) === (atual !== undefined) || !Number.isInteger(valor) || Math.abs(valor) > MAX_VITAL) throw new ErroCampanha("formato_invalido", "Informe delta ou atual, com um valor inteiro de HP válido.");
       let hp;
       await campanha.atualizar("npcs", (lista) => {
         const n = lista.find((x) => x.id === id);
         if (!n) throw new ErroCampanha("npc_inexistente", "Esse NPC não existe mais.");
-        n.hp.atual = Math.max(0, Math.min(n.hp.max, n.hp.atual + delta));
+        n.hp.atual = Math.max(0, Math.min(n.hp.max, delta === undefined ? atual : n.hp.atual + delta));
         hp = { ...n.hp };
         return lista;
       });
@@ -1106,6 +1107,22 @@ io.on("connection", (socket) => {
     },
     { mudaEstado: true },
   );
+
+  // A biblioteca de inimigos controla o HP máximo do modelo, não a vida das cópias em combate.
+  comandos.registrar(socket, "master_inimigo_hp", async ({ id, delta, atual }) => {
+    if (!personagemModelo.ehIdSeguro(id)) throw new ErroCampanha("id_invalido", "Id inválido.");
+    const valor = delta === undefined ? atual : delta;
+    if ((delta !== undefined) === (atual !== undefined) || !Number.isInteger(valor) || Math.abs(valor) > MAX_VITAL) throw new ErroCampanha("formato_invalido", "Informe delta ou atual, com um valor inteiro de HP válido.");
+    let hpMax;
+    await campanha.atualizar("inimigos", lista => {
+      const alvo = lista.find(x => x.id === id);
+      if (!alvo) throw new ErroCampanha("modelo_inexistente", "Esse inimigo não existe mais na biblioteca.");
+      alvo.hpMax = Math.max(1, Math.min(MAX_VITAL, delta === undefined ? atual : alvo.hpMax + delta));
+      hpMax = alvo.hpMax;
+      return lista;
+    });
+    return { hpMax };
+  }, { mudaEstado: true });
 
   comandos.registrar(
     socket,
@@ -1116,7 +1133,7 @@ io.on("connection", (socket) => {
 
   // Energia é controlada por delta na mesma fila do HP. Usar um poder cobra o custo que está no
   // servidor, nunca o valor enviado pelo navegador; uma reserva insuficiente não é consumida.
-  const alterarEnergiaFigurante = async ({ tipo, id, delta, lista, indice, nome }, usarPoder = false) => {
+  const alterarEnergiaFigurante = async ({ tipo, id, delta, atual, lista, indice, nome }, usarPoder = false) => {
     if (!["npcs", "inimigos", "batalha"].includes(tipo) || !personagemModelo.ehIdSeguro(id)) {
       throw new ErroCampanha("alvo_invalido", "Figurante inválido.");
     }
@@ -1129,10 +1146,12 @@ io.on("connection", (socket) => {
         const poder = alvo[lista]?.[indice];
         if (!poder || poder.nome !== nome || poder.cost?.vital !== "vigor") throw new ErroCampanha("poder_invalido", "O poder mudou. Atualize a página.");
         delta = -poder.cost.amount;
+        atual = undefined;
       }
-      if (!Number.isInteger(delta) || Math.abs(delta) > MAX_VITAL) throw new ErroCampanha("valor_invalido", "Valor de energia inválido.");
+      const valor = delta === undefined ? atual : delta;
+      if ((delta !== undefined) === (atual !== undefined) || !Number.isInteger(valor) || Math.abs(valor) > MAX_VITAL) throw new ErroCampanha("valor_invalido", "Informe delta ou atual, com um valor inteiro de energia válido.");
       if (usarPoder && alvo.energia.atual + delta < 0) throw new ErroCampanha("energia_insuficiente", "Energia insuficiente para usar esse poder.");
-      alvo.energia.atual = Math.max(0, Math.min(alvo.energia.max, alvo.energia.atual + delta));
+      alvo.energia.atual = Math.max(0, Math.min(alvo.energia.max, delta === undefined ? atual : alvo.energia.atual + delta));
       energia = { ...alvo.energia };
     });
     console.log(`[FIGURANTE] ${tipo} | ${id} | Energia ${energia.atual}/${energia.max}${usarPoder ? ` | Usou: ${nome}` : ""}`);
@@ -1266,11 +1285,12 @@ io.on("connection", (socket) => {
   comandos.registrar(
     socket,
     "master_batalha_adicionar",
-    async ({ modeloId, quantidade }) => {
+    async ({ modeloId, quantidade, tipo = "inimigos" }) => {
       exigirIdDeAlvo(modeloId);
-      const inimigo = campanha.ver("inimigos").find((i) => i.id === modeloId);
-      if (!inimigo) throw new ErroCampanha("modelo_inexistente", "Esse inimigo não existe mais na biblioteca.");
-      const dados = await campanha.atualizar("batalha", (b) => regrasDaBatalha.adicionar(b, inimigo, quantidade));
+      if (!["inimigos", "npcs"].includes(tipo)) throw new ErroCampanha("tipo_invalido", "Tipo de figurante inválido.");
+      const modelo = campanha.ver(tipo).find((i) => i.id === modeloId);
+      if (!modelo) throw new ErroCampanha("modelo_inexistente", "Esse figurante não existe mais na biblioteca.");
+      const dados = await campanha.atualizar("batalha", (b) => regrasDaBatalha.adicionar(b, { ...modelo, tipo: tipo === "npcs" ? "npc" : "inimigo" }, quantidade));
       return { adicionados: dados.combatentes.slice(-quantidade).map((c) => ({ alvoId: c.alvoId, nome: c.nome })) };
     },
     { mudaEstado: true },
@@ -1287,6 +1307,32 @@ io.on("connection", (socket) => {
     },
     { mudaEstado: true },
   );
+
+  comandos.registrar(socket, "master_batalha_notas", async ({ alvoId, notas }) => {
+    exigirIdDeAlvo(alvoId);
+    if (typeof notas !== "string" || notas.length > 2000) throw new ErroCampanha("formato_invalido", "As notas devem ter até 2000 caracteres.");
+    await campanha.atualizar("batalha", (b) => {
+      const alvo = hpDoCombatente(b, alvoId);
+      if (!alvo) throw new ErroCampanha("alvo_inexistente", "Esse combatente não está na batalha.");
+      alvo.notasCombate = notas;
+      return b;
+    });
+    return { notas };
+  }, { mudaEstado: true });
+
+  // Atualização explícita: não recria a cópia nem sobrescreve os recursos/notas do combate.
+  comandos.registrar(socket, "master_batalha_arma_modelo", async ({ alvoId }) => {
+    exigirIdDeAlvo(alvoId);
+    const dados = await campanha.atualizar("batalha", (b) => {
+      const alvo = hpDoCombatente(b, alvoId);
+      if (!alvo) throw new ErroCampanha("alvo_inexistente", "Esse combatente não está na batalha.");
+      const modelo = campanha.ver(alvo.tipo === "npc" ? "npcs" : "inimigos").find(x => x.id === alvo.modeloId);
+      if (!modelo) throw new ErroCampanha("modelo_inexistente", "O modelo não existe mais na biblioteca.");
+      alvo.arma = modelo.arma ? JSON.parse(JSON.stringify(modelo.arma)) : null;
+      return b;
+    });
+    return { arma: hpDoCombatente(dados, alvoId).arma };
+  }, { mudaEstado: true });
 
   comandos.registrar(
     socket,

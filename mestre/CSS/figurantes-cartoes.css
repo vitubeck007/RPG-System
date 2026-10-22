@@ -1,0 +1,289 @@
+/* Comando tático compacto. Este arquivo é carregado somente na página de figurantes. */
+.master-app .master-header-inner { padding: 10px 24px 8px; gap: 8px 16px; }
+.master-app .master-heading h1 { font-size: 21px; margin-top: 0; }
+.master-app .master-nav { gap: 4px; padding-top: 6px; }
+.master-app .master-nav-link { min-height: 32px; padding: 6px 10px; font-size: 12px; gap: 6px; }
+.master-app .master-credentials summary { min-height: 30px; padding: 5px 9px; font-size: 12px; }
+.master-app .master-notice { font-size: 11px; }
+.master-app .fig-pagina.master-main { margin-top: 16px; padding-bottom: 28px; font-size: 13px; }
+.master-app .fig-pagina button, .master-app .fig-pagina summary { min-height: 30px; font-size: 12px; }
+.master-app .fig-pagina button { padding: 5px 9px; }
+.master-app .fig-pagina :is(input, select) { min-height: 30px; padding: 5px 8px; font-size: 13px; }
+.master-app #fig-cartoes.fig-grade { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px; }
+.master-app .fig-cartao.fig-tatico { gap: 10px; padding: 14px; border-radius: 8px; border-top: 2px solid var(--rpg-gold); background: var(--rpg-surface); min-width: 0; }
+.fig-tatico svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.fig-tatica-cabecalho { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--rpg-line); }
+.fig-tatica-cabecalho > div { min-width: 0; }
+.fig-tatica-identidade { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.fig-tatica-identidade-texto { min-width: 0; }
+.master-app .fig-tatica-cabecalho h3 { font-size: 20px; line-height: 1.2; }
+.master-app .fig-tatica-cabecalho img { width: 36px; height: 42px; border-radius: 5px; object-fit: cover; flex-shrink: 0; }
+.fig-tatica-tipo { display: block; color: var(--rpg-gold); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 3px; }
+.fig-tatica-recursos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fig-tatica-recurso { background: var(--rpg-bg); padding: 6px; border: 1px solid var(--rpg-line); border-radius: 6px; min-width: 0; color: var(--rpg-danger); }
+.fig-tatica-energia { color: var(--rpg-vigor); }
+.fig-tatica-recurso-topo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 4px; margin-bottom: 3px; font-size: 12px; font-weight: 650; }
+.fig-tatica-recurso-topo small { color: var(--rpg-muted); font-size: 10px; font-weight: 400; }
+.fig-tatica-controles { display: flex; align-items: center; gap: 4px; }
+.fig-tatica-valores { display: flex; flex: 1; justify-content: center; align-items: baseline; gap: 3px; min-width: 0; font-variant-numeric: tabular-nums; }
+.master-app .fig-tatica-valores input { appearance: textfield; -moz-appearance: textfield; flex: 1 1 5ch; width: 6ch; min-width: 0; max-width: 6ch; padding: 1px 2px; min-height: 26px; height: 26px; text-align: center; font-size: 16px; font-weight: 600; border: 1px solid transparent; border-bottom-color: var(--rpg-line); background: transparent; color: inherit; border-radius: 3px; }
+.fig-tatica-valores input::-webkit-inner-spin-button, .fig-tatica-valores input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.fig-tatica-valores strong { font-size: 16px; font-weight: 600; }
+.fig-tatica-maximo { color: var(--rpg-muted); font-size: 11px; white-space: nowrap; }
+.fig-tatica-barra { height: 2px; margin-top: 4px; background: var(--rpg-line); border-radius: 3px; overflow: hidden; }
+.fig-tatica-barra > span { display: block; height: 100%; background: currentColor; }
+.master-app .fig-tatico .fig-tatica-icone { display: inline-flex; align-items: center; justify-content: center; padding: 0; min-width: 22px; min-height: 22px; width: 22px; height: 22px; flex: 0 0 22px; border: 1px solid var(--rpg-line); background: var(--rpg-surface); color: inherit; border-radius: 4px; }
+.fig-tatica-controles .fig-tatica-icone svg { width: 12px; height: 12px; }
+.master-app .fig-tatico button:disabled { cursor: not-allowed; opacity: .45; }
+.master-app .fig-tatico button[aria-busy="true"] { cursor: wait; }
+.master-app .fig-tatico button:focus-visible, .master-app .fig-tatico summary:focus-visible, .master-app .fig-tatico textarea:focus-visible { outline: 2px solid var(--rpg-gold); outline-offset: 3px; }
+.fig-tatica-historia > section { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--rpg-line); }
+.fig-tatica-historia > section:first-child { padding-top: 0; }
+.master-app .fig-tatica-historia h4 { margin: 0; font: 600 11px/1.5 var(--rpg-font); text-transform: uppercase; letter-spacing: .04em; color: var(--rpg-gold); }
+.fig-tatica-historia p { font-size: 13px; line-height: 1.55; }
+.fig-tatica-vazio { color: var(--rpg-muted); font-size: 13px; }
+.fig-tatico summary { cursor: pointer; }
+.fig-tatica-expansao > summary { color: var(--rpg-gold); font-size: 13px; padding: 5px 0; min-height: 28px; }
+.fig-tatica-expansao[open] > summary { margin-bottom: 12px; }
+.fig-tatica-combate-corpo { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+.fig-tatica-combate-corpo .fig-tatica-recursos { grid-template-columns: minmax(0, 1fr); }
+.fig-tatica-lateral, .fig-tatica-poderes { min-width: 0; }
+.fig-tatica-poderes { display: grid; gap: 12px; }
+.master-app .fig-tatica-grupo-titulo { display: flex; align-items: center; gap: 6px; color: var(--rpg-gold); font: 600 13px var(--rpg-font); margin: 0 0 7px; }
+.fig-tatica-grupo-titulo > span { margin-left: auto; color: var(--rpg-muted); font-size: 13px; font-weight: 400; }
+.fig-tatica-magias .fig-tatica-grupo-titulo { color: var(--rpg-sanity); }
+.fig-tatica-poder { position: relative; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 10px; background: #101923; }
+.fig-tatica-poder + .fig-tatica-poder { margin-top: 10px; }
+.fig-tatica-poder summary { display: block; position: relative; background: #192533; min-height: 56px; padding: 9px 60px 9px 10px; }
+.fig-tatica-poder summary::-webkit-details-marker { display: none; }
+.fig-tatica-poder summary::after { content: ""; position: absolute; right: 45px; top: 22px; width: 6px; height: 6px; border: solid var(--rpg-muted); border-width: 0 1px 1px 0; transform: rotate(45deg); }
+.fig-tatica-poder details[open] > summary::after { transform: rotate(225deg); top: 25px; }
+.fig-tatica-poder summary strong { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.fig-tatica-meta { display: block; margin-top: 4px; color: var(--rpg-muted); font-size: 12px; }
+.fig-tatica-poder-corpo { display: grid; gap: 8px; border-top: 1px solid var(--rpg-line); padding: 10px; }
+.fig-tatica-narrativa { color: var(--rpg-muted); font-size: 13px; line-height: 1.55; font-style: italic; }
+.fig-tatica-efeito { padding: 8px; background: #223041; border-left: 3px solid var(--rpg-gold); border-radius: 0 5px 5px 0; color: var(--rpg-text); font-size: 13px; line-height: 1.55; }
+.fig-tatica-magias .fig-tatica-efeito { border-left-color: var(--rpg-sanity); }
+.fig-tatica-metadados { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 13px; }
+.fig-tatica-metadados > span { display: grid; gap: 2px; }
+.fig-tatica-metadados small { color: var(--rpg-muted); font-size: 11px; }
+.fig-tatica-extra { padding-top: 10px; border-top: 1px dashed var(--rpg-line); font-size: 13px; }
+.master-app .fig-tatico .fig-tatica-usar { position: absolute; top: 13px; right: 8px; width: 28px; height: 28px; color: var(--rpg-gold); background: transparent; }
+.master-app .fig-tatica-magias .fig-tatica-usar { color: var(--rpg-sanity); }
+.fig-tatica-aviso { color: var(--rpg-danger); font-size: 12px; }
+.fig-tatica-notas { display: grid; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rpg-line); }
+.master-app .fig-tatica-notas label { color: var(--rpg-muted); font-size: 13px; gap: 8px; }
+.master-app .fig-tatica-notas textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid var(--rpg-line); border-radius: 6px; background: var(--rpg-bg); color: var(--rpg-text); padding: 7px; font-size: 13px; line-height: 1.5; }
+.fig-tatica-notas-status { color: var(--rpg-muted); font-size: 11px; }
+.fig-tatica-notas-status[data-erro="true"] { color: var(--rpg-danger); }
+.fig-tatica-legados { border-top: 1px solid var(--rpg-line); padding-top: 12px; font-size: 13px; color: var(--rpg-muted); }
+.fig-tatica-legados p { padding-top: 8px; }
+.fig-tatica-rodape { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; border-top: 1px solid var(--rpg-line); padding-top: 10px; }
+.master-app .fig-tatica-copias { display: grid; gap: 4px; font-size: 11px; color: var(--rpg-muted); }
+.master-app .fig-tatica-copias input { width: 48px; min-height: 28px; padding: 4px; text-align: center; }
+.fig-tatica-secundarios { margin-left: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.fig-tatica-menu { position: relative; }
+.fig-tatica-menu > summary { padding: 5px 3px; min-height: 28px; color: var(--rpg-muted); font-size: 12px; }
+.fig-tatica-menu-opcoes { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); min-width: 180px; display: grid; gap: 8px; border: 1px solid var(--rpg-line); border-radius: 8px; padding: 10px; background: var(--rpg-bg); box-shadow: 0 8px 20px #0006; }
+.master-app .fig-tatica-menu-opcoes button { width: 100%; text-align: left; }
+.master-app .fig-tatico-derrotado { border-top-color: var(--rpg-danger); }
+.fig-tatico-derrotado .fig-tatica-tipo { color: var(--rpg-danger); }
+/* Mesa lateral: o documento fica parado e cada área longa tem rolagem própria. */
+.fig-modo-batalha { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+.fig-modo-batalha #mestre-cabecalho { flex-shrink: 0; }
+.fig-modo-batalha .fig-pagina.master-main { display: flex; flex-direction: column; flex: 1; min-height: 0; margin-top: 12px; padding-bottom: 12px; }
+.fig-modo-batalha .fig-cabecalho, .fig-modo-batalha .fig-toolbar, .fig-resumos-cabecalho { flex-shrink: 0; }
+.fig-modo-batalha #fig-batalha { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.fig-mesa-combate { display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0; }
+.fig-resumos-painel { display: flex; align-items: center; min-height: 0; min-width: 0; padding: 6px; background: var(--rpg-surface); border: 1px solid var(--rpg-line); border-radius: 10px; }
+.fig-cabecalho { padding-bottom: 12px; gap: 12px; }
+.master-app #fig-titulo { font-size: 23px; }
+.fig-tipos { display: inline-flex; align-items: center; padding: 4px; gap: 4px; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-bg); }
+.master-app .fig-tipos button { min-width: 76px; background: transparent; border-color: transparent; color: var(--rpg-muted); }
+.master-app .fig-tipos [aria-pressed="true"] { background: var(--rpg-gold); color: var(--rpg-on-gold); border-color: var(--rpg-gold); font-weight: 650; }
+.master-app .fig-tipos [aria-pressed="true"]:hover { color: var(--rpg-on-gold); }
+.master-app .fig-toolbar { margin: 0 0 12px; padding-bottom: 12px; gap: 8px; }
+.master-app .fig-toolbar .fig-busca { margin-left: auto; max-width: 380px; }
+.fig-resumos-cabecalho { margin-bottom: 8px; flex-wrap: wrap; }
+.master-app .fig-resumos { display: flex; flex-direction: column; gap: 6px; align-items: stretch; align-self: center; width: 100%; height: 100%; max-height: 472px; min-height: 0; list-style: none; margin: 0; padding: 4px 3px; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scroll-snap-type: y proximity; scrollbar-color: var(--rpg-line) var(--rpg-bg); }
+.fig-resumos[data-rolavel="false"] { justify-content: safe center; }
+.fig-resumos > .fig-resumo { position: relative; flex: 0 0 calc((100% - 24px) / 5); min-width: 0; min-height: 70px; display: block; border: 1px solid var(--rpg-line); border-radius: 8px; padding: 0; background: var(--rpg-bg); scroll-snap-align: start; }
+.fig-resumos > .fig-vazio { flex: 1 0 100%; }
+.master-app button.fig-resumo-selecionar { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-height: 0; padding: 0; background: transparent; color: var(--rpg-text); border: 0; text-align: left; }
+.fig-resumo-nome { position: absolute; top: 0; left: 0; right: 0; height: 18px; display: block; padding: 1px 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 7px 7px 0 0; background: var(--rpg-raised); border-bottom: 1px solid var(--rpg-line); font: 400 12px/15px var(--rpg-title); color: var(--rpg-gold); }
+.fig-resumo-foto { display: grid; position: absolute; left: 5px; top: calc(50% + 9px); transform: translateY(-50%); place-items: center; width: 42px; height: 42px; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 12px; background: var(--rpg-surface); }
+.fig-resumo-inicial { color: var(--rpg-gold); font: 400 24px var(--rpg-title); }
+.fig-resumo-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.fig-resumo-recursos { position: absolute; z-index: 1; top: 20px; bottom: 3px; left: 54px; right: 4px; display: grid; gap: 3px; align-content: center; min-width: 0; }
+.fig-resumo .fig-tatica-recurso { display: grid; grid-template-columns: 35px minmax(0, 1fr); gap: 3px; align-items: center; padding: 0 4px; border: 1px solid #49303a; border-radius: 5px; background: #241c26; }
+.fig-resumo .fig-tatica-energia { border-color: #29434e; background: #122630; }
+.fig-resumo .fig-tatica-recurso-topo { margin-bottom: 0; font-size: 10px; white-space: nowrap; }
+.fig-resumo .fig-tatica-recurso-topo small { display: none; }
+.master-app .fig-resumo .fig-tatica-valores input { flex: 0 0 auto; width: calc(var(--fig-digitos, 2) * 1ch + 6px); max-width: none; font-size: 12px; min-height: 18px; height: 18px; }
+.master-app .fig-resumo .fig-tatica-controles .fig-tatica-icone { min-width: 18px; min-height: 18px; width: 18px; height: 18px; flex-basis: 18px; }
+.fig-resumo .fig-tatica-valores { flex: 0 1 auto; gap: 2px; }
+.fig-resumo .fig-tatica-controles { justify-content: flex-end; gap: 2px; }
+.fig-resumo .fig-tatica-maximo { font-size: 10px; }
+.fig-resumo .fig-tatica-barra { display: none; }
+.fig-resumo-estado { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.master-app .fig-resumo-ativo { border: 2px solid var(--rpg-gold); padding: 0; background: var(--rpg-gold-soft); }
+.fig-resumo-ativo .fig-resumo-estado { color: var(--rpg-gold); font-weight: 650; }
+.fig-resumo-caido .fig-resumo-foto img { filter: grayscale(1); opacity: .3; }
+.fig-resumo-caido .fig-resumo-foto { background: var(--rpg-danger-soft); }
+.fig-resumo-recuperacao { position: absolute; z-index: 2; top: 21px; bottom: 4px; left: 55px; right: 4px; display: grid; align-content: center; justify-items: center; gap: 1px; border-radius: 4px; background: #0b1118ee; pointer-events: none; }
+.fig-resumo-recuperacao > span { padding: 0 5px; color: var(--rpg-danger); background: var(--rpg-bg); border-radius: 3px; font-size: 10px; line-height: 1.3; }
+.fig-resumo-recuperacao > div { display: flex; gap: 5px; pointer-events: auto; }
+.master-app .fig-resumo-recuperacao button { min-height: 24px; padding: 2px 7px; font-size: 11px; background: var(--rpg-bg); box-shadow: 0 2px 10px #0008; }
+.fig-ficha-selecionada { display: flex; flex-direction: column; min-height: 0; min-width: 0; container-name: ficha-figurante; container-type: inline-size; }
+#fig-selecionado { flex: 1; min-height: 0; }
+.master-app .fig-ficha-selecionada .fig-tatico-combate { height: 100%; gap: 8px; padding: 12px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho { display: grid; grid-template-columns: minmax(110px, 1fr) auto auto auto; gap: 8px; padding-bottom: 8px; }
+.master-app .fig-ficha-selecionada .fig-tatica-cabecalho h3 { font-size: 18px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-recursos { grid-template-columns: repeat(2, max-content); gap: 5px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-recurso { grid-template-columns: minmax(0, 1fr); padding: 3px 4px; gap: 1px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-recurso-topo { font-size: 10px; }
+.master-app .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-valores input { flex: 0 0 auto; width: calc(var(--fig-digitos, 2) * 1ch + 6px); max-width: none; font-size: 13px; height: 19px; min-height: 19px; }
+.master-app .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-controles .fig-tatica-icone { width: 18px; height: 18px; min-width: 18px; min-height: 18px; flex-basis: 18px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-controles { gap: 2px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-maximo { font-size: 10px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-menu { justify-self: end; }
+.fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-menu > summary { white-space: nowrap; padding: 5px; }
+.fig-ficha-selecionada .fig-tatica-cabecalho, .fig-ficha-selecionada .fig-tatica-recursos, .fig-ficha-selecionada .fig-tatica-notas, .fig-ficha-selecionada .fig-tatica-rodape { flex-shrink: 0; }
+.fig-ficha-selecionada .fig-tatica-area { position: relative; isolation: isolate; flex: 1; min-height: 145px; min-width: 0; overflow: hidden; }
+.fig-ficha-selecionada .fig-tatica-combate-corpo { display: block; height: 100%; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-color: var(--rpg-line) var(--rpg-bg); padding: 2px 4px 110px 0; }
+.fig-ficha-selecionada .fig-tatica-recurso { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 4px 8px; }
+.fig-ficha-selecionada .fig-tatica-recurso-topo { margin: 0; }
+.fig-ficha-selecionada .fig-tatica-recurso-topo small { display: none; }
+.fig-ficha-selecionada .fig-tatica-controles { justify-content: flex-end; }
+.fig-ficha-selecionada .fig-tatica-valores { flex: 0 1 auto; }
+.fig-tatica-atributos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; font-variant-numeric: tabular-nums; }
+.fig-tatica-atributos > div { min-width: 0; padding: 3px 6px; text-align: center; border-left: 1px solid var(--rpg-line); }
+.fig-tatica-atributos dt { color: var(--rpg-muted); font-size: 11px; white-space: nowrap; }
+.fig-tatica-atributos dd { margin: 3px 0 0; color: var(--rpg-text); font-size: 15px; line-height: 1.2; font-weight: 600; }
+.fig-tatica-atributos-curtos { grid-template-columns: repeat(6, minmax(31px, 1fr)); gap: 0; }
+.fig-tatica-atributos-curtos > div { padding: 2px 5px; }
+.fig-tatica-atributos-curtos dt { font-size: 10px; }
+.fig-tatica-atributos-curtos dd { font-size: 14px; }
+.fig-ficha-selecionada .fig-tatica-barra { grid-column: 1 / -1; margin: 0; height: 3px; }
+.fig-ficha-selecionada .fig-tatica-notas { position: absolute; z-index: 2; inset: auto 0 0; margin-top: 0; padding-top: 5px; gap: 3px; background: var(--rpg-surface); box-shadow: 0 -8px 18px #0003; }
+.master-app .fig-ficha-selecionada .fig-tatica-notas label { gap: 3px; font-size: 12px; }
+.master-app .fig-ficha-selecionada .fig-tatica-notas textarea { height: var(--fig-altura-notas, 44px); min-height: 44px; max-height: min(55dvh, 440px); resize: none; padding: 4px 7px; }
+.master-app .fig-tatica-notas-tamanho { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 25px; padding: 2px 0; border: 0; border-radius: 3px; background: transparent; color: var(--rpg-muted); text-align: left; cursor: ns-resize; touch-action: none; }
+.fig-tatica-notas-alca { width: 28px; height: 5px; border-block: 1px solid var(--rpg-muted); opacity: .6; }
+.fig-tatica-notas-indicacao { color: var(--rpg-gold); font-size: 11px; }
+.fig-ficha-selecionada .fig-tatica-rodape { padding-top: 6px; }
+.fig-ficha-selecionada .fig-tatica-poderes { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.fig-ficha-selecionada .fig-tatica-legados { grid-column: 1 / -1; }
+.fig-tatica-arma { display: grid; grid-template-columns: 34px minmax(100px, 1.4fr) repeat(3, minmax(60px, 1fr)); gap: 10px; align-items: center; padding: 7px 9px; flex-shrink: 0; border: 1px solid var(--rpg-line); border-radius: 7px; background: var(--rpg-bg); }
+.fig-tatica-arma-icone { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--rpg-gold-soft); color: var(--rpg-gold); }
+.fig-tatica-arma-icone svg { width: 23px; height: 23px; }
+.fig-tatica-arma small { display: block; color: var(--rpg-muted); font-size: 10px; line-height: 1.4; }
+.fig-tatica-arma strong, .fig-tatica-arma-dado > span { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.fig-tatica-arma strong { color: var(--rpg-gold); font-weight: 500; }
+.fig-tatica-arma-dado { padding-left: 10px; border-left: 1px solid var(--rpg-line); min-width: 0; }
+.fig-tatica-arma-vazia { grid-template-columns: 34px minmax(100px, 1fr) minmax(0, 2fr); }
+.fig-tatica-arma-vazia .fig-discreto { font-size: 11px; }
+.master-app .fig-tatica-arma-sincronizar { grid-column: 1 / -1; justify-self: end; color: var(--rpg-gold); min-height: 26px; padding: 3px 7px; }
+/* Biblioteca recolhida: o cabeçalho é útil por si só, sem controles dentro do botão de expansão. */
+.master-app .fig-cartao.fig-tatico-biblioteca { padding: 10px 12px; gap: 0; }
+.fig-tatico-biblioteca > .fig-tatica-cabecalho { border: 0; padding: 0; }
+.master-app .fig-biblioteca-expandir { display: flex; flex: 1; align-items: center; min-width: 0; gap: 10px; padding: 2px; border: 0; background: transparent; color: var(--rpg-text); text-align: left; }
+.master-app .fig-biblioteca-expandir:hover { background: var(--rpg-raised); }
+.fig-biblioteca-expandir .fig-tatica-identidade { pointer-events: none; }
+.master-app .fig-tatico-biblioteca .fig-tatica-identidade img { width: 60px; height: 64px; border-radius: 12px; object-fit: contain; }
+.fig-biblioteca-nome { display: block; font: 400 18px/1.25 var(--rpg-title); color: var(--rpg-gold); overflow-wrap: anywhere; }
+.fig-biblioteca-seta { color: var(--rpg-gold); font-size: 20px; margin-left: auto; }
+.fig-biblioteca-expandir[aria-expanded="true"] .fig-biblioteca-seta { transform: rotate(180deg); }
+.fig-biblioteca-dados { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fig-biblioteca-maximos { display: flex; flex-shrink: 0; gap: 6px; }
+.fig-biblioteca-maximo { display: flex; align-items: center; gap: 4px; padding: 5px 7px; background: var(--rpg-bg); border: 1px solid var(--rpg-line); border-radius: 5px; font-size: 11px; }
+.fig-biblioteca-vital-rotulo { display: grid; gap: 2px; margin-right: 4px; }
+.fig-biblioteca-vital-rotulo small { font-size: 9px; color: var(--rpg-muted); white-space: nowrap; }
+.fig-biblioteca-dados .fig-tatica-atributos { grid-template-columns: repeat(6, max-content); }
+.fig-biblioteca-maximo strong { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fig-biblioteca-corpo { display: grid; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rpg-line); }
+.fig-biblioteca-corpo[hidden] { display: none; }
+.fig-biblioteca-corpo .fig-tatica-recursos { max-width: 520px; }
+.fig-biblioteca-corpo .fig-tatica-poderes { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.fig-biblioteca-corpo .fig-tatica-legados { grid-column: 1 / -1; }
+.fig-editor-arma { padding: 12px; border: 1px solid #4d493b; border-radius: 9px; background: var(--rpg-bg); }
+.fig-editor-arma fieldset { margin: 10px 0 0; padding: 0; border: 0; min-width: 0; }
+.fig-editor-arma fieldset:disabled { opacity: .4; }
+.fig-arma-editor-topo { display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(100px, .65fr); gap: 10px; align-items: end; margin-bottom: 10px; }
+#fig-arma-previa { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 10px; color: var(--rpg-gold); background: var(--rpg-raised); }
+#fig-arma-previa svg { width: 28px; height: 28px; }
+@container ficha-figurante (max-width: 760px) {
+  .fig-ficha-selecionada .fig-tatica-cabecalho { grid-template-columns: minmax(0, 1fr) auto; }
+  .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-recursos { grid-column: 1; grid-row: 2; justify-content: start; }
+  .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-atributos { grid-column: 2; grid-row: 2; }
+  .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-menu { grid-column: 2; grid-row: 1; }
+  .fig-tatica-arma { grid-template-columns: 30px minmax(80px, 1fr) repeat(3, minmax(45px, .8fr)); gap: 6px; }
+  .fig-tatica-arma-vazia { grid-template-columns: 30px minmax(80px, 1fr); }
+  .fig-tatica-arma-vazia .fig-discreto { grid-column: 1 / -1; }
+}
+@container ficha-figurante (max-width: 480px) {
+  .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-recursos { grid-column: 1 / -1; }
+  .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-atributos { grid-column: 1 / -1; grid-row: 3; }
+}
+@media (max-width: 1150px) {
+  .fig-tatico-biblioteca > .fig-tatica-cabecalho { flex-wrap: wrap; }
+  .fig-tatico-biblioteca .fig-tatica-menu { margin-left: auto; }
+  .fig-biblioteca-dados { order: 3; flex: 1 0 100%; justify-content: space-between; }
+}
+@media (max-width: 1050px) {
+  .fig-ficha-selecionada .fig-tatica-poderes { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1600px) {
+  .master-app .fig-pagina.master-main { max-width: 1536px; }
+  .fig-mesa-combate { grid-template-columns: 320px minmax(0, 1fr); }
+  .fig-resumo-recursos { left: 58px; right: 6px; }
+  .fig-resumo .fig-tatica-recurso { grid-template-columns: 44px minmax(0, 1fr); padding: 1px 6px; }
+  .fig-resumo .fig-tatica-recurso-topo { font-size: 11px; }
+  .fig-resumo-foto { left: 7px; }
+  .fig-resumo-recuperacao { left: 58px; right: 6px; }
+}
+@media (max-width: 760px) {
+  .fig-modo-batalha { height: auto; overflow: visible; }
+  .fig-modo-batalha .fig-pagina.master-main { flex: auto; }
+  .fig-mesa-combate { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .master-app .fig-resumos { height: 384px; max-height: 384px; }
+  .master-app .fig-ficha-selecionada .fig-tatico-combate { height: auto; }
+  .fig-ficha-selecionada .fig-tatica-area { flex: auto; height: 55dvh; min-height: 240px; }
+}
+@media (min-width: 761px) and (max-height: 660px) {
+  .master-app .fig-resumos { overflow-y: auto; }
+}
+@media (max-width: 700px) {
+  .master-app .fig-cartao.fig-tatico { padding: 12px; }
+  .fig-tatica-combate-corpo, .fig-ficha-selecionada .fig-tatica-combate-corpo { grid-template-columns: minmax(0, 1fr); }
+  .fig-tatica-combate-corpo .fig-tatica-recursos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fig-tatica-notas { margin: 14px 0 0; }
+  .fig-tatica-historia > section { grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+  .fig-cabecalho { flex-wrap: wrap; }
+  .master-app .fig-toolbar .fig-busca { max-width: none; width: 100%; margin-left: 0; }
+  .fig-tatico-biblioteca > .fig-tatica-cabecalho { flex-wrap: wrap; gap: 6px; }
+  .fig-biblioteca-expandir { flex-basis: calc(100% - 115px); }
+  .fig-biblioteca-dados { flex-wrap: wrap; gap: 8px; }
+  .fig-biblioteca-maximos { width: 100%; }
+  .fig-biblioteca-dados .fig-tatica-atributos { grid-template-columns: repeat(3, minmax(0, 1fr)); flex: 1 0 100%; row-gap: 8px; }
+  .fig-biblioteca-maximo { flex: 1; justify-content: space-between; }
+  .fig-biblioteca-corpo .fig-tatica-poderes { grid-template-columns: minmax(0, 1fr); }
+  .fig-biblioteca-corpo .fig-tatica-arma { grid-template-columns: 34px minmax(0, 1fr); }
+  .fig-biblioteca-corpo .fig-tatica-arma-dado { grid-column: 2; }
+  .fig-biblioteca-corpo .fig-tatica-arma-vazia .fig-discreto { grid-column: 1 / -1; }
+}
+@media (pointer: coarse) {
+  .master-app .fig-tatico .fig-tatica-controles .fig-tatica-icone,
+  .master-app .fig-ficha-selecionada .fig-tatica-cabecalho .fig-tatica-controles .fig-tatica-icone { min-width: 28px; min-height: 28px; width: 28px; height: 28px; flex-basis: 28px; }
+  .fig-mesa-combate { grid-template-columns: 284px minmax(0, 1fr); }
+  .fig-resumos > .fig-resumo { min-height: 88px; }
+}
+@media (pointer: coarse) and (max-width: 760px) {
+  .fig-mesa-combate { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .fig-tatica-recursos, .fig-tatica-combate-corpo .fig-tatica-recursos { grid-template-columns: minmax(0, 1fr); }
+  .fig-tatica-historia > section { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .fig-tatica-secundarios { width: 100%; justify-content: space-between; margin-left: 0; }
+  .master-app .fig-pagina input, .master-app .fig-pagina textarea, .master-app .fig-resumo .fig-tatica-valores input { font-size: 16px; }
+}

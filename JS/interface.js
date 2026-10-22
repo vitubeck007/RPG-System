@@ -76,37 +76,40 @@ window.RPGUI = (() => {
 
   // Preserva apenas estado de apresentação; os valores vindos do servidor continuam atuais.
   function preservarInteracao(area, renderizar) {
-    const controles = 'button, input, select, summary';
+    const controles = 'button, input, select, textarea, summary';
     const chaveControle = el => el ? JSON.stringify([
       el.closest('details')?.dataset.detalhe || '', el.tagName,
-      el.dataset.campo || el.dataset.preservar || el.dataset.acao || el.getAttribute('aria-label') || el.textContent,
+      el.dataset.campo || el.dataset.preservar || el.dataset.preservarFoco || el.dataset.acao || el.getAttribute('aria-label') || el.textContent,
     ]) : null;
     const registros = new Map();
     for (const card of area.querySelectorAll('[data-ui-chave]')) {
       registros.set(card.dataset.uiChave, {
         abertos: [...card.querySelectorAll('details[open]')].map(el => el.dataset.detalhe),
-        valores: [...card.querySelectorAll('[data-preservar]')].map(el => [el.dataset.preservar, el.value]),
+        valores: [...card.querySelectorAll('[data-preservar], [data-preservar-foco]:focus')].map(el => [el.dataset.preservar || el.dataset.preservarFoco, el.value]),
         foco: card.contains(document.activeElement) ? chaveControle(document.activeElement) : null,
         inicio: document.activeElement?.selectionStart,
+        fim: document.activeElement?.selectionEnd,
       });
     }
     const rolagem = area.scrollTop;
+    const rolagemHorizontal = area.scrollLeft;
     renderizar();
     for (const card of area.querySelectorAll('[data-ui-chave]')) {
       const registro = registros.get(card.dataset.uiChave);
       if (!registro) continue;
       card.querySelectorAll('details').forEach(el => { el.open = registro.abertos.includes(el.dataset.detalhe); });
       for (const [chave, valor] of registro.valores) {
-        const campo = [...card.querySelectorAll('[data-preservar]')].find(el => el.dataset.preservar === chave);
+        const campo = [...card.querySelectorAll('[data-preservar], [data-preservar-foco]')].find(el => (el.dataset.preservar || el.dataset.preservarFoco) === chave);
         if (campo) campo.value = valor;
       }
       if (registro.foco) {
         const controle = [...card.querySelectorAll(controles)].find(el => chaveControle(el) === registro.foco);
         controle?.focus({ preventScroll: true });
-        if (controle?.type === 'text' && registro.inicio != null) controle.setSelectionRange(registro.inicio, registro.inicio);
+        if ((controle?.type === 'text' || controle?.tagName === 'TEXTAREA') && registro.inicio != null) controle.setSelectionRange(registro.inicio, registro.fim ?? registro.inicio);
       }
     }
     area.scrollTop = rolagem;
+    area.scrollLeft = rolagemHorizontal;
   }
 
   function ajustarValor({ titulo, ler, aplicar }) {

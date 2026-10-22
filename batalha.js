@@ -48,18 +48,20 @@ function adicionar(batalha, inimigo, quantidade) {
   const novos = [];
   for (let i = 0; i < quantidade; i++) {
     novos.push({
-      tipo: "inimigo",
+      tipo: inimigo.tipo === "npc" ? "npc" : "inimigo",
       modeloId: inimigo.id,
       nome: `${base} ${primeiro + i}`,
-      imagem: inimigo.imagem,
-      hp: { atual: inimigo.hpMax, max: inimigo.hpMax },
+      imagem: inimigo.imagem || inimigo.retrato,
+      hp: { atual: inimigo.hpMax ?? inimigo.hp?.atual ?? 10, max: inimigo.hpMax ?? inimigo.hp?.max ?? 10 },
       energia: clonar(inimigo.energia || { atual: 10, max: 10 }),
-      derrotado: false,
-      atributos: clonar(inimigo.atributos),
-      ataques: clonar(inimigo.ataques),
-      habilidades: clonar(inimigo.habilidades),
+      arma: inimigo.arma ? clonar(inimigo.arma) : null,
+      derrotado: (inimigo.hpMax ?? inimigo.hp?.atual ?? 10) === 0,
+      atributos: clonar(inimigo.atributos || {}),
+      ataques: clonar(inimigo.ataques || []),
+      habilidades: clonar(inimigo.habilidades || []),
       magias: clonar(inimigo.magias || []),
-      nota: inimigo.nota,
+      nota: inimigo.nota || inimigo.notas || "",
+      notasCombate: "",
     });
   }
   batalha.combatentes.push(...novos); // alvoId novo é gerado na normalização

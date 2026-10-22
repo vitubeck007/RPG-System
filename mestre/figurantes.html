@@ -13,22 +13,35 @@
   <link rel="stylesheet" href="/mestre/CSS/mestre.css">
   <link rel="stylesheet" href="/mestre/CSS/figurantes.css">
   <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
+  <link rel="stylesheet" href="/mestre/CSS/figurantes-cartoes.css">
 </head>
 <body class="rpg-app master-app">
   <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
   <header id="mestre-cabecalho" data-pagina="figurantes"></header>
   <main id="mestre-conteudo" tabindex="-1" class="fig-pagina master-main">
-    <div class="fig-topo">
-      <div><p class="fig-eyebrow">PERSONAGENS DA CAMPANHA</p><h2>Biblioteca de figurantes</h2><p class="fig-discreto">Dê rosto, história e intenções a quem habita a sua mesa.</p></div>
-      <label>Tipo de figurante<select id="fig-tipo"><option value="inimigos">Inimigos</option><option value="npcs">NPCs</option></select></label>
+    <div class="fig-topo fig-cabecalho">
+      <div><p class="fig-eyebrow">PERSONAGENS DA CAMPANHA</p><h2 id="fig-titulo">Inimigos</h2></div>
+      <div id="fig-tipos" class="fig-tipos" role="group" aria-label="Tipo de figurante">
+        <button id="fig-tipo-npcs" type="button" data-fig-tipo="npcs" aria-pressed="false">NPCs</button>
+        <button id="fig-tipo-inimigos" type="button" data-fig-tipo="inimigos" aria-pressed="true">Inimigos</button>
+      </div>
     </div>
     <div class="fig-toolbar">
       <div class="fig-abas" role="tablist" aria-label="Seção"><button id="fig-aba-biblioteca" role="tab" aria-selected="true">Biblioteca</button><button id="fig-aba-batalha" role="tab" aria-selected="false">Batalha</button></div>
-      <label class="fig-busca"><span class="sr-only">Buscar figurantes</span><input id="fig-busca" maxlength="100" placeholder="Buscar por nome, descrição ou história…"></label>
       <button id="fig-novo" class="fig-primario">+ Novo inimigo</button>
+      <label class="fig-busca"><span class="sr-only">Buscar figurantes</span><input id="fig-busca" maxlength="100" placeholder="Buscar por nome, descrição ou história…"></label>
     </div>
     <section id="fig-biblioteca" aria-label="Biblioteca de figurantes"><p id="fig-contagem" class="fig-discreto"></p><div id="fig-cartoes" class="fig-grade"></div></section>
-    <section id="fig-batalha" class="hidden" aria-label="Batalha em andamento"><div class="fig-topo"><p id="fig-batalha-resumo"></p><button id="fig-limpar" class="fig-perigo">Limpar batalha</button></div><div id="fig-combatentes" class="fig-grade"></div></section>
+    <section id="fig-batalha" class="hidden" aria-label="Batalha em andamento">
+      <div class="fig-topo fig-resumos-cabecalho"><div><p id="fig-batalha-resumo" role="status"></p><p class="fig-discreto">Selecione um resumo à esquerda. Acima de cinco, role somente a lista.</p></div><button id="fig-limpar" class="fig-perigo">Limpar batalha inteira</button></div>
+      <div class="fig-mesa-combate">
+        <aside class="fig-resumos-painel" aria-label="Resumos dos combatentes"><ul id="fig-combatentes" class="fig-resumos" aria-label="Combatentes em batalha"></ul></aside>
+        <section id="fig-ficha-regiao" class="fig-ficha-selecionada" aria-labelledby="fig-selecionado-titulo">
+          <h3 id="fig-selecionado-titulo" class="sr-only">Ficha do selecionado</h3>
+          <div id="fig-selecionado"></div>
+        </section>
+      </div>
+    </section>
   </main>
 
   <div id="fig-editor" class="fig-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fig-editor-titulo">
@@ -37,6 +50,14 @@
       <div class="fig-corpo">
         <div class="fig-identidade"><div class="fig-retrato" id="fig-retrato-previa" aria-label="Prévia do retrato">✦</div><div class="fig-identidade-campos"><label>Nome<input id="fig-nome" required maxlength="80" placeholder="Ex.: Guardião da cripta"></label><label>Retrato (URL, opcional)<input id="fig-imagem" maxlength="2000" placeholder="https://… ou /imagens/…"></label></div></div>
         <div class="fig-status"><fieldset><legend>Vida</legend><div class="fig-dois"><label id="fig-hp-atual-label">Atual<input id="fig-hp-atual" type="number" min="0" max="99999" value="10" required></label><label>Máxima<input id="fig-hp-max" type="number" min="1" max="99999" value="10" required></label></div><small id="fig-vida-ajuda">Cópias entram em batalha com a vida cheia.</small></fieldset><fieldset><legend>Energia</legend><div class="fig-dois"><label>Atual<input id="fig-energia-atual" type="number" min="0" max="99999" value="10" required></label><label>Máxima<input id="fig-energia-max" type="number" min="0" max="99999" value="10" required></label></div><small>Reserva usada para habilidades e magias.</small></fieldset></div>
+        <section class="fig-editor-arma" aria-labelledby="fig-arma-titulo">
+          <div class="fig-topo"><h3 id="fig-arma-titulo">Arma carregada</h3><label class="fig-checkbox"><input id="fig-tem-arma" type="checkbox"> Possui arma</label></div>
+          <p class="fig-discreto">Opcional. Novas cópias recebem esta arma. Nas cópias existentes, use Atualizar arma do modelo na ficha de batalha.</p>
+          <fieldset id="fig-arma-campos" disabled>
+            <div class="fig-arma-editor-topo"><span id="fig-arma-previa" aria-hidden="true"></span><label>Nome da arma<input id="fig-arma-nome" maxlength="80" required placeholder="Ex.: Espada longa"></label><label>Ícone<select id="fig-arma-icone"><option value="sword">Espada</option><option value="axe">Machado</option><option value="bow">Arco</option><option value="staff">Cajado</option><option value="dagger">Adaga</option></select></label></div>
+            <div class="fig-tres"><label>Alcance<input id="fig-arma-alcance" maxlength="60" placeholder="Ex.: 1,5 m ou 12 m"></label><label>Dano<input id="fig-arma-dano" maxlength="30" placeholder="Ex.: 1d8+3 ou 5"></label><label>Categoria<select id="fig-arma-categoria"><option value="leve">Leve</option><option value="media" selected>Média</option><option value="pesada">Pesada</option><option value="natural">Natural</option><option value="outra">Outra</option></select></label></div>
+          </fieldset>
+        </section>
         <label>Descrição<textarea id="fig-descricao" maxlength="2000" rows="2" placeholder="Como se parece, se movimenta e age?"></textarea></label>
         <label><span>Lore <span class="fig-discreto">/ História</span></span><textarea id="fig-lore" maxlength="4000" rows="3" placeholder="De onde veio? O que o trouxe até aqui?"></textarea></label>
         <label>Notas do mestre<textarea id="fig-notas" maxlength="2000" rows="3" placeholder="O que carrega, do que é feito, por que anda assim, o que acontece quando morre…"></textarea></label>
@@ -64,6 +85,7 @@
   </div>
     <script src="/JS/interface.js"></script>
     <script src="/mestre/JS/comum.js"></script>
+  <script src="/mestre/JS/figurantes-cartoes.js"></script>
   <script src="/mestre/JS/figurantes.js"></script>
 </body>
 </html>
