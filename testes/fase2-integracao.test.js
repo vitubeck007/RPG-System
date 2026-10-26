@@ -403,13 +403,16 @@ describe("Fase 2: integração do painel do mestre", { concurrency: false }, () 
       paginas.push(pNpc, pIni, pRol);
       await esperarAte(() => pNpc.document.querySelectorAll("#npc-cartoes [data-id]").length >= 30, { rotulo: "30 NPCs na página" });
       await esperarAte(() => pIni.document.querySelectorAll("#ini-combatentes [data-alvo-id]").length === 20, { rotulo: "20 combatentes na página" });
-      await esperarAte(() => pRol.document.querySelectorAll("#atk-alvos [data-alvo-id]").length >= 56, { rotulo: "56 alvos na página de rolagem" });
+      await esperarAte(() => pRol.run("rol.alvos.length >= 56"), { rotulo: "56 alvos carregados na página de rolagem" });
       const tPaginas = Date.now() - t0;
       assert.ok(tPaginas < 8000, `3 páginas com a carga completa demoraram ${tPaginas} ms`);
-      // e ainda respondem: marcar todos e recalcular as 56 prévias
+      // A nova página filtra os cartões por categoria, mas mantém todos os dados carregados.
       t0 = Date.now();
-      pRol.document.getElementById("atk-todos").dispatchEvent(new pRol.window.MouseEvent("click", { bubbles: true }));
-      assert.ok(Date.now() - t0 < 1500, "marcar todos (56 linhas) travou a página");
+      pRol.document.getElementById("atk-inimigos").click();
+      assert.ok(pRol.document.querySelectorAll("#atk-alvos [data-alvo-id]").length >= 50);
+      pRol.document.querySelector("#atk-alvos .fig-resumo-selecionar").click();
+      assert.ok(pRol.document.querySelector('#atk-alvos .fig-resumo-selecionar[aria-pressed="true"]'));
+      assert.ok(Date.now() - t0 < 1500, "alternar categoria/selecionar com 56 alvos travou a página");
       crus.forEach((j) => assert.ok(j));
     });
   });

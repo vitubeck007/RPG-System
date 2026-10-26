@@ -65,12 +65,19 @@ function recursoCartaoFig(item, tipo, recurso, batalha) {
   const controles = criar("div", "fig-tatica-controles");
   const aplicar = async ajuste => {
     if (recursosPendentesFig.has(chave)) return;
-    recursosPendentesFig.add(chave); renderizarFigurantes();
+    recursosPendentesFig.add(chave);
     try {
+      renderizarFigurantes();
       if (recurso === "energia") await pedirAoServidor("master_figurante_energia", { tipo: batalha ? "batalha" : tipo, id: item.alvoId || item.id, ...ajuste }, { muda: true });
       else if (vidaModelo) await pedirAoServidor("master_inimigo_hp", { id: item.id, ...ajuste }, { muda: true });
       else await pedirAoServidor(batalha ? "master_batalha_hp" : "master_npc_hp", batalha ? { alvoId: item.alvoId, ...ajuste } : { id: item.id, ...ajuste }, { muda: true });
-    } catch { /* o servidor mantém o último valor confirmado; o aviso comum explica a falha. */ }
+    } catch (erro) {
+      // Erros dos comandos já têm aviso; falhas locais não podem parecer falhas de autenticação.
+      if (!erro?.codigo) {
+        console.error("[FIGURANTE] Falha na interface ao ajustar recurso:", erro);
+        toast("Falha na interface ao ajustar o recurso. Recarregue para conferir os dados.", "error");
+      }
+    }
     finally { recursosPendentesFig.delete(chave); renderizarFigurantes(); }
   };
   const menos = acaoCartaoFig(`Diminuir ${nome.toLowerCase()} de ${item.nome}`, () => aplicar({ delta: -1 }), { icone: "minus" });
@@ -262,17 +269,13 @@ async function reviverCombatenteFig(item) {
 }
 
 function resumoCombatenteFig(item, selecionado) {
-  const card = criar("li", `fig-resumo fig-tatico${selecionado ? " fig-resumo-ativo" : ""}${item.derrotado ? " fig-resumo-caido" : ""}`);
-  card.dataset.id = item.alvoId; card.dataset.uiChave = JSON.stringify(["resumo", item.alvoId]);
-  const escolher = botaoDeAcao("selecionar-combatente", "", "fig-resumo-selecionar");
-  escolher.setAttribute("aria-label", `Selecionar ${item.nome}${item.derrotado ? ", caído" : ""}`);
-  escolher.setAttribute("aria-pressed", String(selecionado)); escolher.setAttribute("aria-controls", "fig-ficha-regiao");
-  const foto = criar("span", "fig-resumo-foto");
-  foto.append(criar("span", "fig-resumo-inicial", item.nome.slice(0, 1).toUpperCase()));
-  foto.append(retratoCartaoFig(item));
-  escolher.append(criar("strong", "fig-resumo-nome", item.nome), foto);
-  escolher.title = item.nome;
-  escolher.addEventListener("click", () => selecionarCombatenteFig(item.alvoId));
+  const { card, escolher, recursos } = criarResumoTatico({
+    id: item.alvoId, nome: item.nome, selecionado,
+    rotulo: `Selecionar ${item.nome}${item.derrotado ? ", caído" : ""}`,
+    aoSelecionar: () => selecionarCombatenteFig(item.alvoId), retrato: retratoCartaoFig(item),
+  });
+  card.classList.toggle("fig-resumo-caido", Boolean(item.derrotado));
+  escolher.setAttribute("aria-controls", "fig-ficha-regiao");
   if (item.derrotado) {
     const caido = criar("div", "fig-resumo-recuperacao"); caido.append(criar("span", "", "Caído"));
     const acoes = criar("div");
@@ -281,11 +284,10 @@ function resumoCombatenteFig(item, selecionado) {
     if (reviver.disabled) reviver.title = "A vida máxima precisa ser maior que zero para reviver.";
     const excluir = acaoCartaoFig("Excluir da batalha", b => confirmarNoBotao(b, () => pedirAoServidor("master_batalha_remover", { alvoId: item.alvoId }, { muda: true }).catch(() => {})), { classe: "fig-perigo" });
     excluir.textContent = "Excluir"; excluir.title = `Excluir somente ${item.nome} da batalha; o modelo é mantido na biblioteca`;
-    acoes.append(excluir, reviver); caido.append(acoes); card.append(caido);
+    acoes.append(excluir, reviver); caido.append(acoes); card.prepend(caido);
   }
-  const recursos = criar("div", "fig-resumo-recursos");
   recursos.append(recursoCartaoFig(item, "batalha", "hp", true), recursoCartaoFig(item, "batalha", "energia", true));
-  card.append(escolher, recursos, criar("span", "fig-resumo-estado", selecionado ? "Selecionado" : item.derrotado ? "Caído" : "Selecionar para ver ficha"));
+  card.append(criar("span", "fig-resumo-estado", selecionado ? "Selecionado" : item.derrotado ? "Caído" : "Selecionar para ver ficha"));
   return card;
 }
 

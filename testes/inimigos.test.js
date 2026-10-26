@@ -303,8 +303,8 @@ describe("Inimigos e batalha com o servidor real", { concurrency: false }, () =>
     assert.deepEqual([jog.nome, jog.player, jog.nomePasta], ["Ana", "ana", ana.pasta]);
     assert.ok(Number.isInteger(jog.hp.atual) && Number.isInteger(jog.hp.max));
     assert.match(jog.alvoId, /^jog_[0-9a-f]{16}$/);
-    assert.deepEqual(alvos.find((x) => x.tipo === "npc" && x.alvoId === npc.id), { alvoId: npc.id, tipo: "npc", nome: "Alvo NPC", hp: { atual: 4, max: 9 } });
-    assert.deepEqual(alvos.find((x) => x.tipo === "inimigo"), { alvoId, tipo: "inimigo", nome: "Alvo Inimigo 1", hp: { atual: 6, max: 6 }, derrotado: false });
+    assert.deepEqual(alvos.find((x) => x.tipo === "npc" && x.alvoId === npc.id), { alvoId: npc.id, tipo: "npc", nome: "Alvo NPC", imagem: "", hp: { atual: 4, max: 9 }, energia: { atual: 10, max: 10 } });
+    assert.deepEqual(alvos.find((x) => x.tipo === "inimigo"), { alvoId, tipo: "inimigo", nome: "Alvo Inimigo 1", imagem: "", hp: { atual: 6, max: 6 }, energia: { atual: 10, max: 10 }, derrotado: false });
     const ids = alvos.map((x) => x.alvoId);
     assert.equal(new Set(ids).size, ids.length, "ids únicos");
     assert.ok(ids.every((id) => /^[A-Za-z0-9_-]{1,64}$/.test(id)));

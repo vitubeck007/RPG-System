@@ -80,17 +80,18 @@ test('smoke 9–16 e 21: acesso antecipado, estado visual, ajustes, edição e e
     assert.equal(card.querySelector('[data-acao="Ajustar energia…"]'), null);
 
     const rol = await abrirMestre('rolagem');
-    rol.run(`rol.alvos = [{alvoId:'npc:1',nome:'Aliado',tipo:'npc',hp:{atual:20,max:20}}]; renderizarAlvos()`);
+    rol.run(`rol.categoria = 'inimigos'; rol.alvos = [{alvoId:'npc_1',nome:'Aliado',tipo:'npc',hp:{atual:20,max:20},energia:{atual:5,max:10}}]; renderizarAlvos()`);
     let linha = rol.document.querySelector('[data-alvo-id]');
-    linha.querySelector('label').click();
-    assert.equal(linha.querySelector('input').checked, true);
-    const mult = linha.querySelector('select'); mult.value = '0.5';
+    linha.querySelector('.fig-resumo-selecionar').click();
+    linha = rol.document.querySelector('[data-alvo-id]');
+    assert.equal(linha.querySelector('.fig-resumo-selecionar').getAttribute('aria-pressed'), 'true');
+    const mult = linha.querySelector('[data-campo="mult"]'); mult.value = '0.5';
     mult.dispatchEvent(new rol.window.Event('change')); mult.focus();
     rol.run(`rol.alvos[0].hp.atual = 17; renderizarAlvos()`);
     linha = rol.document.querySelector('[data-alvo-id]');
-    assert.equal(linha.dataset.marcado, 'true'); assert.equal(linha.querySelector('select').value, '0.5');
-    assert.equal(rol.document.activeElement, linha.querySelector('select'));
-    linha.querySelector('select').click(); assert.equal(linha.querySelector('input').checked, true);
+    assert.equal(linha.dataset.marcado, 'true'); assert.equal(linha.querySelector('[data-campo="mult"]').value, '0.5');
+    assert.equal(rol.document.activeElement, linha.querySelector('[data-campo="mult"]'));
+    linha.querySelector('[data-campo="mult"]').click(); assert.equal(linha.querySelector('.fig-resumo-selecionar').getAttribute('aria-pressed'), 'true');
 
     for (const [pagina, editor, nome, numero] of [
       ['loot', 'abrirEditorItem()', 'li-name', 'li-w'],

@@ -1,298 +1,287 @@
-/* =========================================================================
-   PÁGINA ROLAGEM E DANO (Sprint 6)
-   Rolar dados (a rolagem acontece no SERVIDOR) e atacar: escolher os alvos (jogadores online, NPCs e
-   inimigos em batalha), um multiplicador por alvo (×1, ×½, ×2), ver a prévia e aplicar. A prévia usa a
-   MESMA conta do servidor (calcularDano, de JS/regras.js). Texto só por textContent (R8).
-   ========================================================================= */
-
-const MULT_ROTULO = { 1: "×1", 0.5: "×½", 2: "×2" };
+/* Rolagem no servidor; Atacar é opt-in e usa a seleção das duas categorias. */
 const MAX_HISTORICO = 30;
-
-const rol = { historico: [], alvos: [], marcados: new Map(), ultimaAplicacao: null, carregou: false };
-
-const estiloInput = "bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono";
-
-/* ------------------------------ rolar ------------------------------ */
-function criarLinhaDeComponente(nome = "", formula = "") {
-  const linha = criar("div", "flex gap-1 items-center");
-  const n = criar("input", `flex-1 ${estiloInput}`);
-  n.placeholder = "Nome (opcional)";
-  n.setAttribute("aria-label", "Nome do componente da rolagem (opcional)");
-  n.maxLength = 40;
-  n.dataset.campo = "nome";
-  n.value = nome;
-  const f = criar("input", `w-28 ${estiloInput}`);
-  f.placeholder = "2d6+3";
-  f.setAttribute("aria-label", "Fórmula do componente da rolagem");
-  f.maxLength = 30;
-  f.dataset.campo = "formula";
-  f.value = formula;
-  const x = criar("button", "px-2 py-1 rounded text-xs border border-dungeon-700 text-rose-300", "✕");
-  x.type = "button";
-  x.setAttribute("aria-label", "Remover componente da rolagem");
-  x.dataset.acao = "remover-componente";
-  x.addEventListener("click", () => {
-    if (campo("rol-componentes").children.length > 1) linha.remove();
-  });
-  linha.append(n, f, x);
-  campo("rol-componentes").append(linha);
-}
-
-function lerComponentes() {
-  return [...campo("rol-componentes").children]
-    .map((l) => ({ nome: l.querySelector('[data-campo="nome"]').value.trim(), formula: l.querySelector('[data-campo="formula"]').value.trim() }))
-    .filter((c) => c.formula);
-}
-
-function descreverComponente(c) {
-  const dados = c.dados.length ? `[${c.dados.join(", ")}]${c.bonus ? ` ${c.bonus > 0 ? "+" : ""}${c.bonus}` : ""}` : "";
-  return `${c.nome ? `${c.nome}: ` : ""}${c.formula}${dados ? ` → ${dados}` : ""} = ${c.soma}`;
-}
-
-function resumoDaRolagem(r) {
-  return r.componentes.map((c) => c.formula).join(" + ");
-}
-
-function renderizarResultadoDaRolagem(r) {
-  const area = campo("rol-resultado");
-  area.replaceChildren();
-  area.classList.remove("hidden");
-  const total = criar("div", "text-amber-200 text-base font-bold", `Total: ${r.total}`);
-  total.dataset.total = String(r.total);
-  area.append(total);
-  r.componentes.forEach((c) => area.append(criar("div", "text-slate-300", descreverComponente(c))));
-}
-
-function renderizarHistorico() {
-  const lista = campo("rol-historico");
-  lista.replaceChildren();
-  if (!rol.historico.length) lista.append(criar("li", "text-slate-500 italic", "Nenhuma rolagem ainda."));
-  for (const r of rol.historico) {
-    const li = criar("li", "flex justify-between gap-2 border-b border-dungeon-800 pb-1");
-    li.dataset.rolagemId = r.rolagemId;
-    li.append(criar("span", "break-words", `${r.total} · ${resumoDaRolagem(r)}`));
-    const usar = criar("button", "px-2 border border-dungeon-700 rounded text-[11px] whitespace-nowrap", "Usar no ataque");
-    usar.type = "button";
-    usar.dataset.acao = "usar";
-    li.append(usar);
-    lista.append(li);
-  }
-}
-
-async function rolar() {
-  const componentes = lerComponentes();
-  if (!componentes.length) return toast("Informe ao menos uma fórmula.", "error");
-  const ruim = componentes.find((c) => !lerFormulaCombo(c.formula));
-  if (ruim) return toast(`Fórmula inválida: ${ruim.formula}. Exemplos: 2d6+3, d20, +5.`, "error");
-  try {
-    const r = await pedirAoServidor("master_rolar", { componentes }, { muda: true });
-    rol.historico.unshift(r);
-    rol.historico.length = Math.min(rol.historico.length, MAX_HISTORICO);
-    renderizarResultadoDaRolagem(r);
-    renderizarHistorico();
-    renderizarFontes(r.rolagemId);
-  } catch { /* aviso já mostrado */ }
-}
-
-/* ------------------------------ atacar: fonte do dano ------------------------------ */
-function renderizarFontes(selecionar) {
-  const select = campo("atk-fonte");
-  const atual = selecionar ?? select.value;
-  select.replaceChildren();
-  rol.historico.forEach((r) => select.append(new Option(`${r.total} · ${resumoDaRolagem(r)}`, r.rolagemId)));
-  select.append(new Option("Valor manual…", "manual"));
-  select.value = [...select.options].some((o) => o.value === atual) ? atual : select.options[0].value;
-  campo("atk-valor").classList.toggle("hidden", select.value !== "manual");
-  atualizarPrevias();
-}
-
-// Total do dano escolhido (ou null se ainda não há).
-function totalDoDano() {
-  const fonte = campo("atk-fonte").value;
-  if (fonte === "manual") {
-    const v = campo("atk-valor").value;
-    return v !== "" && Number.isInteger(Number(v)) && Number(v) >= 0 ? Number(v) : null;
-  }
-  return rol.historico.find((r) => r.rolagemId === fonte)?.total ?? null;
-}
-
-/* ------------------------------ atacar: alvos ------------------------------ */
+const rol = {
+  historico: [], alvos: [], marcados: new Map(), ultimaAplicacao: null, carregou: false,
+  categoria: "jogadores", atacar: false, ocupada: false, carregando: false, erroCarga: "", ausentes: [],
+};
 const ROTULO_TIPO = { jogador: "Jogador", npc: "NPC", inimigo: "Inimigo" };
+let leituraAlvosRol = 0;
 
+function erroRolagem(texto = "") {
+  campo("rol-erro").textContent = texto;
+  campo("rol-erro").hidden = !texto;
+}
+function iconeRolagem(nome) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("class", "rpg-icon");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(svg.namespaceURI, "use");
+  use.setAttribute("href", "/CSS/icones.svg#" + nome); svg.append(use); return svg;
+}
+function atualizarEstadoAtaque() {
+  campo("atk-atacar").checked = rol.atacar;
+  campo("atk-atacar").disabled = rol.ocupada;
+  campo("atk-secao").dataset.atacar = String(rol.atacar);
+  const selecionados = [...rol.marcados.values()].filter(x => x.marcado).length;
+  campo("atk-status").textContent = (selecionados === 1 ? "1 alvo selecionado" : selecionados ? selecionados + " alvos selecionados" : "Nenhum alvo selecionado") +
+    " · " + (rol.atacar ? "ataque ativado" : "ataque desativado");
+}
+function definirOcupadaRolagem(valor) {
+  rol.ocupada = valor;
+  document.querySelectorAll("[data-rol-controle]").forEach(el => { el.disabled = valor; });
+  campo("rol-secao").setAttribute("aria-busy", String(valor));
+  atualizarEstadoAtaque();
+  renderizarAlvos();
+}
+function atualizarDadosInstantaneos() {
+  const qtd = campo("rol-quantidade").value || "1";
+  document.querySelectorAll("[data-dado]").forEach(b => {
+    b.querySelector("span").textContent = qtd + "d" + b.dataset.dado;
+    b.title = "Rolar " + qtd + "d" + b.dataset.dado;
+  });
+}
+function resumoDaRolagem(r) {
+  return r.expressao || r.componentes.map(c => c.formula).join(" + ");
+}
+function renderizarResultadoDaRolagem(r) {
+  campo("rol-total").textContent = String(r.total);
+  campo("rol-total").dataset.total = String(r.total);
+  campo("rol-formula").textContent = resumoDaRolagem(r);
+  campo("rol-espera").hidden = true;
+  const lista = campo("rol-detalhes"); lista.replaceChildren();
+  for (const c of r.componentes) {
+    const dados = c.dados.length ? "[" + c.dados.join(", ") + "]" +
+      (c.bonus ? " " + (c.bonus > 0 ? "+" : "") + c.bonus : "") : "valor fixo";
+    lista.append(criar("li", "", c.formula + " → " + dados + " = " + c.soma));
+  }
+}
+function renderizarHistorico() {
+  campo("rol-historico-painel").hidden = !rol.historico.length;
+  const lista = campo("rol-historico"); lista.replaceChildren();
+  for (const r of rol.historico) {
+    const item = criar("li");
+    item.append(criar("strong", "", String(r.total)), document.createTextNode(" · " + resumoDaRolagem(r)));
+    lista.append(item);
+  }
+}
+function selecaoDoAtaque() {
+  return [...rol.marcados].filter(([, x]) => x.marcado).map(([alvoId, x]) => ({ alvoId, mult: x.mult }));
+}
+
+async function rolar(expressao) {
+  if (rol.ocupada) return;
+  erroRolagem();
+  const formula = typeof expressao === "string" ? expressao.trim() : campo("rol-expressao").value.trim();
+  if (!lerExpressaoRolagem(formula)) {
+    campo("rol-expressao").setAttribute("aria-invalid", "true");
+    return erroRolagem("Expressão inválida. Use somas/subtrações como 2d20+5+3d6+1, com no máximo 999 dados.");
+  }
+  campo("rol-expressao").removeAttribute("aria-invalid");
+  const atacar = rol.atacar, alvos = selecaoDoAtaque(), chave = tokenDoMestre();
+  if (atacar && !alvos.length) return erroRolagem("Selecione ao menos um alvo ou desligue Atacar para apenas rolar.");
+  if (atacar && alvos.some(a => !validarMultiplicadorDano(a.mult))) {
+    return erroRolagem("Corrija o multiplicador dos alvos selecionados: use um número maior ou igual a zero.");
+  }
+  definirOcupadaRolagem(true);
+  try {
+    const r = await pedirAoServidor("master_rolar", { expressao: formula }, { muda: true });
+    r.expressao = formula;
+    rol.historico.unshift(r); rol.historico.length = Math.min(rol.historico.length, MAX_HISTORICO);
+    renderizarResultadoDaRolagem(r); renderizarHistorico();
+    if (atacar && rol.atacar && chave === tokenDoMestre()) {
+      if (alvos.some(a => calcularDano(r.total, a.mult) === null)) {
+        return erroRolagem("Rolagem concluída, mas o dano com esse multiplicador é grande demais. Nenhum dano foi enviado.");
+      }
+      const aplicacao = await pedirAoServidor("master_aplicar_dano", { rolagemId: r.rolagemId, alvos }, { muda: true });
+      rol.ultimaAplicacao = aplicacao;
+      renderizarResultadoDoAtaque(aplicacao);
+      campo("atk-desfazer").hidden = false;
+      campo("atk-desfazer").dataset.aplicacaoId = aplicacao.aplicacaoId;
+      await carregarAlvos();
+    } else if (atacar) {
+      erroRolagem("Rolagem concluída, mas o acesso mudou. O dano não foi enviado.");
+    } else {
+      campo("atk-resultado").hidden = true;
+    }
+  } catch (erro) {
+    // Sem reenvio automático: após timeout, a rolagem/dano pode ter sido confirmada no servidor.
+    erroRolagem(erro.message || "Não foi possível concluir. Confira os dados antes de repetir.");
+  } finally { definirOcupadaRolagem(false); }
+}
+
+function retratoAlvoRolagem(a) {
+  const img = criar("img", "fig-retrato-imagem");
+  img.alt = ""; img.loading = "lazy"; img.referrerPolicy = "no-referrer";
+  const padrao = "/CSS/retrato-padrao.svg";
+  img.src = urlDeImagem(a.imagem) || padrao;
+  img.addEventListener("error", () => {
+    if (img.getAttribute("src") === padrao) img.hidden = true;
+    else img.src = padrao;
+  });
+  return img;
+}
+function recursoAlvoRolagem(nome, vital, classe) {
+  const v = vital || { atual: 0, max: 0 };
+  const painel = criar("div", "fig-tatica-recurso fig-tatica-" + classe);
+  painel.append(criar("span", "", nome));
+  const valor = criar("span", "rol-alvo-valor");
+  valor.append(criar("strong", "", String(v.atual)), document.createTextNode(" / " + v.max));
+  const barra = criar("div", "fig-tatica-barra"), dentro = criar("span");
+  barra.setAttribute("aria-hidden", "true");
+  dentro.style.width = (v.max ? Math.max(0, Math.min(100, v.atual / v.max * 100)) : 0) + "%";
+  barra.append(dentro); painel.append(valor, barra); return painel;
+}
 function criarLinhaDeAlvo(a) {
   const estado = rol.marcados.get(a.alvoId) || { marcado: false, mult: 1 };
-  const linha = criar("div", `flex items-center gap-2 text-xs font-mono border border-dungeon-800 rounded px-2 py-1 ${a.derrotado ? "opacity-50" : ""}`);
-  linha.dataset.alvoId = a.alvoId;
-  linha.dataset.uiChave = a.alvoId;
-  linha.dataset.marcado = String(estado.marcado);
-  const caixa = criar("input");
-  caixa.type = "checkbox";
-  caixa.setAttribute("aria-label", `Selecionar ${a.nome} como alvo`);
-  caixa.checked = estado.marcado;
-  caixa.dataset.campo = "marcado";
-  const nome = criar("span", "flex-1 min-w-0 break-words", a.nome);
-  const selecao = criar('label', 'master-target-label');
-  selecao.append(caixa, nome);
-  const tipo = criar("span", "px-1 rounded border border-slate-600 text-[10px] text-slate-400", ROTULO_TIPO[a.tipo] || a.tipo);
-  const hp = criar("span", "text-rose-300 whitespace-nowrap", `HP ${a.hp.atual}/${a.hp.max}`);
-  const mult = criar("select", estiloInput);
-  mult.dataset.campo = "mult";
-  mult.setAttribute("aria-label", `Multiplicador de dano para ${a.nome}`);
-  [1, 0.5, 2].forEach((m) => mult.append(new Option(MULT_ROTULO[m], String(m))));
-  mult.value = String(estado.mult);
-  const previa = criar("span", "text-amber-200 whitespace-nowrap");
-  previa.dataset.previa = "1";
-  const mudou = () => {
-    rol.marcados.set(a.alvoId, { marcado: caixa.checked, mult: Number(mult.value) });
-    linha.dataset.marcado = String(caixa.checked);
-    atualizarPrevias();
-  };
-  caixa.addEventListener("change", mudou);
-  mult.addEventListener("change", mudou);
-  linha.append(selecao, tipo, hp, mult, previa);
-  return linha;
-}
-
-// Prévia por alvo: "Goblin 2: 8 → 4 (HP 10 → 6)". Mesma conta do servidor.
-function atualizarPrevias() {
-  const total = totalDoDano();
-  for (const linha of campo("atk-alvos").children) {
-    const previa = linha.querySelector("[data-previa]");
-    if (!previa) continue;
-    const alvo = rol.alvos.find((a) => a.alvoId === linha.dataset.alvoId);
-    const mult = Number(linha.querySelector('[data-campo="mult"]').value);
-    if (total === null || !alvo) {
-      previa.textContent = "—";
-      continue;
-    }
-    const dano = calcularDano(total, mult);
-    previa.textContent = `${alvo.nome}: ${total} → ${dano} (HP ${alvo.hp.atual} → ${Math.max(0, alvo.hp.atual - dano)})`;
+  const { card, escolher, recursos } = criarResumoTatico({
+    id: a.alvoId, nome: a.nome, selecionado: estado.marcado,
+    rotulo: "Selecionar " + a.nome + " como alvo", retrato: retratoAlvoRolagem(a),
+    aoSelecionar: () => {
+      if (rol.ocupada) return;
+      const atual = rol.marcados.get(a.alvoId) || { marcado: false, mult: 1 };
+      rol.marcados.set(a.alvoId, { ...atual, marcado: !atual.marcado }); renderizarAlvos();
+    },
+  });
+  card.classList.add("rol-alvo");
+  card.dataset.alvoId = a.alvoId; card.dataset.marcado = String(estado.marcado);
+  escolher.dataset.acao = "selecionar-alvo"; escolher.disabled = rol.ocupada;
+  recursos.append(recursoAlvoRolagem("Vida", a.hp, "hp"), recursoAlvoRolagem("Energia", a.energia, "energia"));
+  card.dataset.indisponivel = String(!!a.indisponivel);
+  card.append(criar("span", "rol-alvo-tipo", (ROTULO_TIPO[a.tipo] || a.tipo) + (a.indisponivel ? " · Indisponível" : a.derrotado ? " · Caído" : "")));
+  if (estado.marcado) {
+    const espada = iconeRolagem("sword"); espada.classList.add("rol-alvo-espada"); card.append(espada);
   }
+  const label = criar("label", "rol-alvo-multiplicador", "Dano ×");
+  label.hidden = !estado.marcado;
+  const mult = criar("input");
+  mult.type = "number"; mult.min = "0"; mult.step = "any"; mult.required = true;
+  mult.value = estado.mult === null ? "" : String(estado.mult);
+  mult.disabled = rol.ocupada; mult.inputMode = "decimal"; mult.dataset.campo = "mult";
+  mult.setAttribute("aria-label", "Multiplicador de dano para " + a.nome);
+  const mudou = () => {
+    const valor = mult.value === "" ? null : mult.valueAsNumber;
+    const atual = rol.marcados.get(a.alvoId) || estado;
+    rol.marcados.set(a.alvoId, { ...atual, mult: valor });
+    mult.setAttribute("aria-invalid", String(!validarMultiplicadorDano(valor)));
+  };
+  mult.addEventListener("input", mudou); mult.addEventListener("change", mudou);
+  label.append(mult); card.append(label); return card;
 }
-
 function renderizarAlvos() {
   const area = campo("atk-alvos");
+  if (!area) return;
+  atualizarEstadoAtaque();
+  for (const categoria of ["jogadores", "inimigos"]) {
+    campo("atk-" + categoria).setAttribute("aria-selected", String(rol.categoria === categoria));
+    campo("atk-" + categoria).tabIndex = rol.categoria === categoria ? 0 : -1;
+  }
+  const lista = [...rol.alvos, ...rol.ausentes.filter(a => rol.marcados.get(a.alvoId)?.marcado)]
+    .filter(a => (a.tipo === "jogador" ? "jogadores" : "inimigos") === rol.categoria);
   RPGUI.preservarInteracao(area, () => {
     area.replaceChildren();
-    if (!rol.alvos.length) area.append(criar("p", "text-xs text-slate-500 italic", "Nenhum alvo: abra fichas, crie NPCs ou ponha inimigos em batalha."));
-    rol.alvos.forEach((a) => area.append(criarLinhaDeAlvo(a)));
+    lista.forEach(a => area.append(criarLinhaDeAlvo(a)));
+    if (!lista.length) area.append(criar("li", "rol-vazio", rol.carregando ? "Carregando alvos…" :
+      !rol.carregou ? "Os alvos aparecerão após autorizar o acesso." :
+      rol.categoria === "jogadores" ? "Nenhuma ficha de jogador conectada." : "Nenhum inimigo em batalha ou NPC na mesa."));
   });
-  atualizarPrevias();
+  const aviso = campo("atk-aviso");
+  aviso.textContent = rol.erroCarga || (!tokenDoMestre() ? "Informe a chave do mestre para carregar os alvos." :
+    rol.categoria === "inimigos" ? "Inclui inimigos em batalha e NPCs da mesa." : "");
+  aviso.hidden = !aviso.textContent;
+  campo("atk-atualizar").hidden = !rol.erroCarga;
 }
-
 async function carregarAlvos() {
-  if (!tokenDoMestre()) return;
+  const chave = tokenDoMestre();
+  if (!chave) { renderizarAlvos(); return; }
+  const leitura = ++leituraAlvosRol;
+  rol.carregando = true; renderizarAlvos();
   try {
     const r = await pedirAoServidor("master_listar_alvos", {}, { silencioso: true });
-    rol.alvos = r.alvos;
-    for (const id of [...rol.marcados.keys()]) if (!rol.alvos.some((a) => a.alvoId === id)) rol.marcados.delete(id);
-    rol.carregou = true;
+    if (leitura !== leituraAlvosRol || chave !== tokenDoMestre()) return;
+    const presentes = new Set(r.alvos.map(a => a.alvoId));
+    // Uma ficha fechada/alvo removido continua desmarcável, sem perder a seleção silenciosamente.
+    rol.ausentes = [...rol.alvos, ...rol.ausentes]
+      .filter(a => !presentes.has(a.alvoId) && rol.marcados.get(a.alvoId)?.marcado)
+      .map(a => ({ ...a, indisponivel: true }));
+    rol.alvos = r.alvos; rol.carregou = true; rol.erroCarga = "";
   } catch (erro) {
-    if (erro.codigo === "nao_autorizado") toast("Token/Senha do mestre incorreta!", "error");
+    if (leitura !== leituraAlvosRol || chave !== tokenDoMestre()) return;
+    rol.erroCarga = erro.codigo === "nao_autorizado" ? "Chave do mestre incorreta." :
+      "Não foi possível sincronizar. Os dados anteriores podem estar desatualizados.";
+  } finally {
+    if (leitura === leituraAlvosRol) { rol.carregando = false; renderizarAlvos(); }
   }
-  renderizarAlvos();
-}
-
-function marcarTodos(valor) {
-  for (const a of rol.alvos) rol.marcados.set(a.alvoId, { marcado: valor, mult: rol.marcados.get(a.alvoId)?.mult ?? 1 });
-  renderizarAlvos();
-}
-
-/* ------------------------------ aplicar e desfazer ------------------------------ */
-function linhaDeResultado(r) {
-  if (!r.ok) return `${r.nome || r.alvoId}: ${r.motivo === "ausente" ? "ausente (não recebeu dano)" : "não foi possível aplicar"}`;
-  return `${r.nome}: ${r.dano} de dano (${MULT_ROTULO[r.mult]}) · HP ${r.antes} → ${r.depois}${r.derrotado ? " · DERROTADO" : ""}`;
 }
 
 function renderizarResultadoDoAtaque(aplicacao) {
-  const area = campo("atk-resultado");
-  area.replaceChildren();
-  area.classList.remove("hidden");
-  area.append(criar("div", "text-amber-200 font-bold", `Dano base: ${aplicacao.total}`));
+  const area = campo("atk-resultado"); area.replaceChildren(); area.hidden = false;
+  area.append(criar("strong", "", "Dano base: " + aplicacao.total));
   for (const r of aplicacao.resultados) {
-    const l = criar("div", r.ok ? "text-slate-300" : "text-rose-300", linhaDeResultado(r));
-    l.dataset.alvoId = r.alvoId;
-    l.dataset.ok = r.ok ? "1" : "0";
-    area.append(l);
+    const linha = criar("p", "", r.ok ? r.nome + ": " + r.dano + " de dano (×" + r.mult + ") · Vida " +
+      r.antes + " → " + r.depois + (r.derrotado ? " · Caído" : "") :
+      (r.nome || r.alvoId) + ": " + (r.motivo === "ausente" ? "indisponível; não recebeu dano." : "não foi possível aplicar."));
+    linha.dataset.alvoId = r.alvoId; linha.dataset.ok = r.ok ? "1" : "0"; area.append(linha);
   }
 }
-
-async function aplicarDano() {
-  const marcados = [...campo("atk-alvos").children].filter((l) => l.querySelector('[data-campo="marcado"]')?.checked);
-  if (!marcados.length) return toast("Marque ao menos um alvo.", "error");
-  const total = totalDoDano();
-  if (total === null) return toast("Escolha uma rolagem ou informe o valor do dano.", "error");
-  const fonte = campo("atk-fonte").value;
-  const dados = { alvos: marcados.map((l) => ({ alvoId: l.dataset.alvoId, mult: Number(l.querySelector('[data-campo="mult"]').value) })) };
-  if (fonte === "manual") dados.valor = total;
-  else dados.rolagemId = fonte;
-  try {
-    const aplicacao = await pedirAoServidor("master_aplicar_dano", dados, { muda: true });
-    rol.ultimaAplicacao = aplicacao;
-    renderizarResultadoDoAtaque(aplicacao);
-    const desfazer = campo("atk-desfazer");
-    desfazer.classList.remove("hidden");
-    desfazer.dataset.aplicacaoId = aplicacao.aplicacaoId;
-    await carregarAlvos();
-  } catch { /* aviso já mostrado */ }
-}
-
 async function desfazerDano() {
   const id = campo("atk-desfazer").dataset.aplicacaoId;
-  if (!id) return;
+  if (!id || rol.ocupada) return;
+  definirOcupadaRolagem(true); erroRolagem();
   try {
     const r = await pedirAoServidor("master_desfazer_dano", { aplicacaoId: id }, { muda: true });
-    const area = campo("atk-resultado");
-    area.replaceChildren(criar("div", "text-amber-200 font-bold", "Dano desfeito"));
-    if (!r.restaurados.length) area.append(criar("div", "text-slate-400", "Nada a restaurar."));
+    const area = campo("atk-resultado"); area.replaceChildren(); area.hidden = false;
+    area.append(criar("strong", "", "Dano desfeito"));
     for (const x of r.restaurados) {
-      const texto = x.ok ? `${x.nome}: HP ${x.antes} → ${x.depois}` : `${x.nome || x.alvoId}: não restaurado (${x.motivo === "hp_mudou" ? "o HP mudou desde então" : "ausente"})`;
-      const l = criar("div", x.ok ? "text-slate-300" : "text-rose-300", texto);
-      l.dataset.ok = x.ok ? "1" : "0";
-      area.append(l);
+      const linha = criar("p", "", x.ok ? x.nome + ": Vida " + x.antes + " → " + x.depois :
+        (x.nome || x.alvoId) + ": não restaurado (" + (x.motivo === "hp_mudou" ? "a vida já mudou" : "indisponível") + ").");
+      linha.dataset.ok = x.ok ? "1" : "0"; area.append(linha);
     }
-    campo("atk-desfazer").classList.add("hidden");
+    campo("atk-desfazer").hidden = true;
     await carregarAlvos();
   } catch (erro) {
-    if (erro.codigo === "nao_e_a_ultima" || erro.codigo === "ja_desfeita") campo("atk-desfazer").classList.add("hidden");
-  }
+    erroRolagem(erro.message);
+    if (["nao_e_a_ultima", "ja_desfeita"].includes(erro.codigo)) campo("atk-desfazer").hidden = true;
+  } finally { definirOcupadaRolagem(false); }
 }
 
-/* ------------------------------ eventos ------------------------------ */
-let recarregar = null;
+let timerAlvosRol = null;
 const recarregarAlvos = () => {
-  clearTimeout(recarregar);
-  recarregar = setTimeout(carregarAlvos, 150);
+  clearTimeout(timerAlvosRol); timerAlvosRol = setTimeout(carregarAlvos, 100);
 };
 socket.on("campanha_atualizada", ({ tipo } = {}) => {
-  if (tipo === "npcs" || tipo === "batalha") recarregarAlvos();
+  if (["npcs", "batalha"].includes(tipo)) recarregarAlvos();
 });
-socket.on("player_updated", recarregarAlvos);
-socket.on("player_removed", recarregarAlvos);
+for (const evento of ["player_updated", "player_removed", "vital_adjusted"]) socket.on(evento, recarregarAlvos);
 socket.on("connect", () => setTimeout(carregarAlvos, 0));
-
 document.addEventListener("DOMContentLoaded", () => {
-  criarLinhaDeComponente("", "d20");
-  campo("rol-add").addEventListener("click", () => {
-    if (campo("rol-componentes").children.length < 10) criarLinhaDeComponente();
+  campo("rol-form").addEventListener("submit", ev => { ev.preventDefault(); rolar(); });
+  document.querySelectorAll("[data-dado]").forEach(b => b.addEventListener("click", ev => {
+    if (ev.detail > 1) return; // O segundo clique físico não inicia outro ataque após uma resposta rápida.
+    const quantidade = campo("rol-quantidade");
+    if (!quantidade.reportValidity()) return erroRolagem("Quantidade inválida: escolha um inteiro de 1 a 999.");
+    rolar(quantidade.value + "d" + b.dataset.dado);
+  }));
+  campo("rol-rolar").addEventListener("click", ev => { if (ev.detail > 1) ev.preventDefault(); });
+  campo("rol-quantidade").addEventListener("input", atualizarDadosInstantaneos);
+  campo("rol-expressao").addEventListener("input", () => { campo("rol-expressao").removeAttribute("aria-invalid"); erroRolagem(); });
+  campo("atk-atacar").addEventListener("change", ev => {
+    if (rol.ocupada) { ev.target.checked = rol.atacar; return; }
+    rol.atacar = ev.target.checked; atualizarEstadoAtaque();
   });
-  campo("rol-rolar").addEventListener("click", rolar);
-  campo("rol-historico").addEventListener("click", (ev) => {
-    const b = ev.target.closest('button[data-acao="usar"]');
-    if (b) renderizarFontes(b.closest("[data-rolagem-id]").dataset.rolagemId);
+  for (const categoria of ["jogadores", "inimigos"]) campo("atk-" + categoria).addEventListener("click", () => {
+    rol.categoria = categoria; renderizarAlvos();
   });
-  campo("atk-fonte").addEventListener("change", () => {
-    campo("atk-valor").classList.toggle("hidden", campo("atk-fonte").value !== "manual");
-    atualizarPrevias();
+  document.querySelector(".rol-segmentado").addEventListener("keydown", ev => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) return;
+    ev.preventDefault();
+    rol.categoria = ev.key === "Home" ? "jogadores" : ev.key === "End" ? "inimigos" :
+      rol.categoria === "jogadores" ? "inimigos" : "jogadores";
+    renderizarAlvos(); campo("atk-" + rol.categoria).focus();
   });
-  campo("atk-valor").addEventListener("input", atualizarPrevias);
-  campo("atk-todos").addEventListener("click", () => marcarTodos(true));
-  campo("atk-nenhum").addEventListener("click", () => marcarTodos(false));
   campo("atk-atualizar").addEventListener("click", carregarAlvos);
-  campo("atk-aplicar").addEventListener("click", () => executarAcaoMestre(campo("atk-aplicar"), "Aplicando…", aplicarDano));
-  campo("atk-desfazer").addEventListener("click", () => executarAcaoMestre(campo("atk-desfazer"), "Desfazendo…", desfazerDano));
-  campo("master-token-input")?.addEventListener("change", () => setTimeout(carregarAlvos, 50));
-  renderizarHistorico();
-  renderizarFontes();
-  renderizarAlvos();
+  campo("atk-desfazer").addEventListener("click", desfazerDano);
+  document.addEventListener("change", ev => {
+    if (ev.target.id === "master-token-input") recarregarAlvos();
+  });
+  renderizarAlvos(); atualizarDadosInstantaneos();
 });

@@ -39,10 +39,10 @@ describe("Fórmulas e conta do dano (compartilhadas)", () => {
     }
   });
 
-  it("calcularDano: ×1, ×½ (arredonda para baixo), ×2; nunca negativo; multiplicador fora da lista é recusado", () => {
-    const casos = [[7, 1, 7], [7, 0.5, 3], [7, 2, 14], [1, 0.5, 0], [0, 2, 0], [9, 0.5, 4], [8, 0.5, 4], [-4, 1, 0], [-4, 2, 0], [100000, 2, 200000]];
+  it("calcularDano: multiplicadores não negativos, decimais e arredondamento para baixo", () => {
+    const casos = [[7, 1, 7], [7, 0.5, 3], [7, 2, 14], [1, 0.5, 0], [0, 2, 0], [9, 0.5, 4], [8, 0.5, 4], [-4, 1, 0], [-4, 2, 0], [100000, 2, 200000], [20, 3, 60], [7, 1.5, 10], [20, 0, 0], [20, 0.3, 6]];
     for (const [t, m, esperado] of casos) assert.equal(regras.calcularDano(t, m), esperado, `${t} × ${m}`);
-    for (const m of [0, 0.3, 3, -1, "1", null, undefined, NaN, Infinity]) assert.equal(regras.calcularDano(5, m), null, String(m));
+    for (const m of [-1, "1", null, undefined, NaN, Infinity]) assert.equal(regras.calcularDano(5, m), null, String(m));
     for (const t of ["x", NaN, Infinity, undefined]) assert.equal(regras.calcularDano(t, 1), null, String(t));
     assert.deepEqual(regras.MULTIPLICADORES_DANO, [0.5, 1, 2]);
   });
@@ -133,10 +133,10 @@ describe("Aplicar dano e desfazer (dano.js)", () => {
     const casos = [
       [{ total: 5, alvos: [] }, "alvos_invalidos"], [{ total: 5, alvos: "x" }, "alvos_invalidos"], [{ total: 5, alvos: [null] }, "alvos_invalidos"],
       [{ total: 5, alvos: [{ alvoId: "../x", mult: 1 }] }, "alvos_invalidos"], [{ total: 5, alvos: Array.from({ length: 101 }, (_, i) => ({ alvoId: `a${i}`, mult: 1 })) }, "alvos_invalidos"],
-      [{ total: 5, alvos: [{ alvoId: npc.id, mult: 3 }] }, "multiplicador_invalido"], [{ total: 5, alvos: [{ alvoId: npc.id, mult: "1" }] }, "multiplicador_invalido"],
+      [{ total: 5, alvos: [{ alvoId: npc.id, mult: -1 }] }, "multiplicador_invalido"], [{ total: 5, alvos: [{ alvoId: npc.id, mult: "1" }] }, "multiplicador_invalido"],
       [{ total: 5, alvos: [{ alvoId: npc.id, mult: 1 }, { alvoId: npc.id, mult: 2 }] }, "alvo_repetido"],
       [{ total: 5.5, alvos: [{ alvoId: npc.id, mult: 1 }] }, "formato_invalido"], [{ total: "5", alvos: [{ alvoId: npc.id, mult: 1 }] }, "formato_invalido"],
-      [{ total: 5, alvos: [{ alvoId: npc.id, mult: 1 }, { alvoId: npc.id + "x", mult: 5 }] }, "multiplicador_invalido"],
+      [{ total: 5, alvos: [{ alvoId: npc.id, mult: 1 }, { alvoId: npc.id + "x", mult: -5 }] }, "multiplicador_invalido"],
     ];
     for (const [dados, codigo] of casos) await assert.rejects(() => d.aplicar(dados), { codigo }, JSON.stringify(dados).slice(0, 80));
     assert.equal(JSON.stringify(c.ler("npcs")), antes);
@@ -304,7 +304,7 @@ describe("Rolagem e dano com o servidor real", { concurrency: false }, () => {
     assert.equal(await erro({ alvos: a }), "formato_invalido");
     assert.equal(await erro({ valor: 5, rolagemId: "rol_x", alvos: a }), "formato_invalido");
     for (const v of [-1, 1.5, "5", null, 1e9, NaN]) assert.equal(await erro({ valor: v, alvos: a }), "formato_invalido", String(v));
-    for (const m_ of [0, 0.3, 3, "2", null, -1]) assert.equal(await erro({ valor: 5, alvos: [{ alvoId: npc.id, mult: m_ }] }), "multiplicador_invalido", String(m_));
+    for (const m_ of ["2", null, -1]) assert.equal(await erro({ valor: 5, alvos: [{ alvoId: npc.id, mult: m_ }] }), "multiplicador_invalido", String(m_));
     assert.equal(await erro({ valor: 5, alvos: [] }), "alvos_invalidos");
     assert.equal(await erro({ valor: 5, alvos: [{ alvoId: "../x", mult: 1 }] }), "alvos_invalidos");
     assert.equal(await erro({ valor: 5, alvos: [{ alvoId: npc.id, mult: 1 }, { alvoId: npc.id, mult: 2 }] }), "alvo_repetido");
@@ -414,82 +414,64 @@ describe("Rolagem e dano com o servidor real", { concurrency: false }, () => {
       if (el.type === "checkbox") el.checked = valor; else el.value = valor;
       el.dispatchEvent(new pg.window.Event(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
     };
-    const linha = (pg, nome) => [...pg.document.querySelectorAll("#atk-alvos [data-alvo-id]")].find((l) => l.children[1].textContent === nome);
+    const linha = (pg, nome) => [...pg.document.querySelectorAll("#atk-alvos [data-alvo-id]")].find((l) => l.querySelector(".fig-resumo-nome")?.textContent === nome);
 
-    it("rolar: valida antes de enviar, mostra cada dado, XSS vira texto, histórico e fonte do ataque", async () => {
+    it("rolar: valida expressão antes de enviar, mostra dados individuais e mantém histórico compacto", async () => {
       const pg = await abrirPagina();
       await esperarAte(() => pg.run("rol.carregou"), { rotulo: "página carregar" });
-      const comp = () => pg.document.querySelector("#rol-componentes > div");
-      mudar(pg, comp().querySelector('[data-campo="formula"]'), "2d6;apagar");
+      const expressao = pg.document.getElementById("rol-expressao");
+      mudar(pg, expressao, "2d6;apagar");
       clicar(pg, pg.document.getElementById("rol-rolar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Fórmula inválida/);
       assert.equal(pg.run("rol.historico.length"), 0, "nada foi enviado");
-      mudar(pg, comp().querySelector('[data-campo="nome"]'), "Golpe <img src=x onerror=alert(1)>");
-      mudar(pg, comp().querySelector('[data-campo="formula"]'), "2d6+3");
-      clicar(pg, pg.document.getElementById("rol-add"));
-      mudar(pg, pg.document.querySelectorAll("#rol-componentes > div")[1].querySelector('[data-campo="formula"]'), "+2");
+      mudar(pg, expressao, "2d6+3+2");
       clicar(pg, pg.document.getElementById("rol-rolar"));
-      await esperarAte(() => pg.document.querySelector("#rol-resultado [data-total]"), { rotulo: "resultado" });
-      const total = Number(pg.document.querySelector("#rol-resultado [data-total]").dataset.total);
+      await esperarAte(() => pg.run("rol.historico.length === 1 && !rol.ocupada"), { rotulo: "resultado" });
+      const total = Number(pg.document.getElementById("rol-total").textContent);
       const r = pg.run("rol.historico[0]");
       assert.equal(total, r.total);
       assert.equal(r.componentes[0].dados.length, 2);
-      assert.match(pg.document.getElementById("rol-resultado").textContent, /2d6\+3 → \[\d, \d\] \+3 = \d+/);
+      assert.equal(r.total, r.componentes.reduce((soma, c) => soma + c.soma, 0));
+      assert.ok(pg.document.getElementById("rol-detalhes").textContent.trim());
       assert.equal(pg.document.querySelectorAll("#rol-resultado img").length, 0, "nome nunca vira HTML");
-      assert.equal(pg.document.querySelectorAll("#rol-historico li").length, 1);
-      assert.equal(pg.document.getElementById("atk-fonte").value, r.rolagemId, "a rolagem nova já é a fonte do ataque");
       clicar(pg, pg.document.getElementById("rol-rolar"));
-      await esperarAte(() => pg.run("rol.historico.length") === 2, { rotulo: "2ª rolagem" });
-      clicar(pg, pg.document.querySelectorAll('#rol-historico [data-acao="usar"]')[1]);
-      assert.equal(pg.document.getElementById("atk-fonte").value, r.rolagemId);
+      await esperarAte(() => pg.run("rol.historico.length === 2 && !rol.ocupada"), { rotulo: "2ª rolagem" });
+      assert.notEqual(pg.run("rol.historico[0].rolagemId"), r.rolagemId);
     });
 
-    it("atacar: marcar todos/nenhum, multiplicador por alvo, prévia igual à conta do servidor, aplicar, resultado e desfazer", async () => {
+    it("atacar: seleção entre categorias, multiplicador por alvo, aplicação automática e desfazer", async () => {
       const m = await mestre();
       const f = await abrir(ana, 20);
       await jogadorAlvo(m, ana);
       const npc = await criarNpc(m, "Alvo-Página-NPC", 20);
       await criarInimigoEmBatalha(m, "Alvo-Página-Orc", 20);
       const pg = await abrirPagina();
-      await esperarAte(() => linha(pg, "Alvo-Página-NPC") && linha(pg, "Ana") && linha(pg, "Alvo-Página-Orc 1"), { rotulo: "alvos na página" });
-      assert.match(linha(pg, "Ana").textContent, /Jogador.*HP 20\/20/);
-      assert.match(linha(pg, "Alvo-Página-NPC").textContent, /NPC/);
-
-      // valor manual
-      mudar(pg, pg.document.getElementById("atk-fonte"), "manual");
-      mudar(pg, pg.document.getElementById("atk-valor"), "7");
-      assert.equal(linha(pg, "Alvo-Página-NPC").querySelector("[data-previa]").textContent, "Alvo-Página-NPC: 7 → 7 (HP 20 → 13)");
+      await esperarAte(() => linha(pg, "Ana"), { rotulo: "jogador na página" });
+      clicar(pg, linha(pg, "Ana").querySelector(".fig-resumo-selecionar"));
+      clicar(pg, pg.document.getElementById("atk-inimigos"));
+      await esperarAte(() => linha(pg, "Alvo-Página-NPC") && linha(pg, "Alvo-Página-Orc 1"), { rotulo: "inimigos na página" });
+      clicar(pg, linha(pg, "Alvo-Página-NPC").querySelector(".fig-resumo-selecionar"));
       mudar(pg, linha(pg, "Alvo-Página-NPC").querySelector('[data-campo="mult"]'), "0.5");
+      clicar(pg, linha(pg, "Alvo-Página-Orc 1").querySelector(".fig-resumo-selecionar"));
       mudar(pg, linha(pg, "Alvo-Página-Orc 1").querySelector('[data-campo="mult"]'), "2");
-      assert.equal(linha(pg, "Alvo-Página-NPC").querySelector("[data-previa]").textContent, "Alvo-Página-NPC: 7 → 3 (HP 20 → 17)");
-      assert.equal(linha(pg, "Alvo-Página-Orc 1").querySelector("[data-previa]").textContent, "Alvo-Página-Orc 1: 7 → 14 (HP 20 → 6)");
-
-      // sem alvo marcado
-      clicar(pg, pg.document.getElementById("atk-aplicar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Marque ao menos um alvo/);
-      clicar(pg, pg.document.getElementById("atk-todos"));
-      assert.ok([...pg.document.querySelectorAll('#atk-alvos [data-campo="marcado"]')].every((c) => c.checked));
-      assert.equal(linha(pg, "Alvo-Página-NPC").querySelector('[data-campo="mult"]').value, "0.5", "marcar todos preserva o multiplicador");
-      clicar(pg, pg.document.getElementById("atk-nenhum"));
-      assert.ok([...pg.document.querySelectorAll('#atk-alvos [data-campo="marcado"]')].every((c) => !c.checked));
-      clicar(pg, pg.document.getElementById("atk-todos"));
-
-      clicar(pg, pg.document.getElementById("atk-aplicar"));
-      await esperarAte(() => pg.document.querySelectorAll("#atk-resultado [data-ok]").length >= 3, { rotulo: "resultado do ataque" });
-      const texto = pg.document.getElementById("atk-resultado").textContent;
-      assert.match(texto, /Dano base: 7/);
-      assert.match(texto, /Alvo-Página-NPC: 3 de dano \(×½\) · HP 20 → 17/);
-      assert.match(texto, /Alvo-Página-Orc 1: 14 de dano \(×2\) · HP 20 → 6/);
-      assert.match(texto, /Ana: 7 de dano \(×1\) · HP 20 → 13/);
+      // Constantes substituem o campo manual separado, usando o mesmo fluxo de rolagem.
+      mudar(pg, pg.document.getElementById("rol-expressao"), "7");
+      clicar(pg, pg.document.getElementById("rol-rolar"));
+      await esperarAte(() => pg.run("rol.historico.length === 1 && !rol.ocupada"));
+      assert.equal(await hpDoNpc(m, npc.id), 20, "seleção não causa dano com ataque desligado");
+      mudar(pg, pg.document.getElementById("atk-atacar"), true);
+      clicar(pg, pg.document.getElementById("rol-rolar"));
+      await esperarAte(() => pg.run("rol.ultimaAplicacao && !rol.ocupada"), { rotulo: "resultado do ataque" });
+      const resultados = JSON.parse(pg.run("JSON.stringify(rol.ultimaAplicacao.resultados)"));
+      assert.deepEqual(resultados.map(x => [x.nome, x.dano, x.depois]).sort(), [["Ana", 7, 13], ["Alvo-Página-NPC", 3, 17], ["Alvo-Página-Orc 1", 14, 6]].sort());
       assert.equal(await hpDoNpc(m, npc.id), 17);
       await esperarAte(() => f.run("STATE.vitals.hp.current") === 13, { rotulo: "ficha com dano" });
-      await esperarAte(() => /HP 17\/20/.test(linha(pg, "Alvo-Página-NPC")?.textContent || ""), { rotulo: "alvos atualizados na página" });
+      await esperarAte(() => pg.run(`rol.alvos.find(a => a.alvoId === ${JSON.stringify(npc.id)}).hp.atual`) === 17, { rotulo: "alvos atualizados na página" });
 
       // desfazer
-      assert.ok(!pg.document.getElementById("atk-desfazer").classList.contains("hidden"));
+      assert.equal(pg.document.getElementById("atk-desfazer").hidden, false);
       clicar(pg, pg.document.getElementById("atk-desfazer"));
       await esperarAte(() => /Dano desfeito/.test(pg.document.getElementById("atk-resultado").textContent), { rotulo: "desfeito" });
-      assert.ok(pg.document.getElementById("atk-desfazer").classList.contains("hidden"));
+      assert.ok(pg.document.getElementById("atk-desfazer").hidden || pg.document.getElementById("atk-desfazer").classList.contains("hidden"));
       assert.equal(await hpDoNpc(m, npc.id), 20);
       await esperarAte(() => f.run("STATE.vitals.hp.current") === 20, { rotulo: "ficha restaurada" });
       assert.equal(s.lerArquivo("ana", ana.pasta, "status").hp.current, 20);
@@ -499,14 +481,15 @@ describe("Rolagem e dano com o servidor real", { concurrency: false }, () => {
       const m = await mestre();
       const npc = await criarNpc(m, "Frágil-Página", 3);
       const pg = await abrirPagina();
+      await esperarAte(() => pg.run("rol.carregou"));
+      clicar(pg, pg.document.getElementById("atk-inimigos"));
       await esperarAte(() => linha(pg, "Frágil-Página"), { rotulo: "alvo na página" });
-      mudar(pg, pg.document.querySelector('#rol-componentes [data-campo="formula"]'), "+10");
+      mudar(pg, pg.document.getElementById("rol-expressao"), "+10");
+      clicar(pg, linha(pg, "Frágil-Página").querySelector(".fig-resumo-selecionar"));
+      mudar(pg, pg.document.getElementById("atk-atacar"), true);
       clicar(pg, pg.document.getElementById("rol-rolar"));
-      await esperarAte(() => pg.run("rol.historico.length") === 1, { rotulo: "rolagem" });
-      mudar(pg, linha(pg, "Frágil-Página").querySelector('[data-campo="marcado"]'), true);
-      assert.equal(linha(pg, "Frágil-Página").querySelector("[data-previa]").textContent, "Frágil-Página: 10 → 10 (HP 3 → 0)");
-      clicar(pg, pg.document.getElementById("atk-aplicar"));
-      await esperarAte(() => /DERROTADO/.test(pg.document.getElementById("atk-resultado").textContent), { rotulo: "derrotado" });
+      await esperarAte(() => pg.run("rol.ultimaAplicacao && !rol.ocupada"), { rotulo: "derrotado" });
+      assert.equal(pg.run("rol.ultimaAplicacao.resultados[0].derrotado"), true);
       assert.equal(await hpDoNpc(m, npc.id), 0);
 
       const errada = await abrirPagina({ real: true, tokenInicial: "errado" });

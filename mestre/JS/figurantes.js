@@ -335,17 +335,24 @@ function renderizarFigurantes() {
     if (selecionado) ficha.append(cartaoFigurante(selecionado, "batalha", true));
     else ficha.append(criar("p", "fig-vazio", "A ficha aparecerá aqui ao selecionar um combatente."));
   });
-  campo("fig-batalha-resumo").textContent = `${combatentes.filter(x => !x.derrotado).length} em pé / ${combatentes.length} ${tipo === "npcs" ? "NPCs" : "inimigos"} em combate${termo ? ` · ${visiveis.length} na busca` : ""}`;
+  const resumo = campo("fig-batalha-resumo");
+  if (resumo) resumo.textContent = `${combatentes.filter(x => !x.derrotado).length} em pé / ${combatentes.length} ${tipo === "npcs" ? "NPCs" : "inimigos"} em combate${termo ? ` · ${visiveis.length} na busca` : ""}`;
   campo("fig-limpar").disabled = !figurantes.batalha.combatentes.length;
 }
 
 async function carregarFigurantes() {
   if (!tokenDoMestre()) return;
+  let dados;
   try {
-    const dados = await pedirAoServidor("master_campanha_ler", {}, { silencioso: true });
+    dados = await pedirAoServidor("master_campanha_ler", {}, { silencioso: true });
+  } catch { toast("Não foi possível carregar. Confira a conexão e o token do mestre.", "error"); return; }
+  try {
     for (const tipo of ["npcs", "inimigos", "habilidades", "magias", "batalha"]) figurantes[tipo] = dados[tipo];
     figurantes.carregou = true; sincronizarRascunhosCombateFig(); renderizarFigurantes();
-  } catch { toast("Não foi possível carregar. Confira a conexão e o token do mestre.", "error"); }
+  } catch (erro) {
+    console.error("[FIGURANTE] Falha ao montar a interface:", erro);
+    toast("Falha ao montar a interface dos figurantes. Recarregue a página; confira o console se persistir.", "error");
+  }
 }
 
 socket.on("campanha_atualizada", ({ tipo, dados } = {}) => {

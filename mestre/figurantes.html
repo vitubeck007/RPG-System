@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,27 +16,40 @@
   <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
   <link rel="stylesheet" href="/mestre/CSS/figurantes-cartoes.css">
 </head>
+
 <body class="rpg-app master-app">
   <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
   <header id="mestre-cabecalho" data-pagina="figurantes"></header>
   <main id="mestre-conteudo" tabindex="-1" class="fig-pagina master-main">
     <div class="fig-topo fig-cabecalho">
-      <div><p class="fig-eyebrow">PERSONAGENS DA CAMPANHA</p><h2 id="fig-titulo">Inimigos</h2></div>
+      <div>
+        <p class="fig-eyebrow">PERSONAGENS DA CAMPANHA</p>
+        <h2 id="fig-titulo">Inimigos</h2>
+      </div>
       <div id="fig-tipos" class="fig-tipos" role="group" aria-label="Tipo de figurante">
         <button id="fig-tipo-npcs" type="button" data-fig-tipo="npcs" aria-pressed="false">NPCs</button>
         <button id="fig-tipo-inimigos" type="button" data-fig-tipo="inimigos" aria-pressed="true">Inimigos</button>
       </div>
     </div>
     <div class="fig-toolbar">
-      <div class="fig-abas" role="tablist" aria-label="Seção"><button id="fig-aba-biblioteca" role="tab" aria-selected="true">Biblioteca</button><button id="fig-aba-batalha" role="tab" aria-selected="false">Batalha</button></div>
+      <div class="fig-abas" role="tablist" aria-label="Seção"><button id="fig-aba-biblioteca" role="tab"
+          aria-selected="true">Biblioteca</button><button id="fig-aba-batalha" role="tab"
+          aria-selected="false">Batalha</button></div>
       <button id="fig-novo" class="fig-primario">+ Novo inimigo</button>
-      <label class="fig-busca"><span class="sr-only">Buscar figurantes</span><input id="fig-busca" maxlength="100" placeholder="Buscar por nome, descrição ou história…"></label>
+      <label class="fig-busca"><span class="sr-only">Buscar figurantes</span><input id="fig-busca" maxlength="100"
+          placeholder="Buscar por nome, descrição ou história…"></label>
+      <button id="fig-limpar" class="fig-perigo">Limpar batalha inteira</button>
     </div>
-    <section id="fig-biblioteca" aria-label="Biblioteca de figurantes"><p id="fig-contagem" class="fig-discreto"></p><div id="fig-cartoes" class="fig-grade"></div></section>
+    <section id="fig-biblioteca" aria-label="Biblioteca de figurantes">
+      <p id="fig-contagem" class="fig-discreto"></p>
+      <div id="fig-cartoes" class="fig-grade"></div>
+    </section>
     <section id="fig-batalha" class="hidden" aria-label="Batalha em andamento">
-      <div class="fig-topo fig-resumos-cabecalho"><div><p id="fig-batalha-resumo" role="status"></p><p class="fig-discreto">Selecione um resumo à esquerda. Acima de cinco, role somente a lista.</p></div><button id="fig-limpar" class="fig-perigo">Limpar batalha inteira</button></div>
+      </div>
       <div class="fig-mesa-combate">
-        <aside class="fig-resumos-painel" aria-label="Resumos dos combatentes"><ul id="fig-combatentes" class="fig-resumos" aria-label="Combatentes em batalha"></ul></aside>
+        <aside class="fig-resumos-painel" aria-label="Resumos dos combatentes">
+          <ul id="fig-combatentes" class="fig-resumos" aria-label="Combatentes em batalha"></ul>
+        </aside>
         <section id="fig-ficha-regiao" class="fig-ficha-selecionada" aria-labelledby="fig-selecionado-titulo">
           <h3 id="fig-selecionado-titulo" class="sr-only">Ficha do selecionado</h3>
           <div id="fig-selecionado"></div>
@@ -46,46 +60,163 @@
 
   <div id="fig-editor" class="fig-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fig-editor-titulo">
     <form id="fig-form" class="fig-janela fig-ficha">
-      <header class="fig-janela-topo"><div><p class="fig-eyebrow" id="fig-editor-tipo">INIMIGO</p><h2 id="fig-editor-titulo">Novo figurante</h2></div><button type="button" data-fechar="fig-editor" aria-label="Fechar ficha">✕</button></header>
+      <header class="fig-janela-topo">
+        <div>
+          <p class="fig-eyebrow" id="fig-editor-tipo">INIMIGO</p>
+          <h2 id="fig-editor-titulo">Novo figurante</h2>
+        </div><button type="button" data-fechar="fig-editor" aria-label="Fechar ficha">✕</button>
+      </header>
       <div class="fig-corpo">
-        <div class="fig-identidade"><div class="fig-retrato" id="fig-retrato-previa" aria-label="Prévia do retrato">✦</div><div class="fig-identidade-campos"><label>Nome<input id="fig-nome" required maxlength="80" placeholder="Ex.: Guardião da cripta"></label><label>Retrato (URL, opcional)<input id="fig-imagem" maxlength="2000" placeholder="https://… ou /imagens/…"></label></div></div>
-        <div class="fig-status"><fieldset><legend>Vida</legend><div class="fig-dois"><label id="fig-hp-atual-label">Atual<input id="fig-hp-atual" type="number" min="0" max="99999" value="10" required></label><label>Máxima<input id="fig-hp-max" type="number" min="1" max="99999" value="10" required></label></div><small id="fig-vida-ajuda">Cópias entram em batalha com a vida cheia.</small></fieldset><fieldset><legend>Energia</legend><div class="fig-dois"><label>Atual<input id="fig-energia-atual" type="number" min="0" max="99999" value="10" required></label><label>Máxima<input id="fig-energia-max" type="number" min="0" max="99999" value="10" required></label></div><small>Reserva usada para habilidades e magias.</small></fieldset></div>
+        <div class="fig-identidade">
+          <div class="fig-retrato" id="fig-retrato-previa" aria-label="Prévia do retrato">✦</div>
+          <div class="fig-identidade-campos"><label>Nome<input id="fig-nome" required maxlength="80"
+                placeholder="Ex.: Guardião da cripta"></label><label>Retrato (URL, opcional)<input id="fig-imagem"
+                maxlength="2000" placeholder="https://… ou /imagens/…"></label></div>
+        </div>
+        <div class="fig-status">
+          <fieldset>
+            <legend>Vida</legend>
+            <div class="fig-dois"><label id="fig-hp-atual-label">Atual<input id="fig-hp-atual" type="number" min="0"
+                  max="99999" value="10" required></label><label>Máxima<input id="fig-hp-max" type="number" min="1"
+                  max="99999" value="10" required></label></div><small id="fig-vida-ajuda">Cópias entram em batalha com
+              a vida cheia.</small>
+          </fieldset>
+          <fieldset>
+            <legend>Energia</legend>
+            <div class="fig-dois"><label>Atual<input id="fig-energia-atual" type="number" min="0" max="99999" value="10"
+                  required></label><label>Máxima<input id="fig-energia-max" type="number" min="0" max="99999" value="10"
+                  required></label></div><small>Reserva usada para habilidades e magias.</small>
+          </fieldset>
+        </div>
         <section class="fig-editor-arma" aria-labelledby="fig-arma-titulo">
-          <div class="fig-topo"><h3 id="fig-arma-titulo">Arma carregada</h3><label class="fig-checkbox"><input id="fig-tem-arma" type="checkbox"> Possui arma</label></div>
-          <p class="fig-discreto">Opcional. Novas cópias recebem esta arma. Nas cópias existentes, use Atualizar arma do modelo na ficha de batalha.</p>
+          <div class="fig-topo">
+            <h3 id="fig-arma-titulo">Arma carregada</h3><label class="fig-checkbox"><input id="fig-tem-arma"
+                type="checkbox"> Possui arma</label>
+          </div>
+          <p class="fig-discreto">Opcional. Novas cópias recebem esta arma. Nas cópias existentes, use Atualizar arma do
+            modelo na ficha de batalha.</p>
           <fieldset id="fig-arma-campos" disabled>
-            <div class="fig-arma-editor-topo"><span id="fig-arma-previa" aria-hidden="true"></span><label>Nome da arma<input id="fig-arma-nome" maxlength="80" required placeholder="Ex.: Espada longa"></label><label>Ícone<select id="fig-arma-icone"><option value="sword">Espada</option><option value="axe">Machado</option><option value="bow">Arco</option><option value="staff">Cajado</option><option value="dagger">Adaga</option></select></label></div>
-            <div class="fig-tres"><label>Alcance<input id="fig-arma-alcance" maxlength="60" placeholder="Ex.: 1,5 m ou 12 m"></label><label>Dano<input id="fig-arma-dano" maxlength="30" placeholder="Ex.: 1d8+3 ou 5"></label><label>Categoria<select id="fig-arma-categoria"><option value="leve">Leve</option><option value="media" selected>Média</option><option value="pesada">Pesada</option><option value="natural">Natural</option><option value="outra">Outra</option></select></label></div>
+            <div class="fig-arma-editor-topo"><span id="fig-arma-previa" aria-hidden="true"></span><label>Nome da
+                arma<input id="fig-arma-nome" maxlength="80" required
+                  placeholder="Ex.: Espada longa"></label><label>Ícone<select id="fig-arma-icone">
+                  <option value="sword">Espada</option>
+                  <option value="axe">Machado</option>
+                  <option value="bow">Arco</option>
+                  <option value="staff">Cajado</option>
+                  <option value="dagger">Adaga</option>
+                </select></label></div>
+            <div class="fig-tres"><label>Alcance<input id="fig-arma-alcance" maxlength="60"
+                  placeholder="Ex.: 1,5 m ou 12 m"></label><label>Dano<input id="fig-arma-dano" maxlength="30"
+                  placeholder="Ex.: 1d8+3 ou 5"></label><label>Categoria<select id="fig-arma-categoria">
+                  <option value="leve">Leve</option>
+                  <option value="media" selected>Média</option>
+                  <option value="pesada">Pesada</option>
+                  <option value="natural">Natural</option>
+                  <option value="outra">Outra</option>
+                </select></label></div>
           </fieldset>
         </section>
-        <label>Descrição<textarea id="fig-descricao" maxlength="2000" rows="2" placeholder="Como se parece, se movimenta e age?"></textarea></label>
-        <label><span>Lore <span class="fig-discreto">/ História</span></span><textarea id="fig-lore" maxlength="4000" rows="3" placeholder="De onde veio? O que o trouxe até aqui?"></textarea></label>
-        <label>Notas do mestre<textarea id="fig-notas" maxlength="2000" rows="3" placeholder="O que carrega, do que é feito, por que anda assim, o que acontece quando morre…"></textarea></label>
-        <details class="fig-legado"><summary>Atributos e informações adicionais</summary><div id="fig-atributos" class="fig-atributos"></div><label id="fig-papel-label">Papel na história<input id="fig-papel" maxlength="80"></label><label id="fig-segredo-label">Segredo do mestre<textarea id="fig-segredo" rows="2" maxlength="2000"></textarea></label><div id="fig-ataques-legados"></div></details>
-        <section class="fig-poderes"><div class="fig-topo"><div><h3>Habilidades e magias</h3><p class="fig-discreto">Poderes próprios ou cópias do catálogo do mestre.</p></div><div class="fig-acoes"><button id="fig-adicionar-poder" type="button">Adicionar</button><button id="fig-criar-poder" type="button">Criar</button></div></div><div id="fig-poderes-lista"></div></section>
+        <label>Descrição<textarea id="fig-descricao" maxlength="2000" rows="2"
+            placeholder="Como se parece, se movimenta e age?"></textarea></label>
+        <label><span>Lore <span class="fig-discreto">/ História</span></span><textarea id="fig-lore" maxlength="4000"
+            rows="3" placeholder="De onde veio? O que o trouxe até aqui?"></textarea></label>
+        <label>Notas do mestre<textarea id="fig-notas" maxlength="2000" rows="3"
+            placeholder="O que carrega, do que é feito, por que anda assim, o que acontece quando morre…"></textarea></label>
+        <details class="fig-legado">
+          <summary>Atributos e informações adicionais</summary>
+          <div id="fig-atributos" class="fig-atributos"></div><label id="fig-papel-label">Papel na história<input
+              id="fig-papel" maxlength="80"></label><label id="fig-segredo-label">Segredo do mestre<textarea
+              id="fig-segredo" rows="2" maxlength="2000"></textarea></label>
+          <div id="fig-ataques-legados"></div>
+        </details>
+        <section class="fig-poderes">
+          <div class="fig-topo">
+            <div>
+              <h3>Habilidades e magias</h3>
+              <p class="fig-discreto">Poderes próprios ou cópias do catálogo do mestre.</p>
+            </div>
+            <div class="fig-acoes"><button id="fig-adicionar-poder" type="button">Adicionar</button><button
+                id="fig-criar-poder" type="button">Criar</button></div>
+          </div>
+          <div id="fig-poderes-lista"></div>
+        </section>
       </div>
-      <footer class="fig-rodape"><span id="fig-salvamento" role="status" class="fig-discreto">Alterações são salvas ao confirmar.</span><div class="fig-acoes"><button type="button" data-fechar="fig-editor">Cancelar</button><button id="fig-salvar" type="submit" class="fig-primario">Salvar figurante</button></div></footer>
+      <footer class="fig-rodape"><span id="fig-salvamento" role="status" class="fig-discreto">Alterações são salvas ao
+          confirmar.</span>
+        <div class="fig-acoes"><button type="button" data-fechar="fig-editor">Cancelar</button><button id="fig-salvar"
+            type="submit" class="fig-primario">Salvar figurante</button></div>
+      </footer>
     </form>
   </div>
 
-  <div id="fig-catalogo" class="fig-overlay fig-sobreposta hidden" role="dialog" aria-modal="true" aria-labelledby="fig-catalogo-titulo">
-    <section class="fig-janela"><header class="fig-janela-topo"><div><p class="fig-eyebrow">CATÁLOGO DO MESTRE</p><h2 id="fig-catalogo-titulo">Adicionar poder</h2></div><button data-fechar="fig-catalogo" aria-label="Fechar catálogo">✕</button></header><div class="fig-corpo"><div class="fig-dois"><label>Tipo<select id="fig-catalogo-tipo"><option value="habilidades">Habilidades</option><option value="magias">Magias</option></select></label><label>Buscar<input id="fig-catalogo-busca" maxlength="100" placeholder="Nome ou descrição…"></label></div><p class="fig-discreto">Inclui entradas públicas e privadas. Adicionar cria uma cópia neste figurante.</p><div id="fig-catalogo-lista" class="fig-catalogo-lista"></div></div></section>
+  <div id="fig-catalogo" class="fig-overlay fig-sobreposta hidden" role="dialog" aria-modal="true"
+    aria-labelledby="fig-catalogo-titulo">
+    <section class="fig-janela">
+      <header class="fig-janela-topo">
+        <div>
+          <p class="fig-eyebrow">CATÁLOGO DO MESTRE</p>
+          <h2 id="fig-catalogo-titulo">Adicionar poder</h2>
+        </div><button data-fechar="fig-catalogo" aria-label="Fechar catálogo">✕</button>
+      </header>
+      <div class="fig-corpo">
+        <div class="fig-dois"><label>Tipo<select id="fig-catalogo-tipo">
+              <option value="habilidades">Habilidades</option>
+              <option value="magias">Magias</option>
+            </select></label><label>Buscar<input id="fig-catalogo-busca" maxlength="100"
+              placeholder="Nome ou descrição…"></label></div>
+        <p class="fig-discreto">Inclui entradas públicas e privadas. Adicionar cria uma cópia neste figurante.</p>
+        <div id="fig-catalogo-lista" class="fig-catalogo-lista"></div>
+      </div>
+    </section>
   </div>
 
-  <div id="fig-poder-editor" class="fig-overlay fig-sobreposta hidden" role="dialog" aria-modal="true" aria-labelledby="fig-poder-titulo">
-    <form id="fig-poder-form" class="fig-janela"><header class="fig-janela-topo"><div><p class="fig-eyebrow">HABILIDADE / MAGIA</p><h2 id="fig-poder-titulo">Criar poder</h2></div><button type="button" data-fechar="fig-poder-editor" aria-label="Fechar poder">✕</button></header><div class="fig-corpo">
-      <div class="fig-dois"><label>Tipo<select id="fig-poder-tipo"><option value="habilidades">Habilidade</option><option value="magias">Magia</option></select></label><label>Nome<input id="fig-poder-nome" required maxlength="60"></label></div>
-      <label>Descrição<textarea id="fig-poder-descricao" rows="2" maxlength="2000" placeholder="Como aparece no jogo?"></textarea></label>
-      <label>Efeito<textarea id="fig-poder-efeito" rows="3" maxlength="4000" placeholder="O que faz nas regras? Condições, bônus e consequências."></textarea></label>
-      <div class="fig-dois"><label>Custo em energia<input id="fig-poder-custo" type="number" min="0" max="99999" value="0" required></label><label>Dano principal<input id="fig-poder-dano" maxlength="30" placeholder="1d20+5 (opcional)"></label></div>
-      <section><div class="fig-topo"><h3>Danos extras</h3><button id="fig-extra-adicionar" type="button">+ Dano extra</button></div><p class="fig-discreto">Queimação, explosivo, corrosivo, mental… Até 10 efeitos.</p><div id="fig-extras"></div></section>
-      <div class="fig-tres"><label>Alcance<input id="fig-poder-alcance" maxlength="60" placeholder="12 metros"></label><label>Duração<input id="fig-poder-duracao" maxlength="60" placeholder="3 turnos"></label><label>Canalização<input id="fig-poder-canalizacao" maxlength="100" placeholder="1 ação / 2 turnos"></label></div>
-      <label class="fig-checkbox"><input id="fig-poder-catalogar" type="checkbox" checked> Salvar também no catálogo (privado)</label>
-    </div><footer class="fig-rodape"><p class="fig-discreto">O figurante guarda uma cópia independente.</p><div class="fig-acoes"><button type="button" data-fechar="fig-poder-editor">Cancelar</button><button id="fig-poder-salvar" class="fig-primario" type="submit">Criar e adicionar</button></div></footer></form>
+  <div id="fig-poder-editor" class="fig-overlay fig-sobreposta hidden" role="dialog" aria-modal="true"
+    aria-labelledby="fig-poder-titulo">
+    <form id="fig-poder-form" class="fig-janela">
+      <header class="fig-janela-topo">
+        <div>
+          <p class="fig-eyebrow">HABILIDADE / MAGIA</p>
+          <h2 id="fig-poder-titulo">Criar poder</h2>
+        </div><button type="button" data-fechar="fig-poder-editor" aria-label="Fechar poder">✕</button>
+      </header>
+      <div class="fig-corpo">
+        <div class="fig-dois"><label>Tipo<select id="fig-poder-tipo">
+              <option value="habilidades">Habilidade</option>
+              <option value="magias">Magia</option>
+            </select></label><label>Nome<input id="fig-poder-nome" required maxlength="60"></label></div>
+        <label>Descrição<textarea id="fig-poder-descricao" rows="2" maxlength="2000"
+            placeholder="Como aparece no jogo?"></textarea></label>
+        <label>Efeito<textarea id="fig-poder-efeito" rows="3" maxlength="4000"
+            placeholder="O que faz nas regras? Condições, bônus e consequências."></textarea></label>
+        <div class="fig-dois"><label>Custo em energia<input id="fig-poder-custo" type="number" min="0" max="99999"
+              value="0" required></label><label>Dano principal<input id="fig-poder-dano" maxlength="30"
+              placeholder="1d20+5 (opcional)"></label></div>
+        <section>
+          <div class="fig-topo">
+            <h3>Danos extras</h3><button id="fig-extra-adicionar" type="button">+ Dano extra</button>
+          </div>
+          <p class="fig-discreto">Queimação, explosivo, corrosivo, mental… Até 10 efeitos.</p>
+          <div id="fig-extras"></div>
+        </section>
+        <div class="fig-tres"><label>Alcance<input id="fig-poder-alcance" maxlength="60"
+              placeholder="12 metros"></label><label>Duração<input id="fig-poder-duracao" maxlength="60"
+              placeholder="3 turnos"></label><label>Canalização<input id="fig-poder-canalizacao" maxlength="100"
+              placeholder="1 ação / 2 turnos"></label></div>
+        <label class="fig-checkbox"><input id="fig-poder-catalogar" type="checkbox" checked> Salvar também no catálogo
+          (privado)</label>
+      </div>
+      <footer class="fig-rodape">
+        <p class="fig-discreto">O figurante guarda uma cópia independente.</p>
+        <div class="fig-acoes"><button type="button" data-fechar="fig-poder-editor">Cancelar</button><button
+            id="fig-poder-salvar" class="fig-primario" type="submit">Criar e adicionar</button></div>
+      </footer>
+    </form>
   </div>
-    <script src="/JS/interface.js"></script>
-    <script src="/mestre/JS/comum.js"></script>
+  <script src="/JS/interface.js"></script>
+  <script src="/mestre/JS/comum.js"></script>
+  <script src="/mestre/JS/cartao-resumo.js"></script>
   <script src="/mestre/JS/figurantes-cartoes.js"></script>
   <script src="/mestre/JS/figurantes.js"></script>
 </body>
+
 </html>

@@ -1,83 +1,70 @@
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rolagem e Dano • Painel do Mestre - RPG VTT</title>
-
-    <!-- Tailwind CSS (CDN) e as cores/fontes do painel -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/mestre/JS/tailwind-config.js"></script>
-
-    <!-- Socket.io Client -->
-    <script src="/socket.io/socket.io.js"></script>
-    <!-- Regras compartilhadas com a ficha (catálogo de perícias, modificadores, escape de HTML...) -->
-    <script src="/JS/regras.js"></script>
-
-    <link rel="stylesheet" href="/CSS/rpg-ui.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="/mestre/CSS/mestre.css">
-    <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rolagens • Painel do Mestre</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/JS/regras.js"></script>
+  <link rel="stylesheet" href="/CSS/rpg-ui.css">
+  <link rel="stylesheet" href="/mestre/CSS/mestre.css">
+  <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
+  <link rel="stylesheet" href="/mestre/CSS/figurantes-cartoes.css">
+  <link rel="stylesheet" href="/mestre/CSS/rolagem.css">
 </head>
-
-<body
-    class="rpg-app master-app flex flex-col">
-    <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
-
-    <!-- Menu, token e conexão: montados pelo comum.js -->
-    <header id="mestre-cabecalho" data-pagina="rolagem"></header>
-
-    <main id="mestre-conteudo" tabindex="-1" class="master-main space-y-6">
-
-        <div class="master-section-heading">
-            <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2"><i class="fa-solid fa-dice-d20"></i> Rolagem e Dano</h2>
-            <span class="text-[11px] font-mono text-slate-500">A rolagem é feita no servidor</span>
+<body class="rpg-app master-app rol-app">
+  <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
+  <header id="mestre-cabecalho" data-pagina="rolagem"></header>
+  <main id="mestre-conteudo" tabindex="-1" class="master-main rol-pagina">
+    <div class="rol-titulo"><h2>Rolagens</h2><p>Dados no servidor · dano por alvo</p></div>
+    <div class="rol-mesa">
+      <section id="rol-secao" class="rol-painel" aria-label="Rolagens do mestre">
+        <div class="rol-instantaneas-topo">
+          <h3>Rolagens Instantâneas</h3>
+          <label class="rol-quantidade">Quantidade de dados
+            <input id="rol-quantidade" data-rol-controle type="number" value="1" min="1" max="999" step="1" required inputmode="numeric">
+          </label>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <!-- Rolar dados -->
-            <section id="rol-secao" class="bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
-                <h3 class="font-cinzel font-bold text-amber-200 text-sm">Rolar dados</h3>
-                <div id="rol-componentes" class="space-y-1"></div>
-                <div class="flex gap-2">
-                    <button id="rol-add" type="button" class="px-2 py-1 rounded text-xs border border-dungeon-700">+ Componente</button>
-                    <button id="rol-rolar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Rolar</button>
-                </div>
-                <p class="text-[11px] text-slate-500">Exemplos: 2d6+3, d20, +5. Cada componente em uma linha; o total soma todos.</p>
-                <div id="rol-resultado" class="hidden bg-dungeon-950 border border-amberGold-600 rounded p-3 space-y-1 text-xs font-mono"></div>
-                <h4 class="font-cinzel font-bold text-slate-300 text-xs pt-2">Histórico da sessão</h4>
-                <ul id="rol-historico" class="space-y-1 text-xs font-mono max-h-64 overflow-y-auto"></ul>
-            </section>
-
-            <!-- Atacar -->
-            <section id="atk-secao" class="bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
-                <h3 class="font-cinzel font-bold text-amber-200 text-sm">Atacar</h3>
-                <div class="flex flex-wrap gap-2 items-center text-xs font-mono">
-                    <label>Dano:
-                        <select id="atk-fonte" class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
-                    </label>
-                    <input id="atk-valor" aria-label="Valor manual do dano" type="number" min="0" placeholder="valor" class="w-20 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 hidden">
-                </div>
-                <div class="flex flex-wrap gap-2 text-xs font-mono">
-                    <button id="atk-todos" type="button" class="px-2 py-1 rounded border border-dungeon-700">Marcar todos</button>
-                    <button id="atk-nenhum" type="button" class="px-2 py-1 rounded border border-dungeon-700">Nenhum</button>
-                    <button id="atk-atualizar" type="button" class="px-2 py-1 rounded border border-dungeon-700"><i class="fa-solid fa-rotate"></i> Atualizar alvos</button>
-                </div>
-                <div id="atk-alvos" class="space-y-1 max-h-80 overflow-y-auto"></div>
-                <div class="flex gap-2">
-                    <button id="atk-aplicar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-rose-600 text-white">Aplicar dano</button>
-                    <button id="atk-desfazer" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700 hidden">Desfazer</button>
-                </div>
-                <div id="atk-resultado" class="hidden bg-dungeon-950 border border-dungeon-700 rounded p-3 space-y-1 text-xs font-mono"></div>
-            </section>
+        <div class="rol-dados" aria-label="Dados instantâneos">
+          <button type="button" data-dado="20" data-rol-controle aria-label="Rolar d20"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d20</span></button>
+          <button type="button" data-dado="12" data-rol-controle aria-label="Rolar d12"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d12</span></button>
+          <button type="button" data-dado="10" data-rol-controle aria-label="Rolar d10"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d10</span></button>
+          <button type="button" data-dado="8" data-rol-controle aria-label="Rolar d8"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d8</span></button>
+          <button type="button" data-dado="6" data-rol-controle aria-label="Rolar d6"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d6</span></button>
+          <button type="button" data-dado="4" data-rol-controle aria-label="Rolar d4"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d4</span></button>
         </div>
-
-    </main>
-
-    <script src="/JS/interface.js"></script>
-    <script src="/mestre/JS/comum.js"></script>
-    <script src="/mestre/JS/rolagem.js"></script>
+        <form id="rol-form" class="rol-personalizada">
+          <label for="rol-expressao">Rolagem personalizada</label>
+          <div><input id="rol-expressao" data-rol-controle type="text" maxlength="300" placeholder="2d20+5+3d6+1" autocomplete="off" spellcheck="false" aria-describedby="rol-ajuda rol-erro"><button id="rol-rolar" data-rol-controle type="submit">Rolar</button></div>
+          <p id="rol-ajuda">Some ou subtraia dados e valores fixos. A quantidade acima só altera os dados instantâneos.</p>
+        </form>
+        <p id="rol-erro" class="rol-erro" role="alert" hidden></p>
+        <section id="rol-resultado" class="rol-resultado" aria-label="Última rolagem" aria-live="polite" aria-atomic="true">
+          <div class="rol-resultado-topo"><span>Última rolagem</span><span id="rol-formula">—</span></div>
+          <output id="rol-total">—</output>
+          <p id="rol-espera">Selecione um dado ou escreva uma expressão.</p>
+          <ul id="rol-detalhes" aria-label="Resultados individuais"></ul>
+        </section>
+        <section id="atk-resultado" class="rol-aplicacao" aria-label="Resultado do dano" aria-live="polite" hidden></section>
+        <button id="atk-desfazer" data-rol-controle type="button" class="rol-desfazer" hidden>Desfazer último dano</button>
+        <details id="rol-historico-painel" class="rol-historico" hidden><summary>Histórico da sessão</summary><ol id="rol-historico"></ol></details>
+      </section>
+      <aside id="atk-secao" class="rol-painel rol-alvos-painel" aria-labelledby="atk-titulo" data-atacar="false">
+        <div class="rol-alvos-topo"><h3 id="atk-titulo">Alvos</h3><label class="rol-atacar"><input id="atk-atacar" type="checkbox" role="switch"><span class="rol-switch" aria-hidden="true"></span><span>Atacar</span></label></div>
+        <p id="atk-status" role="status">Nenhum alvo selecionado · ataque desativado</p>
+        <p id="atk-aviso" class="rol-alvos-aviso">Informe a chave do mestre para carregar os alvos.</p>
+        <button id="atk-atualizar" type="button" hidden>Tentar carregar novamente</button>
+        <ul id="atk-alvos" class="fig-resumos rol-alvos" aria-label="Alvos disponíveis"></ul>
+        <div class="rol-segmentado" role="tablist" aria-label="Categoria dos alvos">
+          <div><button id="atk-jogadores" type="button" role="tab" aria-selected="true" aria-controls="atk-alvos">Jogadores</button></div>
+          <div><button id="atk-inimigos" type="button" role="tab" aria-selected="false" aria-controls="atk-alvos" tabindex="-1">Inimigos</button></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script src="/JS/interface.js"></script>
+  <script src="/mestre/JS/comum.js"></script>
+  <script src="/mestre/JS/cartao-resumo.js"></script>
+  <script src="/mestre/JS/rolagem.js"></script>
 </body>
-
 </html>
