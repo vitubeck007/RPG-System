@@ -1,4 +1,4 @@
-/* Sprint 4 (Fase 2): NPCs (mini lore, status básicos, segredo do mestre) e a página NPCs. */
+/* NPCs: modelo, persistência, privacidade e compatibilidade das rotas antigas. A UI atual está nos testes de figurantes. */
 const { describe, it, before, after, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { io: clienteIo } = require("socket.io-client");
 const { criarCampanha, normalizarNpc, LIMITE_DE_ITENS } = require("../campanha.js");
-const { iniciarServidor, abrirPaginaMestre, esperar, esperarAte } = require("./ajuda/ambiente.js");
+const { iniciarServidor, esperar, esperarAte } = require("./ajuda/ambiente.js");
 
 const SENHA = "senha-teste";
 const SEGREDO = "SEGREDO-NPC-4471";
@@ -59,7 +59,6 @@ describe("Modelo do NPC (armazém)", () => {
 describe("NPCs com o servidor real", { concurrency: false }, () => {
   let s, ana;
   const abertos = [];
-  const paginas = [];
   let contador = 0;
 
   const conectar = async (auth) => {
@@ -79,7 +78,6 @@ describe("NPCs com o servidor real", { concurrency: false }, () => {
   const listar = async (m) => (await pedir(m, "master_campanha_ler", { token: SENHA, tipo: "npcs" })).dados;
 
   afterEach(async () => {
-    paginas.splice(0).forEach((p) => p.fechar());
     abertos.splice(0).forEach((k) => k.close());
     await esperar(200);
   });
@@ -165,143 +163,14 @@ describe("NPCs com o servidor real", { concurrency: false }, () => {
     assert.ok(!/bausPublicos[^;]*npcs|npcs[^;]*SALA_BAUS/.test(codigo));
   });
 
-  /* ---- página ---- */
-  describe("página NPCs (navegador)", () => {
-    const abrirPagina = async (opcoes = { real: true, tokenInicial: SENHA }) => {
-      const pg = await abrirPaginaMestre(s, "npc", opcoes);
-      paginas.push(pg);
-      return pg;
-    };
-    const clicar = (pg, el) => el.dispatchEvent(new pg.window.MouseEvent("click", { bubbles: true }));
-    const preencher = (pg, id, v) => {
-      const el = pg.document.getElementById(id);
-      el.value = v;
-      el.dispatchEvent(new pg.window.Event("input", { bubbles: true }));
-    };
-    const cartoes = (pg) => [...pg.document.querySelectorAll("#npc-cartoes [data-id]")];
-    const cartao = (pg, nome) => cartoes(pg).find((c) => c.querySelector("h4").textContent === nome);
-
-    it("criar, editar, buscar, duplicar e excluir; segredo fica fora do cartão; texto nunca vira HTML", async () => {
-      const pg = await abrirPagina();
-      await esperarAte(() => pg.run("npcs.carregou"), { rotulo: "página carregar" });
-      const xss = "Gárgula <img src=x onerror=alert(1)>";
-      clicar(pg, pg.document.getElementById("npc-novo"));
-      clicar(pg, pg.document.getElementById("np-salvar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Dê um nome ao NPC/);
-      preencher(pg, "np-nome", xss);
-      preencher(pg, "np-papel", "Vigia <b>da torre</b>");
-      preencher(pg, "np-lore", "Lore ".repeat(5));
-      preencher(pg, "np-hp-atual", "30");
-      preencher(pg, "np-hp-max", "20");
-      preencher(pg, "np-attr-FOR", "16");
-      preencher(pg, "np-segredo", SEGREDO);
-      assert.equal(pg.document.getElementById("np-lore-contador").textContent, "(25/500)");
-      clicar(pg, pg.document.getElementById("np-salvar"));
-      await esperarAte(() => cartao(pg, xss), { rotulo: "cartão" });
-      const c = cartao(pg, xss);
-      assert.match(c.textContent, /HP 20\/20/, "HP atual cortado no máximo");
-      assert.match(c.textContent, /FOR 16/);
-      assert.equal(pg.document.querySelectorAll("#npc-cartoes img, #npc-cartoes b").length, 0, "texto do usuário nunca vira HTML");
-      assert.ok(c.querySelector("[data-segredo]"), "indica que tem segredo");
-      assert.ok(!pg.document.getElementById("npc-cartoes").textContent.includes(SEGREDO), "o segredo não aparece no cartão");
-
-      // editar: o segredo aparece no editor, e editar não cria outro
-      clicar(pg, c.querySelector('[data-acao="editar"]'));
-      assert.equal(pg.document.getElementById("np-segredo").value, SEGREDO);
-      assert.equal(pg.document.getElementById("np-attr-DES").value, "", "atributo não definido continua vazio");
-      preencher(pg, "np-nome", "Gárgula");
-      clicar(pg, pg.document.getElementById("np-salvar"));
-      await esperarAte(() => cartao(pg, "Gárgula"), { rotulo: "cartão editado" });
-      assert.equal(cartoes(pg).filter((x) => x.querySelector("h4").textContent.startsWith("Gárgula")).length, 1);
-
-      // busca sem acento nem maiúsculas (nome, papel, lore) — não procura no segredo
-      preencher(pg, "npc-busca", "VIGIA");
-      assert.deepEqual(cartoes(pg).map((x) => x.querySelector("h4").textContent), ["Gárgula"]);
-      preencher(pg, "npc-busca", "gargula");
-      assert.equal(cartoes(pg).length, 1);
-      preencher(pg, "npc-busca", SEGREDO);
-      assert.equal(cartoes(pg).length, 0);
-      preencher(pg, "npc-busca", "");
-
-      // duplicar e excluir com confirmação
-      clicar(pg, cartao(pg, "Gárgula").querySelector('[data-acao="duplicar"]'));
-      await esperarAte(() => cartao(pg, "Gárgula (cópia)"), { rotulo: "cópia" });
-      assert.ok(cartao(pg, "Gárgula (cópia)").querySelector("[data-segredo]"), "a cópia leva o segredo");
-      const excluir = () => cartao(pg, "Gárgula (cópia)").querySelector('[data-acao="excluir"]');
-      clicar(pg, excluir());
-      assert.equal(excluir().textContent, "Confirmar?");
-      clicar(pg, excluir());
-      await esperarAte(() => !cartao(pg, "Gárgula (cópia)"), { rotulo: "cópia excluída" });
-      assert.ok(cartao(pg, "Gárgula"));
-    });
-
-    it("retrato: só URL válida; inválida é recusada na página antes de enviar; cartão mostra a imagem com segurança", async () => {
-      const pg = await abrirPagina();
-      await esperarAte(() => pg.run("npcs.carregou"), { rotulo: "página carregar" });
-      clicar(pg, pg.document.getElementById("npc-novo"));
-      preencher(pg, "np-nome", "Retratada");
-      preencher(pg, "np-retrato", "javascript:alert(1)");
-      const antes = (await listar(await mestre())).length;
-      clicar(pg, pg.document.getElementById("np-salvar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Retrato inválido/);
-      assert.equal((await listar(await mestre())).length, antes, "nada foi enviado");
-      preencher(pg, "np-retrato", "https://exemplo.com/foto.png");
-      clicar(pg, pg.document.getElementById("np-salvar"));
-      await esperarAte(() => cartao(pg, "Retratada"), { rotulo: "cartão" });
-      const img = cartao(pg, "Retratada").querySelector("img");
-      assert.equal(img.getAttribute("src"), "https://exemplo.com/foto.png");
-      assert.equal(img.referrerPolicy, "no-referrer");
-      // um NPC com retrato perigoso que chegasse ao navegador não vira <img>
-      pg.run("renderizarNpcs.__x = 1; npcs.lista = [{ id: 'x1', nome: 'Hostil', papel: '', lore: '', notas: '', segredo: '', retrato: 'javascript:alert(1)', hp: { atual: 1, max: 1 }, atributos: {} }]; renderizarNpcs();");
-      assert.equal(pg.document.querySelectorAll("#npc-cartoes img").length, 0);
-    });
-
-    it("HP: cliques rápidos não se perdem (+1 cinco vezes = +5), nunca passa do máximo nem fica abaixo de 0", async () => {
-      const m = await mestre();
-      const n = await salvar(m, { nome: "Alvo", hp: { atual: 0, max: 8 } });
-      const pg = await abrirPagina();
-      await esperarAte(() => cartao(pg, "Alvo"), { rotulo: "cartão" });
-      const botao = (acao) => cartao(pg, "Alvo").querySelector(`[data-acao="${acao}"]`);
-      for (let i = 0; i < 5; i++) clicar(pg, botao("hp+1"));
-      await esperarAte(async () => (await listar(m)).find((x) => x.id === n.id).hp.atual === 5, { rotulo: "HP 5" });
-      clicar(pg, botao("hp+5"));
-      clicar(pg, botao("hp+5"));
-      await esperarAte(() => /HP 8\/8/.test(cartao(pg, "Alvo").textContent), { rotulo: "HP no máximo" });
-      for (let i = 0; i < 3; i++) clicar(pg, botao("hp-5"));
-      await esperarAte(() => /HP 0\/8/.test(cartao(pg, "Alvo").textContent), { rotulo: "HP em 0" });
-      assert.equal((await listar(m)).find((x) => x.id === n.id).hp.atual, 0);
-    });
-
-    it("dezenas de NPCs: mostra 100 cartões, ordenados, e avisa para refinar a busca; a contagem é de todos", async () => {
-      const m = await mestre();
-      const base = (await listar(m)).length;
-      await Promise.all(Array.from({ length: 120 }, (_, i) => salvar(m, { nome: `Aldeão ${String(i).padStart(3, "0")}` })));
-      const pg = await abrirPagina();
-      await esperarAte(() => pg.run("npcs.carregou"), { rotulo: "página carregar" });
-      assert.equal(cartoes(pg).length, 100);
-      assert.match(pg.document.getElementById("npc-cartoes").textContent, /Mostrando 100 de \d+\. Refine a busca\./);
-      assert.equal(pg.document.getElementById("npc-contagem").textContent, `${base + 120} NPCs`);
-      const nomes = cartoes(pg).map((c) => c.querySelector("h4").textContent);
-      assert.deepEqual(nomes, [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")));
-      preencher(pg, "npc-busca", "Aldeão 07");
-      assert.equal(cartoes(pg).length, 10);
-      assert.equal(pg.document.getElementById("npc-contagem").textContent, `10 de ${base + 120} NPCs`);
-    });
-
-    it("tempo real entre duas páginas do mestre; token errado não carrega nada", async () => {
-      const a = await abrirPagina();
-      const b = await abrirPagina();
-      await esperarAte(() => a.run("npcs.carregou") && b.run("npcs.carregou"), { rotulo: "páginas carregarem" });
-      preencher(b, "npc-busca", "tempo real"); // com muitos NPCs, só os 100 primeiros aparecem sem busca
-      clicar(a, a.document.getElementById("npc-novo"));
-      preencher(a, "np-nome", "Aparece em tempo real");
-      clicar(a, a.document.getElementById("np-salvar"));
-      await esperarAte(() => cartao(b, "Aparece em tempo real"), { rotulo: "NPC na outra página" });
-      const errada = await abrirPagina({ real: true, tokenInicial: "errado" });
-      await esperarAte(() => errada.run("socket.connected"), { rotulo: "conectar" });
-      await esperar(400);
-      assert.equal(errada.run("npcs.carregou"), false);
-      assert.equal(cartoes(errada).length, 0);
-    });
+  // As páginas separadas foram substituídas pela interface unificada.
+  // O fluxo visual é coberto em figurantes.test.js e figurantes-cartoes.test.js.
+  it("rota antiga de npc abre Figurantes e o endereço .html continua compatível", async () => {
+    const resposta = await fetch(s.url + "/mestre/npc");
+    assert.equal(resposta.status, 200);
+    assert.match(await resposta.text(), /id="fig-cartoes"/);
+    const antiga = await fetch(s.url + "/mestre/npc.html", { redirect: "manual" });
+    assert.equal(antiga.status, 302);
+    assert.equal(antiga.headers.get("location"), "/mestre/npc");
   });
 });

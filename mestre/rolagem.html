@@ -16,7 +16,6 @@
   <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
   <header id="mestre-cabecalho" data-pagina="rolagem"></header>
   <main id="mestre-conteudo" tabindex="-1" class="master-main rol-pagina">
-    <div class="rol-titulo"><h2>Rolagens</h2><p>Dados no servidor · dano por alvo</p></div>
     <div class="rol-mesa">
       <section id="rol-secao" class="rol-painel" aria-label="Rolagens do mestre">
         <div class="rol-instantaneas-topo">
@@ -33,32 +32,41 @@
           <button type="button" data-dado="6" data-rol-controle aria-label="Rolar d6"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d6</span></button>
           <button type="button" data-dado="4" data-rol-controle aria-label="Rolar d4"><svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#dice"></use></svg><span>1d4</span></button>
         </div>
-        <form id="rol-form" class="rol-personalizada">
+        <form novalidate id="rol-form" class="rol-personalizada">
           <label for="rol-expressao">Rolagem personalizada</label>
-          <div><input id="rol-expressao" data-rol-controle type="text" maxlength="300" placeholder="2d20+5+3d6+1" autocomplete="off" spellcheck="false" aria-describedby="rol-ajuda rol-erro"><button id="rol-rolar" data-rol-controle type="submit">Rolar</button></div>
+          <div><input id="rol-expressao" data-validar-dados="expressao" data-rol-controle type="text" maxlength="300" placeholder="2d20+5+3d6+1" autocomplete="off" spellcheck="false" aria-describedby="rol-ajuda rol-erro"><button id="rol-rolar" data-rol-controle type="submit">Rolar</button></div>
           <p id="rol-ajuda">Some ou subtraia dados e valores fixos. A quantidade acima só altera os dados instantâneos.</p>
         </form>
         <p id="rol-erro" class="rol-erro" role="alert" hidden></p>
-        <section id="rol-resultado" class="rol-resultado" aria-label="Última rolagem" aria-live="polite" aria-atomic="true">
+        <section id="rol-resultado" class="rol-resultado" aria-label="Rolagem e aplicação de dano">
           <div class="rol-resultado-topo"><span>Última rolagem</span><span id="rol-formula">—</span></div>
-          <output id="rol-total">—</output>
+          <output id="rol-total" aria-label="Total da rolagem" aria-live="polite">—</output>
           <p id="rol-espera">Selecione um dado ou escreva uma expressão.</p>
-          <ul id="rol-detalhes" aria-label="Resultados individuais"></ul>
+          <div class="rol-resultado-acoes">
+            <ul id="atk-selecao-resumo" aria-label="Todos os alvos selecionados" class="rol-selecao-resumo"></ul>
+            <button id="atk-aplicar-ultimo" data-rol-controle type="button" hidden disabled title="Aplicar o último resultado aos alvos selecionados">
+              <svg class="rpg-icon" aria-hidden="true"><use href="/CSS/icones.svg#sword"></use></svg><span>Aplicar dano</span>
+            </button>
+          </div>
+          <section id="atk-resultado" class="rol-aplicacao" aria-label="Última aplicação de dano" aria-live="polite" hidden></section>
+          <button id="atk-desfazer" data-rol-controle type="button" class="rol-desfazer" hidden>Desfazer último dano</button>
+          <details id="rol-detalhes-painel" class="rol-detalhes-painel" hidden>
+            <summary>Detalhes da rolagem</summary>
+            <ul id="rol-detalhes" aria-label="Resultados individuais"></ul>
+          </details>
         </section>
-        <section id="atk-resultado" class="rol-aplicacao" aria-label="Resultado do dano" aria-live="polite" hidden></section>
-        <button id="atk-desfazer" data-rol-controle type="button" class="rol-desfazer" hidden>Desfazer último dano</button>
         <details id="rol-historico-painel" class="rol-historico" hidden><summary>Histórico da sessão</summary><ol id="rol-historico"></ol></details>
       </section>
       <aside id="atk-secao" class="rol-painel rol-alvos-painel" aria-labelledby="atk-titulo" data-atacar="false">
         <div class="rol-alvos-topo"><h3 id="atk-titulo">Alvos</h3><label class="rol-atacar"><input id="atk-atacar" type="checkbox" role="switch"><span class="rol-switch" aria-hidden="true"></span><span>Atacar</span></label></div>
-        <p id="atk-status" role="status">Nenhum alvo selecionado · ataque desativado</p>
-        <p id="atk-aviso" class="rol-alvos-aviso">Informe a chave do mestre para carregar os alvos.</p>
-        <button id="atk-atualizar" type="button" hidden>Tentar carregar novamente</button>
-        <ul id="atk-alvos" class="fig-resumos rol-alvos" aria-label="Alvos disponíveis"></ul>
         <div class="rol-segmentado" role="tablist" aria-label="Categoria dos alvos">
           <div><button id="atk-jogadores" type="button" role="tab" aria-selected="true" aria-controls="atk-alvos">Jogadores</button></div>
           <div><button id="atk-inimigos" type="button" role="tab" aria-selected="false" aria-controls="atk-alvos" tabindex="-1">Inimigos</button></div>
         </div>
+        <p id="atk-status" role="status" tabindex="-1">Nenhum alvo selecionado · ataque desativado</p>
+        <p id="atk-aviso" class="rol-alvos-aviso">Aguardando os alvos do servidor…</p>
+        <button id="atk-atualizar" type="button" hidden>Tentar carregar novamente</button>
+        <ul id="atk-alvos" class="fig-resumos rol-alvos" aria-label="Alvos disponíveis"></ul>
       </aside>
     </div>
   </main>

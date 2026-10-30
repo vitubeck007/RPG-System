@@ -5,15 +5,7 @@ const ICONES_APARENCIA_MESTRE = [
   ['fa-wand-magic-sparkles', 'Magia'], ['fa-book', 'Livro'], ['fa-gem', 'Tesouro'],
   ['fa-leaf', 'Natureza'], ['fa-skull', 'Sombrio'], ['fa-bag-shopping', 'Bolsa'],
 ];
-const CORES_APARENCIA_MESTRE = [
-  ['', 'Padrão', '#1c2836', '#141d28'],
-  ['from-slate-800 to-slate-900', 'Cinza ardósia', '#1e293b', '#0f172a'],
-  ['from-amber-900 to-amber-950', 'Âmbar', '#78350f', '#451a03'],
-  ['from-red-900 to-red-950', 'Vermelho', '#7f1d1d', '#450a0a'],
-  ['from-emerald-900 to-emerald-950', 'Verde', '#064e3b', '#022c22'],
-  ['from-sky-900 to-sky-950', 'Azul', '#0c4a6e', '#082f49'],
-  ['from-violet-900 to-violet-950', 'Violeta', '#4c1d95', '#2e1065'],
-];
+const CORES_APARENCIA_MESTRE = RPGUI.coresItens;
 const editoresAparenciaMestre = new Map();
 
 function atualizarAparenciaMestre(prefixo) {
@@ -44,7 +36,7 @@ function atualizarAparenciaMestre(prefixo) {
       return select;
     };
     const selectIcone = seletor(icone, ICONES_APARENCIA_MESTRE, 'Ícone', 'icone-visual');
-    if (cor) seletor(cor, CORES_APARENCIA_MESTRE, 'Cor da peça na mochila', 'cor-visual');
+    if (cor) seletor(cor, CORES_APARENCIA_MESTRE, 'Cor do item', 'cor-visual');
     const previa = criar('div', 'master-appearance-preview');
     previa.id = `${prefixo}-aparencia-previa`;
     previa.setAttribute('role', 'img');
@@ -57,8 +49,25 @@ function atualizarAparenciaMestre(prefixo) {
       const corEscolhida = CORES_APARENCIA_MESTRE.find(([valor]) => valor === cor?.value);
       const rotuloCor = cor ? (corEscolhida?.[1] || 'Personalizada (prévia neutra)') : '';
       const rotuloIcone = ICONES_APARENCIA_MESTRE.find(([valor]) => valor === icone.value)?.[1] || 'Personalizado';
-      previa.style.background = corEscolhida ? `linear-gradient(135deg, ${corEscolhida[2]}, ${corEscolhida[3]})` : 'var(--rpg-bg)';
       previa.replaceChildren();
+      if (prefixo === 'li') {
+        previa.classList.add('loot-appearance-preview');
+        const valor = sufixo => document.getElementById(`li-${sufixo}`)?.value.trim() || '';
+        const card = criarCartaoItem({ name: valor('name') || 'Nome do item', type: valor('type') || 'Item',
+          color: cor.value, icon: icone.value, dice: valor('dice'), atributo: valor('atributo'),
+          tipoDano: valor('tipoDano'), categoria: valor('categoria'), subtitulo: valor('subtitulo'),
+          tipoRolagem: valor('tipo-rolagem'), tipoCura: valor('tipo-cura'), usos: Number(valor('usos')),
+          desc: valor('desc'), imagem: valor('imagem'), weight: Number(valor('weight')) || 0 });
+        if (imagemItem) {
+          const canvas = document.createElement('canvas'); canvas.width = canvas.height = 96;
+          desenharImagemItem(canvas);
+          card.querySelector('.loot-item-retrato').replaceChildren(canvas);
+        }
+        card.querySelector('.loot-item-base').remove();
+        previa.append(card);
+        previa.setAttribute('aria-label', `Prévia do card ${valor('name') || 'novo item'}, cor ${rotuloCor}`);
+        return;
+      }
       const desenho = criar('i'); desenho.setAttribute('aria-hidden', 'true');
       const classeIcone = /^[a-z0-9-]{1,40}$/i.test(icone.value) ? icone.value : (prefixo === 'li' ? 'fa-box-open' : 'fa-bolt');
       desenho.className = `fa-solid ${classeIcone}`;
@@ -68,6 +77,11 @@ function atualizarAparenciaMestre(prefixo) {
       selectIcone.title = `Ícone: ${rotuloIcone}`;
     };
     nome.addEventListener('input', atualizar);
+    if (prefixo === 'li') {
+      for (const sufixo of ['type', 'dice', 'atributo', 'tipoDano', 'categoria', 'subtitulo', 'desc', 'imagem', 'tipo-cura', 'usos']) {
+        document.getElementById(`li-${sufixo}`)?.addEventListener('input', atualizar);
+      }
+    }
     editoresAparenciaMestre.set(prefixo, atualizar);
   }
   atualizar();

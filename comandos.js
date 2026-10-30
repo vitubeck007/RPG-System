@@ -2,7 +2,6 @@
    COMANDOS DO MESTRE: CONVENÇÃO DOS EVENTOS master_*
    Todo evento novo do painel do mestre é registrado por aqui, e ganha de graça:
      1. formato: o pedido tem que ser um objeto e caber no limite de tamanho;
-     2. autorização: `dados.token` tem que ser a senha do mestre (estar numa página /mestre não conta);
      3. idempotência (eventos que mudam estado): `dados.acaoId` obrigatório; repetir o mesmo acaoId
         (duplo clique, reenvio depois de um tempo esgotado) NÃO executa de novo: devolve a mesma
         resposta. Duas chegadas ao mesmo tempo também executam uma vez só;
@@ -20,7 +19,7 @@ const { ehIdSeguro, ehObjeto } = require("./personagem.js");
 
 const falha = (erro, mensagem) => ({ ok: false, erro, mensagem });
 
-function criarComandos({ senhaMestre, log = console, tamanhoMaximo = 60_000, maxAcoes = 500 }) {
+function criarComandos({ log = console, tamanhoMaximo = 60_000, maxAcoes = 500 } = {}) {
   const concluidas = new Map(); // "evento:acaoId" -> resposta ok (para repetir a mesma resposta)
   const emCurso = new Map(); // "evento:acaoId" -> promessa da execução em andamento
 
@@ -48,11 +47,6 @@ function criarComandos({ senhaMestre, log = console, tamanhoMaximo = 60_000, max
       }
       if (tamanho > tamanhoMaximo) {
         responder(falha("pedido_grande", "Pedido grande demais."));
-        return;
-      }
-      if (dados.token !== senhaMestre) {
-        log.warn(`[SEGURANÇA] ${evento} recusado para o cliente ${socket.id}: token inválido.`);
-        responder(falha("nao_autorizado", "Token/Senha do mestre incorreta!"));
         return;
       }
       if (mudaEstado && !ehIdSeguro(dados.acaoId)) {

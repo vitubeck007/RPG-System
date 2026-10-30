@@ -1,11 +1,11 @@
 /* =========================================================================
    PAINEL DO MESTRE: PARTE COMUM
-   Carregado por TODAS as páginas de /mestre. Cuida de: menu entre as páginas, token do mestre,
+   Carregado por TODAS as páginas de /mestre. Cuida de: menu entre as páginas,
    conexão com o servidor (socket), indicador de conexão e avisos (toast).
 
    Como cada página usa:
      - no HTML:  <header id="mestre-cabecalho" data-pagina="rolagem"></header>
-     - se tiver lógica própria, carrega o seu script DEPOIS deste (usa `socket`, `tokenDoMestre()`
+     - se tiver lógica própria, carrega o seu script DEPOIS deste (usa `socket`, `pedirAoServidor()`
        e `toast()`).
    O socket só conecta no fim do DOMContentLoaded, quando os scripts da página já registraram os
    seus eventos (conectar antes faria a página perder o 'connect').
@@ -38,31 +38,9 @@ const PAGINAS_MESTRE = [
   },
 ];
 
-const CHAVE_TOKEN_MESTRE = "rpg_mestre_token"; // o token digitado vale para todas as páginas da mesma aba
 
 // Não conecta já: ver o comentário no topo do arquivo.
 const socket = io({ autoConnect: false });
-
-/* ------------------------------ token do mestre ------------------------------ */
-function tokenDoMestre() {
-  return (document.getElementById("master-token-input")?.value || "").trim();
-}
-
-function lembrarToken(valor) {
-  try {
-    sessionStorage.setItem(CHAVE_TOKEN_MESTRE, valor);
-  } catch {
-    /* sem sessionStorage: o token só vale nesta página */
-  }
-}
-
-function tokenLembrado() {
-  try {
-    return sessionStorage.getItem(CHAVE_TOKEN_MESTRE) || "";
-  } catch {
-    return "";
-  }
-}
 
 /* ------------------------------ cabeçalho e menu ------------------------------ */
 function montarCabecalho() {
@@ -91,28 +69,15 @@ function montarCabecalho() {
     <div class="master-header-inner">
       <div class="master-heading">
         <span class="rpg-sigil" aria-hidden="true"><svg class="rpg-icon"><use href="/CSS/icones.svg#shield"></use></svg></span>
-        <div><p class="rpg-eyebrow">Arquivo de campanha · Mestre</p><h1>${escaparHtml(atual.rotulo)}</h1></div>
+        <h1>${escaparHtml(atual.rotulo)}</h1>
       </div>
       <div class="master-tools">
         <div id="connection-status" role="status" aria-live="polite"></div>
-        <details class="master-credentials">
-          <summary>Chave do mestre</summary>
-          <div class="master-credentials-panel">
-            <label for="master-token-input">Chave configurada no servidor</label>
-            <input type="password" id="master-token-input" autocomplete="current-password" spellcheck="false" aria-describedby="master-key-hint">
-            <p id="master-key-hint">Mantida somente nesta aba do navegador. Conexão online não significa acesso autorizado.</p>
-          </div>
-        </details>
       </div>
       <nav class="master-nav" aria-label="Páginas do painel do mestre">${links}</nav>
       <p id="master-context-notice" class="master-notice" role="status">Conectando ao servidor…</p>
     </div>`;
 
-  const campoToken = document.getElementById("master-token-input");
-  campoToken.value = tokenLembrado();
-  campoToken.addEventListener("input", () => lembrarToken(campoToken.value.trim()));
-  // Ao terminar de digitar/colar o token: entra na sala dos mestres (e avisa se estiver errado).
-  campoToken.addEventListener("change", () => entrarNaSalaDoMestre({ silencioso: false }));
   definirStatusConexao("conectando");
 }
 
@@ -124,19 +89,13 @@ function definirAvisoMestre(texto, estado = "info") {
   aviso.dataset.estado = estado;
 }
 
-function focarChaveMestre() {
-  const input = document.getElementById('master-token-input');
-  const detalhes = input?.closest('details');
-  if (detalhes) detalhes.open = true;
-  input?.focus();
-}
 
 // Os editores não são forms: valide antes de converter números ou aplicar valores padrão.
 function validarCamposMestre(id, regras = {}) {
   const area = document.getElementById(id);
   let primeiro = null;
   for (const input of area.querySelectorAll('input, select, textarea')) {
-    if (input.disabled) continue;
+    if (input.matches(':disabled')) continue;
     const texto = regras[input.id]?.(input.value.trim()) || (!input.validity.valid ? input.validationMessage : '');
     const erroId = `${input.id}-erro`;
     let erro = document.getElementById(erroId);
@@ -201,7 +160,10 @@ socket.on("connect", () => {
   definirStatusConexao("online");
   entrarNaSalaDoMestre(); // reconexão também: a sala se perde quando a conexão cai
 });
-socket.on("disconnect", () => definirStatusConexao("offline"));
+socket.on("disconnect", () => { definirStatusConexao("offline"); toast("Servidor desconectado.", "evento"); });
+socket.on("bau_item_retirado", ({ jogador, item, quantidade } = {}) => {
+  if (jogador && item && quantidade) toast(`${jogador} pegou ${quantidade} × ${item}.`, "evento");
+});
 socket.on("connect_error", () => definirStatusConexao("offline"));
 
 /* ------------------------------ pedidos ao servidor ------------------------------ */
@@ -239,7 +201,9 @@ function assinaturaEditorMestre(id, extra = () => null) {
   ]);
 }
 
-function protegerEditorMestre(id, extra = () => null) {
+function protegerEditorMestre(id, extra = () => null, opcoes = {}) {
+  const anterior = editoresProtegidos.get(id);
+  clearTimeout(anterior?.timer); anterior?.observador?.disconnect();
   const area = document.getElementById(id);
   area?.querySelectorAll('.master-field-error').forEach(el => { el.textContent = ''; el.hidden = true; });
   area?.querySelectorAll('[aria-invalid]').forEach(input => {
@@ -248,7 +212,75 @@ function protegerEditorMestre(id, extra = () => null) {
     if (descricoes.length) input.setAttribute('aria-describedby', descricoes.join(' '));
     else input.removeAttribute('aria-describedby');
   });
-  editoresProtegidos.set(id, { extra, inicial: assinaturaEditorMestre(id, extra) });
+  const registro = { extra, inicial: assinaturaEditorMestre(id, extra), opcoes,
+    chave: `rpg_mestre_rascunho:${location.pathname}:${id}:${opcoes.chave || "novo"}`, pendente: false };
+  editoresProtegidos.set(id, registro);
+  area?.querySelector('.master-draft-notice')?.remove();
+  try {
+    const salvo = JSON.parse(localStorage.getItem(registro.chave));
+    if (salvo && Array.isArray(salvo.campos)) {
+      registro.pendente = true;
+      registro.bloqueados = [...area.querySelectorAll('input, select, textarea, button')]
+        .filter(el => !el.matches('[data-fechar], [id$="cancelar"]'))
+        .map(el => [el, el.disabled]);
+      registro.bloqueados.forEach(([el]) => { el.disabled = true; });
+      const liberar = () => { registro.bloqueados.forEach(([el, desabilitado]) => { el.disabled = desabilitado; }); registro.bloqueados = []; };
+      const aviso = criar('div', 'master-draft-notice rpg-message');
+      aviso.setAttribute('role', 'status');
+      aviso.append(criar('p', '', `Há um rascunho de ${new Date(salvo.quando).toLocaleString('pt-BR')}. Escolha restaurar ou descartar para continuar. Restaurar preenche o editor; só será enviado ao confirmar o salvamento.`));
+      const restaurar = botaoDeAcao('restaurar-rascunho', 'Restaurar rascunho');
+      const descartar = botaoDeAcao('descartar-rascunho', 'Descartar rascunho');
+      restaurar.addEventListener('click', () => {
+        liberar();
+        opcoes.restaurarExtra?.(salvo.extra);
+        const controles = [...area.querySelectorAll('input, select, textarea')];
+        for (const [chave, valor] of salvo.campos) {
+          const input = controles.find((el, indice) => (el.id || `campo-${indice}`) === chave);
+          if (!input || input.type === 'password' || input.type === 'file') continue;
+          if (input.type === 'checkbox') input.checked = Boolean(valor); else input.value = valor;
+        }
+        opcoes.aposRestaurar?.();
+        registro.pendente = false; aviso.remove();
+        guardarRascunhoEditorMestre(id);
+        area.querySelector('input:not(:disabled), textarea:not(:disabled)')?.focus();
+      });
+      descartar.addEventListener('click', () => {
+        try { localStorage.removeItem(registro.chave); } catch { toast('Não foi possível descartar o rascunho.', 'error'); return; }
+        liberar();
+        registro.pendente = false; aviso.remove(); guardarRascunhoEditorMestre(id);
+      });
+      aviso.append(restaurar, descartar);
+      (area.querySelector('form') || area).prepend(aviso);
+    }
+  } catch { toast('Não foi possível ler o rascunho local deste editor.', 'error'); }
+  if (area) {
+    area.oninputRascunhoMestre && area.removeEventListener('input', area.oninputRascunhoMestre);
+    area.oninputRascunhoMestre && area.removeEventListener('change', area.oninputRascunhoMestre);
+    area.oninputRascunhoMestre = () => {
+      clearTimeout(registro.timer);
+      registro.timer = setTimeout(() => guardarRascunhoEditorMestre(id), 350);
+    };
+    area.addEventListener('input', area.oninputRascunhoMestre);
+    area.addEventListener('change', area.oninputRascunhoMestre);
+    // Alterações estruturais (adicionar/remover poderes ou linhas) também precisam de cópia.
+    registro.observador = new MutationObserver(() => area.oninputRascunhoMestre());
+    registro.observador.observe(area, { childList: true, subtree: true });
+  }
+}
+
+function guardarRascunhoEditorMestre(id) {
+  const registro = editoresProtegidos.get(id), area = document.getElementById(id);
+  if (!registro || !area || registro.pendente) return;
+  try {
+    if (!editorMestreAlterado(id)) { localStorage.removeItem(registro.chave); return; }
+    const campos = [...area.querySelectorAll('input, select, textarea')]
+      .map((el, indice) => [el.id || `campo-${indice}`, el.type === 'checkbox' ? el.checked : el.value, el.type])
+      .filter(([, , tipo]) => !['password', 'file'].includes(tipo)).map(([chave, valor]) => [chave, valor]);
+    localStorage.setItem(registro.chave, JSON.stringify({ quando: Date.now(), campos, extra: registro.extra() }));
+  } catch {
+    if (!registro.avisouErro) toast('Não foi possível guardar o rascunho local. Mantenha o editor aberto até salvar.', 'error');
+    registro.avisouErro = true;
+  }
 }
 
 function editorMestreAlterado(id) {
@@ -256,11 +288,25 @@ function editorMestreAlterado(id) {
   return Boolean(registro && registro.inicial !== assinaturaEditorMestre(id, registro.extra));
 }
 
-function podeDescartarEditorMestre(id) {
-  return !editorMestreAlterado(id) || window.confirm("Há alterações não salvas. Descartar o rascunho?\nCancelar mantém a edição aberta.");
+async function podeDescartarEditorMestre(id) {
+  return !editorMestreAlterado(id) || RPGUI.confirmar({ titulo: 'Descartar alterações?', mensagem: 'As alterações deste editor ainda não foram salvas. Cancelar mantém os campos preenchidos.', acao: 'Descartar alterações' });
 }
 
-function limparProtecaoEditorMestre(id) { editoresProtegidos.delete(id); }
+function limparProtecaoEditorMestre(id, salvo = false) {
+  const registro = editoresProtegidos.get(id);
+  clearTimeout(registro?.timer); registro?.observador?.disconnect();
+  registro?.bloqueados?.forEach(([el, desabilitado]) => { el.disabled = desabilitado; });
+  const area = document.getElementById(id);
+  if (area?.oninputRascunhoMestre) {
+    area.removeEventListener('input', area.oninputRascunhoMestre);
+    area.removeEventListener('change', area.oninputRascunhoMestre);
+  }
+  // Fechamento explícito significa salvar ou descartar; uma oferta ainda não respondida é mantida.
+  if (registro && (salvo || !registro.pendente)) {
+    try { localStorage.removeItem(registro.chave); } catch { /* o próximo acesso permite descartar */ }
+  }
+  editoresProtegidos.delete(id);
+}
 
 async function executarAcaoMestre(botao, rotulo, acao) {
   if (botao?.dataset.enviando === "1") return;
@@ -289,7 +335,7 @@ function mostrarEstadoLeituraMestre(area, { carregando, erro, carregou }, repeti
   if (!carregando && !erro && carregou) return true;
   const aviso = criar("div", "master-empty master-load-notice");
   aviso.setAttribute("role", erro ? "alert" : "status");
-  aviso.append(criar("p", "", carregando ? "Carregando dados…" : erro || "Informe a chave do mestre para carregar os dados."));
+  aviso.append(criar("p", "", carregando ? "Carregando dados…" : erro || "Aguardando dados do servidor…"));
   if (erro && repetir) {
     const botao = botaoDeAcao("recarregar", "Tentar novamente");
     botao.addEventListener("click", repetir);
@@ -304,9 +350,13 @@ function mostrarEstadoLeituraMestre(area, { carregando, erro, carregou }, repeti
 }
 
 window.addEventListener("beforeunload", (evento) => {
+  for (const id of editoresProtegidos.keys()) guardarRascunhoEditorMestre(id);
   if (![...editoresProtegidos.keys()].some(editorMestreAlterado) && !mutacoesEmAndamento.size) return;
   evento.preventDefault();
   evento.returnValue = "";
+});
+window.addEventListener("pagehide", () => {
+  for (const id of editoresProtegidos.keys()) guardarRascunhoEditorMestre(id);
 });
 
 function novoAcaoId() {
@@ -316,7 +366,7 @@ function novoAcaoId() {
 function pedirAoServidor(evento, dados = {}, { muda = false, acaoId = null, silencioso = false, tempoLimiteMs = TEMPO_LIMITE_PEDIDO_MS } = {}) {
   const chave = JSON.stringify([evento, dados]);
   if (muda && mutacoesEmAndamento.has(chave)) return mutacoesEmAndamento.get(chave);
-  const corpo = { ...dados, token: tokenDoMestre() };
+  const corpo = { ...dados };
   const id = muda ? acaoId || novoAcaoId() : null;
   if (id) corpo.acaoId = id;
 
@@ -348,18 +398,14 @@ function pedirAoServidor(evento, dados = {}, { muda = false, acaoId = null, sile
 
 // Entra na sala que recebe os dados do mestre em tempo real. Devolve a resposta, ou null se não deu.
 async function entrarNaSalaDoMestre({ silencioso = true } = {}) {
-  if (!tokenDoMestre()) {
-    definirAvisoMestre("Informe a chave do mestre para carregar e gerenciar os dados da campanha.");
-    return null;
-  }
-  definirAvisoMestre("Verificando acesso à campanha…");
+  definirAvisoMestre("Sincronizando campanha…");
   try {
     const resposta = await pedirAoServidor("master_entrar", {}, { silencioso });
-    definirAvisoMestre("Acesso autorizado · Dados da campanha sincronizados em tempo real.", "success");
+    definirAvisoMestre("Dados da campanha sincronizados em tempo real.", "success");
     (resposta?.avisos || []).forEach((aviso) => toast(aviso, "error"));
     return resposta;
   } catch (erro) {
-    definirAvisoMestre(erro.message || "Não foi possível acessar a campanha. Confira a chave e a conexão.", "error");
+    definirAvisoMestre(erro.message || "Não foi possível acessar a campanha. Confira a conexão.", "error");
     return null;
   }
 }
@@ -396,18 +442,21 @@ function marcarEnvioMestre(id, enviando) {
 }
 
 // Ação destrutiva com confirmação no próprio botão: o 1º clique vira "Confirmar?" (volta ao normal em 4 s); o 2º executa.
-function confirmarNoBotao(botao, aoConfirmar) {
-  if (botao.dataset.confirmar !== "1") {
-    const rotulo = botao.textContent;
-    botao.dataset.confirmar = "1";
-    botao.textContent = "Confirmar?";
-    setTimeout(() => {
-      botao.dataset.confirmar = "";
-      botao.textContent = rotulo;
-    }, 4000);
-    return;
-  }
-  aoConfirmar();
+async function confirmarNoBotao(botao, aoConfirmar, mensagem = `Confirmar ${botao.textContent.trim().toLowerCase()}?`, ampla = false) {
+  if (botao.disabled || botao.dataset.enviando === '1') return;
+  const acao = ampla ? 'Limpar batalha' : botao.textContent.trim();
+  if (!await RPGUI.confirmar({ titulo: ampla ? 'Limpar batalha inteira?' : 'Confirmar exclusão', mensagem, acao })) return;
+  try { return await executarAcaoMestre(botao, 'Aguarde…', aoConfirmar); }
+  catch (erro) { toast(erro.message || 'Não foi possível concluir a ação.', 'error'); }
+}
+
+// Somente preferências de apresentação; nunca restaura ataque ou valores do jogo.
+function lerContextoMestre(pagina) {
+  try { return JSON.parse(sessionStorage.getItem(`rpg_mestre_contexto:${pagina}`)) || {}; }
+  catch { return {}; }
+}
+function guardarContextoMestre(pagina, contexto) {
+  try { sessionStorage.setItem(`rpg_mestre_contexto:${pagina}`, JSON.stringify(contexto)); } catch { /* navegação continua sem armazenamento */ }
 }
 
 // Miniatura de imagem (retrato/ilustração) só se a URL passa por urlDeImagem; sem referrer; some se não carregar.
@@ -424,13 +473,21 @@ function miniaturaDeImagem(url) {
 }
 
 /* ------------------------------ aviso (toast) ------------------------------ */
+const temporizadoresToastMestre = new WeakMap();
 function toast(mensagem, tipo = "info") {
+  if (!['error', 'evento', 'info', 'success'].includes(tipo)) tipo = 'info';
   let container = document.getElementById("toast-container");
   if (!container) {
     container = document.createElement("div");
     container.id = "toast-container";
     container.className = "master-toasts";
     document.body.appendChild(container);
+  }
+  const existente = [...container.children].find(el => el.dataset.tipo === tipo && el.querySelector('span')?.textContent === String(mensagem));
+  if (existente) {
+    clearTimeout(temporizadoresToastMestre.get(existente));
+    if (tipo !== 'error') temporizadoresToastMestre.set(existente, setTimeout(() => existente.remove(), 6000));
+    return;
   }
   const toastEl = document.createElement("div");
   toastEl.className = "master-toast";
@@ -446,12 +503,119 @@ function toast(mensagem, tipo = "info") {
   toastEl.appendChild(fechar);
   container.appendChild(toastEl);
   while (container.children.length > 4) container.firstElementChild.remove();
-  if (tipo !== "error") setTimeout(() => toastEl.remove(), 6000);
+  if (tipo !== "error") temporizadoresToastMestre.set(toastEl, setTimeout(() => toastEl.remove(), 6000));
 }
+
+/* Resumo somente de leitura: os mesmos estados públicos usados pela Mesa. */
+const resumoJogadoresMestre = { jogadores: {}, recentes: {}, energia: false, sincronizado: false, timer: null };
+function atualizarJogadoresRecentesMestre() {
+  clearTimeout(resumoJogadoresMestre.timer);
+  const agora = Date.now();
+  for (const [id, registro] of Object.entries(resumoJogadoresMestre.recentes)) {
+    if (registro.expiraEm <= agora || resumoJogadoresMestre.jogadores[id]) delete resumoJogadoresMestre.recentes[id];
+  }
+  const proximos = Object.values(resumoJogadoresMestre.recentes).map(r => r.expiraEm);
+  if (proximos.length) resumoJogadoresMestre.timer = setTimeout(() => {
+    atualizarJogadoresRecentesMestre(); renderizarResumoJogadoresMestre();
+  }, Math.max(1, Math.min(...proximos) - agora));
+}
+function renderizarResumoJogadoresMestre() {
+  const area = document.getElementById("master-resumo-jogadores");
+  if (!area) return;
+  const lista = area.querySelector(".master-resumo-lista"), aviso = area.querySelector(".master-resumo-status");
+  const jogadores = [...Object.values(resumoJogadoresMestre.jogadores).map(jogador => ({ jogador, offline: false })),
+    ...Object.values(resumoJogadoresMestre.recentes).map(({ jogador }) => ({ jogador, offline: true }))];
+  aviso.textContent = !resumoJogadoresMestre.sincronizado ? "Aguardando sincronização dos jogadores…" : jogadores.length ? "Jogadores" : "Nenhum jogador conectado.";
+  lista.replaceChildren();
+  for (const { jogador, offline } of jogadores) {
+    const nome = typeof jogador.name === "string" && jogador.name.trim() ? jogador.name : "Personagem";
+    const card = criar("li", "master-resumo-jogador");
+    card.dataset.offline = String(offline);
+    const foto = criar("span", "master-resumo-foto");
+    foto.setAttribute("aria-hidden", "true");
+    foto.append(criar("span", "", nome.trim().charAt(0).toLocaleUpperCase("pt-BR")));
+    const imagem = miniaturaDeImagem(jogador.avatar);
+    if (imagem) foto.append(imagem);
+    const dados = criar("div", "master-resumo-dados");
+    const titulo = criar("strong", "master-resumo-nome", nome); titulo.title = `${nome} · ${offline ? "Desconectado" : "Conectado"}`;
+    titulo.append(criar("span", "rpg-sr-only", offline ? " · Desconectado" : " · Conectado"));
+    const vitais = criar("div", "master-resumo-vitais");
+    const formatar = vital => Number.isFinite(vital?.current) && Number.isFinite(vital?.max) ? `${vital.current}/${vital.max}` : "—";
+    const vitalResumo = (nomeVital, vital, classe, simbolo) => {
+      const linha = criar("div", `master-resumo-vital ${classe}`);
+      const icone = criar("span", "master-resumo-icone", simbolo); icone.setAttribute("aria-hidden", "true");
+      const rotulo = criar("span", "rpg-sr-only", `${nomeVital} `);
+      const trilho = criar("span", "master-resumo-trilho"); trilho.setAttribute("aria-hidden", "true");
+      const barra = criar("span", "master-resumo-barra");
+      const atual = Number.isFinite(vital?.current) ? vital.current : 0;
+      const maximo = Number.isFinite(vital?.max) ? vital.max : 0;
+      barra.style.width = `${maximo > 0 ? Math.max(0, Math.min(100, atual / maximo * 100)) : 0}%`;
+      trilho.append(barra);
+      linha.append(icone, rotulo, trilho, criar("span", "master-resumo-valor", formatar(vital)));
+      return linha;
+    };
+    vitais.append(vitalResumo("Vida", jogador.vitals?.hp, "master-resumo-vida", "♥"));
+    if (resumoJogadoresMestre.energia) vitais.append(vitalResumo("Energia", jogador.vitals?.vigor, "master-resumo-energia", "⚡"));
+    dados.append(titulo, vitais); card.append(foto, dados); lista.append(card);
+  }
+}
+function montarResumoJogadoresMestre() {
+  const pagina = document.getElementById("mestre-cabecalho")?.dataset.pagina;
+  if (!pagina || pagina === "index" || pagina === "rolagem") return;
+  let area = document.getElementById("master-resumo-jogadores");
+  if (!area) {
+    area = criar("section", "master-resumo-jogadores"); area.id = "master-resumo-jogadores";
+    document.getElementById("mestre-conteudo")?.prepend(area);
+  }
+  area.classList.add("master-resumo-jogadores");
+  area.setAttribute("aria-label", "Resumo dos jogadores conectados");
+  const status = criar("span", "master-resumo-status"); status.setAttribute("role", "status");
+  const lista = criar("ul", "master-resumo-lista"); lista.setAttribute("aria-label", "Personagens conectados");
+  area.replaceChildren(status, lista); renderizarResumoJogadoresMestre();
+}
+socket.on("sync_all_players", jogadores => {
+  resumoJogadoresMestre.jogadores = jogadores && typeof jogadores === "object" ? jogadores : {};
+  atualizarJogadoresRecentesMestre();
+  resumoJogadoresMestre.sincronizado = true; renderizarResumoJogadoresMestre();
+});
+socket.on("sync_recent_players", registros => {
+  resumoJogadoresMestre.recentes = {};
+  if (Array.isArray(registros)) for (const registro of registros) {
+    if (registro?.jogador?.id && Number.isFinite(registro.expiraEm)) resumoJogadoresMestre.recentes[registro.jogador.id] = registro;
+  }
+  atualizarJogadoresRecentesMestre(); renderizarResumoJogadoresMestre();
+});
+socket.on("player_recently_disconnected", registro => {
+  if (!registro?.jogador?.id || !Number.isFinite(registro.expiraEm)) return;
+  resumoJogadoresMestre.recentes[registro.jogador.id] = registro;
+  atualizarJogadoresRecentesMestre(); renderizarResumoJogadoresMestre();
+});
+socket.on("sync_config", config => {
+  if (typeof config?.AtivarMana !== "boolean") return;
+  resumoJogadoresMestre.energia = config.AtivarMana; renderizarResumoJogadoresMestre();
+});
+socket.on("player_updated", jogador => {
+  if (!jogador?.id) return;
+  resumoJogadoresMestre.jogadores[jogador.id] = jogador;
+  atualizarJogadoresRecentesMestre(); renderizarResumoJogadoresMestre();
+});
+socket.on("vital_adjusted", dados => {
+  const jogador = resumoJogadoresMestre.jogadores[dados?.charId];
+  if (!jogador || !dados.vitals) return;
+  jogador.vitals = dados.vitals; renderizarResumoJogadoresMestre();
+});
+socket.on("player_removed", dados => {
+  if (!dados?.charId) return;
+  delete resumoJogadoresMestre.jogadores[dados.charId]; renderizarResumoJogadoresMestre();
+});
+socket.on("disconnect", () => {
+  resumoJogadoresMestre.jogadores = {}; resumoJogadoresMestre.sincronizado = false; renderizarResumoJogadoresMestre();
+});
 
 /* ------------------------------ início ------------------------------ */
 window.addEventListener("DOMContentLoaded", () => {
   montarCabecalho();
+  montarResumoJogadoresMestre();
   document.querySelectorAll('[role="tablist"]').forEach((lista) => {
     const abas = [...lista.querySelectorAll("button")];
     abas.forEach((aba) => aba.setAttribute("role", "tab"));
@@ -466,12 +630,5 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
   document.querySelectorAll("i.fa-solid").forEach((icone) => icone.setAttribute("aria-hidden", "true"));
-  document.addEventListener("keydown", (ev) => {
-    const painelChave = document.querySelector(".master-credentials[open]");
-    if (ev.key === "Escape" && painelChave) {
-      painelChave.removeAttribute("open");
-      painelChave.querySelector("summary")?.focus();
-    }
-  });
   socket.connect(); // por último: a página (e o seu script) já registraram os eventos
 });

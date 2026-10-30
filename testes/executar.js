@@ -5,7 +5,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const arquivos = fs.readdirSync(__dirname).filter((f) => f.endsWith(".test.js")).sort().map((f) => path.join(__dirname, f));
-const args = ["--test"];
+// Cada arquivo pode abrir servidores e páginas: não disputar CPU, memória e portas entre arquivos.
+const args = ["--test", "--test-concurrency=1"];
 // Limite por teste (evita travar para sempre), quando esta versão do Node suporta.
 if (process.allowedNodeEnvironmentFlags.has("--test-timeout")) args.push("--test-timeout=240000");
 const r = spawnSync(process.execPath, [...args, ...arquivos], { stdio: "inherit" });

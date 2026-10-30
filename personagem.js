@@ -238,6 +238,9 @@ function normalizarItem(item, uidsVistos, naGrade) {
     h: inteiro(base.h, 1, MAX_LARGURA_ITEM, 1),
   };
   if (naGrade) {
+    const formato = require('./JS/regras.js').normalizarFormatoItem(base.formato);
+    if (formato) { normalizado.formato = formato; normalizado.w = Math.max(...formato.map(p=>p[0]))+1; normalizado.h = Math.max(...formato.map(p=>p[1]))+1; }
+    else delete normalizado.formato;
     normalizado.col = inteiro(base.col, 1, MAX_POSICAO_ITEM, 1);
     normalizado.row = inteiro(base.row, 1, MAX_POSICAO_ITEM, 1);
   }
@@ -260,7 +263,7 @@ const MAX_CODICE_TEXTO = {
   tipoDano: 40,
   custo: 40,
 };
-const DADO_VALIDO = /^\d{0,3}d\d{1,4}\s*([+-]\s*\d{1,4})?$/i;
+const DADO_VALIDO = { test: require("./JS/regras.js").dadoDePoderValido };
 const ICONE_VALIDO = /^[a-z0-9-]{1,40}$/i;
 
 function normalizarEntradaCodice(item, uidsVistos) {
@@ -409,6 +412,43 @@ function gravarJson(caminho, dados) {
   trocarArquivo(tmp, caminho); // troca atômica: evita JSON pela metade
 }
 
+// Durante a sessão, esperar um arquivo do Windows não pode bloquear os demais sockets.
+// A versão síncrona acima fica para a inicialização e os comandos de migração offline.
+async function trocarArquivoAsync(origem, destino, { tentativas = 6, espera = 25 } = {}) {
+  for (let i = 1; ; i++) {
+    try {
+      await fs.promises.rename(origem, destino);
+      return;
+    } catch (erro) {
+      if (!ERROS_DE_ARQUIVO_EM_USO.has(erro.code)) throw erro;
+      if (i >= tentativas) {
+        await fs.promises.copyFile(origem, destino);
+        await fs.promises.rm(origem, { force: true });
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, espera * i));
+    }
+  }
+}
+
+const gravacoesPendentes = new Map();
+function gravarJsonAsync(caminho, dados) {
+  // Captura o valor solicitado antes de aguardar outra gravação desse mesmo arquivo.
+  const conteudo = JSON.stringify(dados, null, 2);
+  const absoluto = path.resolve(caminho);
+  const chave = process.platform === "win32" ? absoluto.toLowerCase() : absoluto;
+  const anterior = gravacoesPendentes.get(chave) || Promise.resolve();
+  const execucao = anterior.then(async () => {
+    const tmp = `${absoluto}.tmp`;
+    await fs.promises.writeFile(tmp, conteudo, "utf8");
+    await trocarArquivoAsync(tmp, absoluto);
+  });
+  const cauda = execucao.catch(() => {});
+  gravacoesPendentes.set(chave, cauda);
+  cauda.then(() => { if (gravacoesPendentes.get(chave) === cauda) gravacoesPendentes.delete(chave); });
+  return execucao;
+}
+
 function extrairNomeEId(nomePasta) {
   const m = /^(.*?)_(\d+)(?:_\d+)?$/.exec(nomePasta);
   return m ? { nome: m[1], id: m[2] } : { nome: nomePasta, id: "" };
@@ -421,7 +461,7 @@ function extrairNomeEId(nomePasta) {
  * copia os arquivos originais para _backup_pre_schema/ (uma única vez).
  * Retorna { alterados: [...], erros: [...] } ; com dryRun não grava nada.
  */
-function migrarPasta(dir, { dryRun = false } = {}) {
+function migrarPasta(dir, { dryRun = false, escritas = null } = {}) {
   const relatorio = { alterados: [], erros: [] };
   const backupDir = path.join(dir, "_backup_pre_schema");
   const contexto = extrairNomeEId(path.basename(dir));
@@ -437,6 +477,7 @@ function migrarPasta(dir, { dryRun = false } = {}) {
   const escrever = (arquivo, dados, motivo) => {
     relatorio.alterados.push(`${arquivo}.json (${motivo})`);
     if (dryRun) return;
+    if (escritas) { escritas.push({ arquivo, dados }); return; }
     fazerBackup();
     gravarJson(path.join(dir, `${arquivo}.json`), dados);
   };
@@ -481,11 +522,30 @@ function migrarPasta(dir, { dryRun = false } = {}) {
 
   // backpack.json antigo sai do lugar (o backup em _backup_pre_schema/ o preserva)
   const legado = path.join(dir, "backpack.json");
-  if (!dryRun && fs.existsSync(legado) && fs.existsSync(path.join(dir, "inventario.json"))) {
+  if (!dryRun && !escritas && fs.existsSync(legado) && fs.existsSync(path.join(dir, "inventario.json"))) {
     fs.unlinkSync(legado);
     relatorio.alterados.push("backpack.json (removido após migração)");
   }
 
+  return relatorio;
+}
+
+async function migrarPastaAsync(dir) {
+  const escritas = [];
+  const relatorio = migrarPasta(dir, { escritas });
+  const backupDir = path.join(dir, "_backup_pre_schema");
+  if (escritas.length && !fs.existsSync(backupDir)) {
+    await fs.promises.mkdir(backupDir);
+    for (const f of await fs.promises.readdir(dir)) {
+      if (f.endsWith(".json")) await fs.promises.copyFile(path.join(dir, f), path.join(backupDir, f));
+    }
+  }
+  for (const { arquivo, dados } of escritas) await gravarJsonAsync(path.join(dir, `${arquivo}.json`), dados);
+  const legado = path.join(dir, "backpack.json");
+  if (fs.existsSync(legado) && fs.existsSync(path.join(dir, "inventario.json"))) {
+    await fs.promises.unlink(legado);
+    relatorio.alterados.push("backpack.json (removido após migração)");
+  }
   return relatorio;
 }
 
@@ -518,6 +578,18 @@ function criarArquivosPadrao(dir, contexto) {
   for (const arquivo of ARQUIVOS) {
     gravarJson(path.join(dir, `${arquivo}.json`), DEFAULTS[arquivo](contexto));
   }
+}
+
+async function criarArquivosPadraoAsync(dir, contexto) {
+  for (const arquivo of ARQUIVOS) await gravarJsonAsync(path.join(dir, `${arquivo}.json`), DEFAULTS[arquivo](contexto));
+}
+
+async function carregarPersonagemDaPastaAsync(dir) {
+  const relatorio = await migrarPastaAsync(dir);
+  if (relatorio.erros.length) return { erros: relatorio.erros };
+  const personagem = {};
+  for (const arquivo of ARQUIVOS) personagem[arquivo] = lerJson(path.join(dir, `${arquivo}.json`));
+  return { personagem };
 }
 
 function carregarPersonagemDaPasta(dir) {
@@ -553,8 +625,12 @@ module.exports = {
   lerJson,
   gravarJson,
   trocarArquivo,
+  gravarJsonAsync,
+  trocarArquivoAsync,
   criarArquivosPadrao,
+  criarArquivosPadraoAsync,
   carregarPersonagemDaPasta,
+  carregarPersonagemDaPastaAsync,
   lerArquivosNormalizados,
   migrarPasta,
 };

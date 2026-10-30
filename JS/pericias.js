@@ -47,12 +47,21 @@ function renderizarPericias() {
       botao.addEventListener("click", () => alterarModPericia(skill.id, delta));
       bonus.appendChild(botao);
     }
-    const combo = elTexto("button", "rpg-btn", "Ao combo");
+    const combo = elTexto("button", "rpg-btn", "+");
     combo.type = "button";
     combo.disabled = !personagemCarregado;
     combo.setAttribute("aria-label", `Adicionar ${skill.name} ao combo`);
+    combo.title = `Adicionar ${skill.name} ao combo`;
     combo.addEventListener("click", () => adicionarPericiaAoCombo(skill.id));
-    const rolar = elTexto('button', 'rpg-btn', 'Rolar');
+    const rolar = elTexto('button', 'rpg-btn');
+    const dado = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    dado.setAttribute('class', 'rpg-icon');
+    dado.setAttribute('viewBox', '0 0 24 24');
+    dado.setAttribute('aria-hidden', 'true');
+    dado.setAttribute('focusable', 'false');
+    const simbolo = document.createElementNS(dado.namespaceURI, 'use');
+    simbolo.setAttribute('href', '/CSS/icones.svg#dice');
+    dado.append(simbolo); rolar.append(dado);
     rolar.type = 'button'; rolar.disabled = !personagemCarregado;
     rolar.setAttribute('aria-label', `Rolar ${skill.name}: 1d20 ${formatarBonus(calc.total)}`);
     rolar.title = `1d20 ${formatarBonus(calc.total)}`;

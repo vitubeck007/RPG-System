@@ -7,6 +7,57 @@ const { lerExpressaoRolagem, calcularDano } = require("../JS/regras.js");
 const { rolar } = require("../rolagem.js");
 const { iniciarServidor, abrirPaginaMestre, abrirFicha, esperarAte } = require("./ajuda/ambiente");
 
+test("aplicar dano depois de rolar sem Atacar usa a mesma rolagem uma única vez", async () => {
+  const pg = await abrirPaginaMestre({ dir: path.resolve(__dirname, ".."), url: "http://localhost" }, "rolagem", { tokenInicial: "chave-teste" });
+  try {
+    const botao = pg.document.getElementById("atk-aplicar-ultimo");
+    assert.equal(botao.hidden, true);
+    pg.run(`socket.connected=true;rol.carregou=true;rol.categoria='inimigos';
+      rol.alvos=[{alvoId:'npc_teste',tipo:'npc',nome:'Alvo',hp:{atual:20,max:20},energia:{atual:10,max:10}}];renderizarAlvos()`);
+    const pedidos = evento => pg.falso.pedidos.filter(p => p.evento === evento);
+    const resultado = (id, total) => ({ rolagemId: id, total, componentes: [{ formula: '+' + total, dados: [], bonus: total, soma: total }] });
+    const primeira = pg.run("rolar('+8')");
+    pedidos("master_rolar")[0].cb(null, { ok: true, dados: resultado("rol_manual_1", 8) });
+    await primeira;
+    assert.equal(pedidos("master_aplicar_dano").length, 0, "Atacar desligado não aplica dano automaticamente");
+    assert.equal(botao.hidden, false);
+    assert.equal(botao.disabled, true, "sem alvo o botão não envia dano");
+    pg.document.querySelector("#atk-alvos .fig-resumo-selecionar").click();
+    const mult = pg.document.querySelector('#atk-alvos [data-campo="mult"]');
+    mult.value = '0.5'; mult.dispatchEvent(new pg.window.Event('input'));
+    assert.equal(botao.disabled, false);
+    botao.click(); botao.click();
+    assert.equal(pedidos("master_aplicar_dano").length, 1, "clique repetido não envia outro ataque");
+    const aplicar = pedidos("master_aplicar_dano")[0];
+    assert.equal(aplicar.dados.rolagemId, "rol_manual_1");
+    assert.equal(Object.hasOwn(aplicar.dados, "valor"), false, "o servidor reaproveita o resultado original");
+    assert.deepEqual(JSON.parse(JSON.stringify(aplicar.dados.alvos)), [{ alvoId: 'npc_teste', mult: 0.5 }]);
+    aplicar.cb(null, { ok: true, dados: { aplicacaoId: 'apl_manual', total: 8, resultados: [{ alvoId: 'npc_teste', ok: true, nome: 'Alvo', dano: 4, mult: 0.5, antes: 20, depois: 16 }] } });
+    await esperarAte(() => pedidos("master_listar_alvos").length === 1);
+    pedidos("master_listar_alvos")[0].cb(null, { ok: true, dados: { alvos: [{ alvoId: 'npc_teste', tipo: 'npc', nome: 'Alvo', hp: { atual: 16, max: 20 } }] } });
+    await esperarAte(() => pg.run("!rol.ocupada"));
+    assert.equal(botao.disabled, true);
+    assert.match(botao.textContent, /Dano aplicado/);
+    assert.match(pg.document.getElementById("atk-resultado").textContent, /4 de dano/);
+    assert.equal(pg.document.getElementById("atk-desfazer").hidden, false);
+    await pg.run("aplicarUltimoDano()");
+    assert.equal(pedidos("master_aplicar_dano").length, 1);
+    assert.equal(pedidos("master_rolar").length, 1, "aplicar não rola novamente");
+
+    // O caminho automático continua marcando a mesma proteção do botão manual.
+    pg.run("rol.atacar=true");
+    const segunda = pg.run("rolar('+6')");
+    pedidos("master_rolar")[1].cb(null, { ok: true, dados: resultado("rol_manual_2", 6) });
+    await esperarAte(() => pedidos("master_aplicar_dano").length === 2);
+    pedidos("master_aplicar_dano")[1].cb(null, { ok: true, dados: { aplicacaoId: 'apl_auto', total: 6, resultados: [{ alvoId: 'npc_teste', ok: true, nome: 'Alvo', dano: 3, mult: 0.5, antes: 16, depois: 13 }] } });
+    await esperarAte(() => pedidos("master_listar_alvos").length === 2);
+    pedidos("master_listar_alvos")[1].cb(null, { ok: true, dados: { alvos: [{ alvoId: 'npc_teste', tipo: 'npc', nome: 'Alvo', hp: { atual: 13, max: 20 } }] } });
+    await segunda;
+    assert.equal(botao.disabled, true, "ataque automático também impede reaplicar pelo botão");
+    assert.deepEqual(pg.erros, []);
+  } finally { pg.fechar(); }
+});
+
 test("expressões compostas, dados negativos e multiplicadores decimais usam a mesma regra", () => {
   assert.ok(lerExpressaoRolagem("2d20+5+3d6+1"));
   const resultado = rolar("2d20+5+3d6+1", () => 1);

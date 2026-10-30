@@ -82,20 +82,34 @@ const fundosRecuperacao = [];
 // Uma cópia por aba evita que a confirmação de uma aba apague o rascunho de outra.
 const PREFIXO_RASCUNHO = CHARACTER ? `rpg_pendente_v1:${JSON.stringify([CHARACTER.player, CHARACTER.nomePasta])}:` : null;
 let chaveRascunho = null;
+let revisaoRascunhoFicha = 0;
+let cacheRascunhoFicha = null;
+let conteudoRascunhoGravado = null;
 try {
   const aba = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   if (PREFIXO_RASCUNHO) chaveRascunho = PREFIXO_RASCUNHO + aba;
 } catch { copiaLocalDisponivel = false; }
 
-function guardarRascunhoFicha() {
+function guardarRascunhoFicha({ conferir = false } = {}) {
   if (!personagemCarregado || !chaveRascunho) return;
   const pendentes = ARQUIVOS_SALVAVEIS.filter(arquivo => arquivoProtegido(arquivo));
   try {
     if (pendentes.length) {
-      const arquivos = Object.fromEntries(pendentes.map(arquivo => [arquivo, dadosParaSalvar(arquivo)]).filter(([, dados]) => dados));
-      localStorage.setItem(chaveRascunho, JSON.stringify({ versao: 1, personagem: CHARACTER, atualizadoEm: Date.now(), arquivos }));
+      const assinatura = `${revisaoRascunhoFicha}:${pendentes.join(",")}`;
+      if (conferir || cacheRascunhoFicha?.assinatura !== assinatura) {
+        const arquivos = Object.fromEntries(pendentes.map(arquivo => [arquivo, dadosParaSalvar(arquivo)]).filter(([, dados]) => dados));
+        cacheRascunhoFicha = { assinatura, conteudo: JSON.stringify(arquivos) };
+      }
+      if (cacheRascunhoFicha.conteudo !== conteudoRascunhoGravado) {
+        // O JSON dos arquivos já foi serializado; só o pequeno cabeçalho recebe uma nova data.
+        const cabecalho = JSON.stringify({ versao: 1, personagem: CHARACTER, atualizadoEm: Date.now() });
+        localStorage.setItem(chaveRascunho, `${cabecalho.slice(0, -1)},"arquivos":${cacheRascunhoFicha.conteudo}}`);
+        conteudoRascunhoGravado = cacheRascunhoFicha.conteudo;
+      }
     } else if (!rascunhoRecuperavel) {
-      localStorage.removeItem(chaveRascunho);
+      if (conteudoRascunhoGravado !== null) localStorage.removeItem(chaveRascunho);
+      conteudoRascunhoGravado = null;
+      cacheRascunhoFicha = null;
       if (chaveRecuperada) localStorage.removeItem(chaveRecuperada);
       chaveRecuperada = null;
     }
@@ -172,7 +186,7 @@ function tentarSalvarNovamente() {
 }
 
 window.addEventListener("beforeunload", evento => {
-  guardarRascunhoFicha();
+  guardarRascunhoFicha({ conferir: true });
   if (!arquivosSujos.size && !totalEmVoo() && !rascunhoRecuperavel && !(typeof temRascunhoPoder === "function" && temRascunhoPoder())) return;
   evento.preventDefault();
   evento.returnValue = "";
@@ -235,8 +249,8 @@ function marcarAlterado(arquivo, { imediato = false } = {}) {
   // Antes de o servidor entregar a ficha, o STATE só tem valores provisórios: marcar um arquivo
   // como "sujo" agora faria esses valores sobrescreverem os dados salvos (ver arquivoProtegido).
   if (!personagemCarregado) return;
+  revisaoRascunhoFicha++;
   arquivosSujos.add(arquivo);
-  guardarRascunhoFicha();
   clearTimeout(timersSalvamento[arquivo]);
   if (imediato) {
     enviarSalvamento(arquivo);
@@ -261,7 +275,7 @@ function enviarSalvamento(arquivo) {
   }
 
   const dados = dadosParaSalvar(arquivo);
-  if (!dados) return;
+  if (!dados) { atualizarIndicadorSalvamento(); return; }
   arquivosSujos.delete(arquivo);
   salvarArquivoPersonagem(arquivo, dados);
   if (arquivo === "perfil") syncPlayerToServer();

@@ -42,6 +42,7 @@ async function iniciarServidor(dir = copiarProjeto(), extraEnv = {}) {
   const logs = [];
 
   async function ligar() {
+    let erroDeInicializacao = null;
     processo = spawn(process.execPath, ["server.js"], {
       cwd: dir,
       env: {
@@ -57,9 +58,14 @@ async function iniciarServidor(dir = copiarProjeto(), extraEnv = {}) {
     });
     processo.stdout.on("data", (d) => logs.push(String(d)));
     processo.stderr.on("data", (d) => logs.push(String(d)));
+    processo.once("error", erro => { erroDeInicializacao = erro; });
     await esperarAte(
       async () => {
-        try { return (await fetch(`${url}/api/catalogo/magias`)).status === 401; } catch { return false; }
+        if (erroDeInicializacao) throw erroDeInicializacao;
+        if (processo.exitCode !== null || processo.signalCode !== null) {
+          throw new Error(`O servidor de teste terminou antes de responder (código ${processo.exitCode}, sinal ${processo.signalCode || "nenhum"}).`);
+        }
+        try { return (await fetch(`${url}/api/catalogo/magias`, { signal: AbortSignal.timeout(1000) })).status === 401; } catch { return false; }
       },
       { ms: 8000, rotulo: "servidor responder" },
     );
@@ -69,6 +75,7 @@ async function iniciarServidor(dir = copiarProjeto(), extraEnv = {}) {
     if (!processo) return;
     const p = processo;
     processo = null;
+    if (!p.pid || p.exitCode !== null || p.signalCode !== null) return;
     await new Promise((r) => { p.once("exit", r); p.kill(); });
   }
 
@@ -117,6 +124,9 @@ async function abrirFicha(servidor, { player, nomePasta, token, esperarCarga = t
   virtual.on("jsdomError", (e) => erros.push(e.message));
   const dom = new JSDOM(html, { url: `${servidor.url}/`, pretendToBeVisual: true, runScripts: "outside-only", virtualConsole: virtual });
   const w = dom.window;
+  // O fetch do Node exige seu próprio AbortSignal, inclusive nas chamadas feitas pela página.
+  w.AbortController = globalThis.AbortController;
+  w.AbortSignal = globalThis.AbortSignal;
   if (atrasarInicio > 0) {
     const original = w.addEventListener.bind(w);
     w.addEventListener = (tipo, fn, opcoes) => {
@@ -172,8 +182,7 @@ async function abrirFicha(servidor, { player, nomePasta, token, esperarCarga = t
 // Abre uma página do painel do mestre (mestre/<pagina>.html), rodando os scripts locais que ELA declara.
 // Por padrão usa um `io` FALSO (sem rede): guarda os eventos registrados em `eventos` e o que a página
 // envia em `emitidos`; `disparar(evento, dado)` simula o servidor. Com { real: true } conecta ao servidor.
-// `tokenInicial` simula um token já digitado numa página anterior (sessionStorage da aba).
-async function abrirPaginaMestre(servidor, pagina = "index", { real = false, tokenInicial = "" } = {}) {
+async function abrirPaginaMestre(servidor, pagina = "index", { real = false } = {}) {
   const htmlOriginal = fs.readFileSync(path.join(servidor.dir, "mestre", `${pagina}.html`), "utf8");
   const html = htmlOriginal.replace(/<script[\s\S]*?<\/script>/g, "");
   const erros = [];
@@ -181,7 +190,8 @@ async function abrirPaginaMestre(servidor, pagina = "index", { real = false, tok
   virtual.on("jsdomError", (e) => erros.push(e.message));
   const dom = new JSDOM(html, { url: `${servidor.url}/mestre`, pretendToBeVisual: true, runScripts: "outside-only", virtualConsole: virtual });
   const w = dom.window;
-  if (tokenInicial) w.sessionStorage.setItem("rpg_mestre_token", tokenInicial);
+  w.AbortController = globalThis.AbortController;
+  w.AbortSignal = globalThis.AbortSignal;
   w.confirm = () => true;
   // jsdom não implementa innerText (a Mesa usa); espelha em textContent para ler a tela.
   Object.defineProperty(w.HTMLElement.prototype, "innerText", {
@@ -215,7 +225,7 @@ async function abrirPaginaMestre(servidor, pagina = "index", { real = false, tok
     fechar() { try { rodar("socket.close()"); } catch { /* a página já foi fechada */ } w.close(); },
   };
   // O cabeçalho é montado no DOMContentLoaded (o jsdom o dispara sozinho, logo depois dos scripts).
-  await esperarAte(() => w.document.getElementById("master-token-input"), { rotulo: "cabeçalho do mestre montar" });
+  await esperarAte(() => w.document.querySelector("#mestre-cabecalho .master-nav"), { rotulo: "cabeçalho do mestre montar" });
   return pg;
 }
 

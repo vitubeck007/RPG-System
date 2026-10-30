@@ -11,7 +11,10 @@
    - toda alteração passa pelo salvamento central (salvarHabilidades / salvarMagias).
    ========================================================================= */
 const CODICE_MAX = 500; // mesmo limite do servidor (MAX_LISTA)
-const CODICE_DADO = /^\d{0,3}d\d{1,4}\s*([+-]\s*\d{1,4})?$/i; // igual ao servidor
+const CODICE_POR_PAGINA = 40;
+const indicesBuscaCatalogo = new WeakMap(); // cada lista recebida representa uma versão do catálogo
+let paginaCatalogoCodice = { tipo: null, catalogo: null, busca: "", numero: 0 };
+const CODICE_DADO = { test: dadoDePoderValido }; // igual ao servidor
 const COR_VITAL = {
   hp: "text-crimson-400",
   vigor: "text-vigor-400",
@@ -338,7 +341,7 @@ function adicionarEntradaCodice(tipo, entrada, mensagem = null) {
   });
   renderizarCodice();
   renderizarResultadosCatalogo();
-  toast(mensagem ?? `${cfg.rotulo} adicionada: ${nomeDaEntradaCodice(entrada, cfg.rotulo)}`, "info");
+  toast(mensagem ?? `${cfg.rotulo} adicionada: ${nomeDaEntradaCodice(entrada, cfg.rotulo)}`, mensagem?.startsWith('Você recebeu:') ? 'evento' : 'info');
 }
 
 function removerEntradaCodice(tipo, entrada) {
@@ -385,7 +388,7 @@ function criarEntradaCodice() {
   if (!nome) return mostrarErro("Informe um nome.");
   const dados = valor("codice-f-dados");
   if (dados && !CODICE_DADO.test(dados)) {
-    return mostrarErro("Dados inválidos. Use o formato 2d6 ou 2d6+1.");
+    return mostrarErro("Dados inválidos. Use 2d6+1 ou 1d6+1d4+2 (até 30 caracteres).");
   }
   const edicao = CODICE_UI.editando;
   if (!edicao && codiceCheio(tipo)) return;
@@ -559,6 +562,7 @@ async function carregarCatalogoCodice(tipo) {
     CODICE_UI.catalogo[tipo] = dados.items.filter(
       (e) => ehEntradaCodice(e) && typeof e.id === "string",
     );
+    indexarBuscaCatalogo(CODICE_UI.catalogo[tipo]);
   } catch (erro) {
     console.warn("[RPG] Falha ao carregar o catálogo:", erro);
     CODICE_UI.erroCatalogo = `Não foi possível carregar o catálogo (${erro.message}).`;
@@ -588,6 +592,15 @@ function textoDeBuscaCodice(entrada) {
       entrada.alcance,
     ].join(" "),
   );
+}
+
+function indexarBuscaCatalogo(catalogo) {
+  let indice = indicesBuscaCatalogo.get(catalogo);
+  if (!indice || indice.length !== catalogo.length) {
+    indice = catalogo.map(entrada => ({ entrada, texto: textoDeBuscaCodice(entrada) }));
+    indicesBuscaCatalogo.set(catalogo, indice);
+  }
+  return indice;
 }
 
 function renderizarResultadosCatalogo() {
@@ -621,23 +634,54 @@ function renderizarResultadosCatalogo() {
     return;
   }
 
-  const termos = normalizarBusca(document.getElementById("codice-busca")?.value)
-    .split(/\s+/)
-    .filter(Boolean);
-  const achados = catalogo.filter((entrada) => {
-    const alvo = textoDeBuscaCodice(entrada);
-    return termos.every((termo) => alvo.includes(termo));
-  });
+  const busca = normalizarBusca(document.getElementById("codice-busca")?.value);
+  if (paginaCatalogoCodice.tipo !== tipo || paginaCatalogoCodice.catalogo !== catalogo || paginaCatalogoCodice.busca !== busca) {
+    paginaCatalogoCodice = { tipo, catalogo, busca, numero: 0 };
+    lista.scrollTop = 0;
+  }
+  const termos = busca.split(/\s+/).filter(Boolean);
+  const achados = indexarBuscaCatalogo(catalogo)
+    .filter(({ texto }) => termos.every(termo => texto.includes(termo)));
   if (achados.length === 0) {
     lista.appendChild(aviso("Nada encontrado para essa busca."));
     return;
   }
-  achados.forEach((entrada) => lista.appendChild(criarLinhaCatalogo(tipo, entrada)));
+  const paginas = Math.ceil(achados.length / CODICE_POR_PAGINA);
+  paginaCatalogoCodice.numero = Math.min(paginaCatalogoCodice.numero, paginas - 1);
+  const inicio = paginaCatalogoCodice.numero * CODICE_POR_PAGINA;
+  const status = elTexto("p", "rpg-hint", `Mostrando ${inicio + 1}–${Math.min(inicio + CODICE_POR_PAGINA, achados.length)} de ${achados.length} resultado(s).`);
+  status.setAttribute("role", "status");
+  lista.append(status);
+  if (paginas > 1) {
+    const navegacao = elTexto("div", "flex flex-wrap items-center gap-2");
+    navegacao.setAttribute("role", "navigation");
+    navegacao.setAttribute("aria-label", "Páginas do catálogo");
+    for (const [direcao, rotulo] of [[-1, "Anterior"], [1, "Próxima"]]) {
+      const botao = elTexto("button", "rpg-btn", rotulo);
+      botao.type = "button";
+      botao.dataset.paginaCatalogo = String(direcao);
+      botao.disabled = direcao < 0 ? inicio === 0 : paginaCatalogoCodice.numero === paginas - 1;
+      botao.addEventListener("click", () => {
+        paginaCatalogoCodice.numero += direcao;
+        renderizarResultadosCatalogo();
+        lista.scrollTop = 0;
+        const foco = lista.querySelector(`[data-pagina-catalogo="${direcao}"]:not(:disabled)`)
+          || lista.querySelector("[data-pagina-catalogo]:not(:disabled)");
+        foco?.focus({ preventScroll: true });
+      });
+      navegacao.append(botao);
+      if (direcao < 0) navegacao.append(elTexto("span", "rpg-hint", `Página ${paginaCatalogoCodice.numero + 1} de ${paginas}`));
+    }
+    lista.append(navegacao);
+  }
+  const possuidos = new Set(listaCodice(tipo).map(item => item?.catalogId));
+  achados.slice(inicio, inicio + CODICE_POR_PAGINA)
+    .forEach(({ entrada }) => lista.appendChild(criarLinhaCatalogo(tipo, entrada, possuidos)));
 }
 
-function criarLinhaCatalogo(tipo, entrada) {
+function criarLinhaCatalogo(tipo, entrada, possuidos = new Set(listaCodice(tipo).map(item => item?.catalogId))) {
   const cfg = CODICE_TIPOS[tipo];
-  const jaTem = listaCodice(tipo).some((item) => item?.catalogId === entrada.id);
+  const jaTem = possuidos.has(entrada.id);
 
   const linha = elTexto(
     "div",
@@ -711,14 +755,16 @@ function aplicarEntrega(entrega) {
   const { entregaId, tipo, entrada } = entrega;
   const cfg = CODICE_TIPOS[tipo];
   if (listaCodice(tipo).some((item) => item?.catalogId === entrada.catalogId)) {
-    socket.emit("entrega_aplicada", { entregaId }); // já tem: só confirma, não duplica
+    // Já pode estar na tela, mas ainda aguardando uma gravação anterior.
+    if (arquivoProtegido(tipo)) entregasAguardandoSalvar.set(entregaId, tipo);
+    else socket.emit("entrega_aplicada", { entregaId });
     return true;
   }
   if (codiceCheio(tipo)) return false; // fica pendente no servidor
   const copia = JSON.parse(JSON.stringify(entrada));
   delete copia.id;
   entregasAguardandoSalvar.set(entregaId, tipo);
-  adicionarEntradaCodice(tipo, { ...copia, uid: novoUidCodice() }, `Você recebeu: ${nomeDaEntradaCodice(copia, cfg.rotulo)}`);
+  adicionarEntradaCodice(tipo, { ...copia, uid: novoUidCodice() }, `Você recebeu: ${cfg.rotulo} ${nomeDaEntradaCodice(copia, cfg.rotulo)}`);
   return true;
 }
 
@@ -727,7 +773,8 @@ function aplicarEntrega(entrega) {
 function aplicarEntregaDeItem({ entregaId, entrada }) {
   if (!personagemCarregado || entregasAguardandoSalvar.has(entregaId)) return false;
   if (STATE.entregasRecebidas.includes(entregaId)) {
-    socket.emit("entrega_aplicada", { entregaId }); // já aplicada antes: só confirma
+    if (arquivoProtegido("inventario")) entregasAguardandoSalvar.set(entregaId, "inventario");
+    else socket.emit("entrega_aplicada", { entregaId });
     return true;
   }
   const quantidade = Number(entrada.quantity);
@@ -756,6 +803,9 @@ socket.on("entrega", aplicarEntrega);
 
 // Salvamento confirmado pelo servidor: agora sim a entrega está no arquivo da ficha.
 socket.on("personagem_salvo", ({ arquivo } = {}) => {
+  // O salvamento central já descontou este ACK. O primeiro de vários envios não
+  // confirma as entregas das versões seguintes, nem alterações ainda não enviadas.
+  if (arquivoProtegido(arquivo)) return;
   for (const [entregaId, tipo] of [...entregasAguardandoSalvar]) {
     if (tipo !== arquivo) continue;
     entregasAguardandoSalvar.delete(entregaId);

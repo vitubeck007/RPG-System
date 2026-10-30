@@ -105,6 +105,7 @@ function renderizarSlotsEquipados() {
 function desequiparSlot(slotKey) {
   const item = STATE.equipped[slotKey];
   if (!item) return;
+  if (item.impossivelArmazenar === true) return toast(`${item.name} é grande demais para guardar na mochila.`, 'error');
 
   // Tirar a mochila troca a grade para "Bolsos Básicos": todos os itens precisam caber lá.
   const config =
@@ -213,12 +214,8 @@ const larguraDoItem = (item) => Math.max(1, Math.floor(Number(item?.w)) || 1);
 const alturaDoItem = (item) => Math.max(1, Math.floor(Number(item?.h)) || 1);
 
 function retangulosSeSobrepoem(a, b) {
-  return (
-    a.col < b.col + b.w &&
-    b.col < a.col + a.w &&
-    a.row < b.row + b.h &&
-    b.row < a.row + a.h
-  );
+  const ocupados = new Set(quadrantesItem(a).map(([x,y])=>`${a.col+x},${a.row+y}`));
+  return quadrantesItem(b).some(([x,y])=>ocupados.has(`${b.col+x},${b.row+y}`));
 }
 
 function retanguloCabeNaGrade(r, config) {
@@ -231,10 +228,10 @@ function retanguloCabeNaGrade(r, config) {
 }
 
 // Primeira posição livre (linha a linha) para um bloco w x h.
-function acharPosicaoLivre(w, h, ocupados, config) {
+function acharPosicaoLivre(w, h, ocupados, config, formato) {
   for (let row = 1; row + h - 1 <= config.rows; row++) {
     for (let col = 1; col + w - 1 <= config.cols; col++) {
-      const candidato = { col, row, w, h };
+      const candidato = { col, row, w, h, formato };
       if (!ocupados.some((o) => retangulosSeSobrepoem(candidato, o))) {
         return { col, row };
       }
@@ -259,6 +256,7 @@ function calcularLayout(itens, config) {
       row: item.row,
       w: larguraDoItem(item),
       h: alturaDoItem(item),
+      formato: item.formato,
     };
     const valido =
       Number.isInteger(r.col) &&
@@ -276,17 +274,17 @@ function calcularLayout(itens, config) {
   const semEspaco = [];
   pendentes.sort(
     (a, b) =>
-      larguraDoItem(b) * alturaDoItem(b) - larguraDoItem(a) * alturaDoItem(a),
+      quadrantesItem(b).length - quadrantesItem(a).length,
   );
   for (const item of pendentes) {
     const w = larguraDoItem(item);
     const h = alturaDoItem(item);
-    const pos = acharPosicaoLivre(w, h, aceitos, config);
+    const pos = acharPosicaoLivre(w, h, aceitos, config, item.formato);
     if (!pos) {
       semEspaco.push(item);
       continue;
     }
-    aceitos.push({ ...pos, w, h });
+    aceitos.push({ ...pos, w, h, formato: item.formato });
     colocados.push({ item, ...pos });
   }
   return { colocados, semEspaco };
@@ -338,6 +336,11 @@ function repararInventarioAoCarregar() {
  * (É a porta de entrada para loot, itens dados pelo mestre e futura loja/catálogo.)
  */
 function adicionarItemAoInventario(modelo, quantidade = 1, { tudoOuNada = false, silencioso = false } = {}) {
+  if (modelo.impossivelArmazenar === true) {
+    const total = Math.max(1, Math.floor(Number(quantidade)) || 1);
+    if (!silencioso) toast(`${modelo.name} é grande demais para guardar na mochila.`, 'error');
+    return { adicionado: 0, sobrou: total };
+  }
   // tudoOuNada: se não couber a quantidade INTEIRA, nada muda (usado pelo loot). silencioso: sem aviso de falta de espaço.
   const antes = tudoOuNada ? JSON.parse(JSON.stringify(STATE.backpackItems)) : null;
   let restante = Math.max(1, Math.floor(Number(quantidade)) || 1);
@@ -429,8 +432,33 @@ function ajustarQuantidadeItemAtual(delta) {
     atual: nova,
   });
   atualizarPopoverQuantidade(item);
-  renderizarMochilaGrid();
+  atualizarQuantidadeItemNaTela(item);
   salvarInventario();
+}
+
+function atualizarQuantidadeItemNaTela(item) {
+  const quantidade = quantidadeDoItem(item);
+  const elemento = document.getElementById(`item-node-${item.uid || item.id}`);
+  if (elemento) {
+    const contador = elemento.querySelector("[data-item-quantidade]");
+    if (contador) contador.textContent = quantidade > 1 ? `×${quantidade}` : "";
+    const peso = elemento.querySelector("[data-item-peso]");
+    if (peso) peso.textContent = `${Number(pesoDoItem(item).toFixed(2))}kg`;
+    elemento.setAttribute("aria-label", rotuloDetalhesItem(item));
+  }
+  const linha = document.getElementById(`item-details-${chaveItemMochila(item)}`)?.closest("[data-item-mochila]");
+  const resumo = linha?.querySelector("[data-item-quantidade]");
+  if (resumo) resumo.textContent = resumoPilhaMochila(item);
+  linha?.querySelector("[data-item-detalhes]")?.setAttribute("aria-label", `Ver detalhes de ${item.name}, ${quantidade} unidade(s)`);
+  atualizarRotuloCarga();
+}
+
+function rotuloDetalhesItem(item) {
+  return `Ver detalhes de ${item.name}, ${quantidadeDoItem(item)} unidade(s)${itensSemEspaco.has(item.uid) ? "; sem espaço na mochila" : ""}`;
+}
+
+function resumoPilhaMochila(item) {
+  return `${quantidadeDoItem(item)} un. · ${item.type || "Item"}${itensSemEspaco.has(item.uid) ? " · Sem espaço na grade" : ""}`;
 }
 
 function atualizarPopoverQuantidade(item) {
@@ -446,6 +474,8 @@ function atualizarPopoverQuantidade(item) {
     descarte.max = String(quantidadeDoItem(item));
     descarte.value = String(Math.min(quantidadeDoItem(item), Math.max(1, Number(descarte.value) || 1)));
   }
+  const peso = document.querySelector("#popover-tags [data-item-peso]");
+  if (peso) peso.textContent = `${Number(pesoDoItem(item).toFixed(2))} kg`;
   atualizarBotaoDescarte();
 }
 
@@ -509,7 +539,7 @@ function renderizarMochilaGrid() {
     const semEspaco = itensSemEspaco.has(item.uid);
     const w = larguraDoItem(item);
     const h = alturaDoItem(item);
-    if (!semEspaco) celulasUsadas += w * h;
+    if (!semEspaco) celulasUsadas += quadrantesItem(item).length;
 
     // Item que não coube é desenhado dentro da grade só para poder ser visto/descartado.
     const col = Math.max(
@@ -528,7 +558,7 @@ function renderizarMochilaGrid() {
     itemEl.classList.add("inventory-item");
     itemEl.tabIndex = 0;
     itemEl.setAttribute("role", "button");
-    itemEl.setAttribute("aria-label", `Ver detalhes de ${item.name}${semEspaco ? "; sem espaço na mochila" : ""}`);
+    itemEl.setAttribute("aria-label", rotuloDetalhesItem(item));
     itemEl.addEventListener("keydown", (evento) => {
       if (evento.key !== "Enter" && evento.key !== " ") return;
       evento.preventDefault();
@@ -540,16 +570,25 @@ function renderizarMochilaGrid() {
     itemEl.style.top = `${(row - 1) * (cellSize + gap)}px`;
     itemEl.style.width = `${w * cellSize + (w - 1) * gap}px`;
     itemEl.style.height = `${h * cellSize + (h - 1) * gap}px`;
+    if (normalizarFormatoItem(item.formato)) {
+      const caminho = quadrantesItem(item).map(([x,y]) => {
+        const esquerda=x*(cellSize+gap), topo=y*(cellSize+gap);
+        return `M${esquerda} ${topo}h${cellSize}v${cellSize}h-${cellSize}Z`;
+      }).join(' ');
+      itemEl.style.clipPath = `path('${caminho}')`;
+      itemEl.style.transform = 'none';
+      itemEl.title = item.name;
+    }
     if (semEspaco) itemEl.title = "Não cabe na mochila atual";
 
     itemEl.innerHTML = `
           <div class="flex justify-between items-start leading-none pointer-events-none">
-            <span class="text-[11px] font-cinzel font-bold text-amber-200 truncate pr-1">${escaparHtml(item.name)}${quantidade > 1 ? ` <span class="text-amberGold-400">×${quantidade}</span>` : ""}</span>
+            <span class="text-[11px] font-cinzel font-bold text-amber-200 truncate pr-1">${escaparHtml(item.name)} <span data-item-quantidade class="text-amberGold-400">${quantidade > 1 ? `×${quantidade}` : ""}</span></span>
             <i class="fa-solid ${escaparHtml(item.icon)} text-xs text-amber-400"></i>
           </div>
           <div class="text-[10px] font-mono text-slate-300 flex justify-between items-end pointer-events-none">
             <span class="text-amberGold-400 font-bold">${escaparHtml(item.dice || (item.isBackpackItem ? "Mochila" : ""))}</span>
-            <span class="text-slate-400">${escaparHtml(Number(pesoDoItem(item).toFixed(2)))}kg</span>
+            <span data-item-peso class="text-slate-400">${escaparHtml(Number(pesoDoItem(item).toFixed(2)))}kg</span>
           </div>
         `;
 
@@ -581,8 +620,9 @@ function renderizarListaMochila() {
     const linha = elTexto('li', 'sheet-backpack-row');
     linha.dataset.itemMochila = chaveItemMochila(item);
     const info = elTexto('div', 'sheet-backpack-copy');
-    info.append(elTexto('strong', '', item.name), elTexto('span', 'rpg-hint',
-      `${quantidadeDoItem(item)} un. · ${item.type || 'Item'}${itensSemEspaco.has(item.uid) ? ' · Sem espaço na grade' : ''}`));
+    const resumo = elTexto('span', 'rpg-hint', resumoPilhaMochila(item));
+    resumo.dataset.itemQuantidade = '';
+    info.append(elTexto('strong', '', item.name), resumo);
     const detalhes = elTexto('button', 'rpg-btn', 'Detalhes');
     detalhes.id = `item-details-${chaveItemMochila(item)}`;
     detalhes.type = 'button'; detalhes.dataset.itemDetalhes = chaveItemMochila(item);
@@ -643,7 +683,7 @@ function abrirItemPopover(item, el) {
         <span class="px-1.5 py-0.5 bg-dungeon-800 border border-slate-700 text-slate-300 rounded">${escaparHtml(item.type)}</span>
         ${item.twoHanded ? '<span class="px-1.5 py-0.5 bg-rose-950 border border-rose-700 text-rose-300 rounded font-bold">Duas Mãos</span>' : ""}
         ${item.dice ? `<span class="px-1.5 py-0.5 bg-crimson-900/60 border border-crimson-600/50 text-crimson-300 rounded">${escaparHtml(item.dice)}</span>` : ""}
-        <span class="px-1.5 py-0.5 bg-dungeon-800 border border-slate-700 text-slate-400 rounded">${escaparHtml(Number(pesoDoItem(item).toFixed(2)))} kg</span>
+        <span data-item-peso class="px-1.5 py-0.5 bg-dungeon-800 border border-slate-700 text-slate-400 rounded">${escaparHtml(Number(pesoDoItem(item).toFixed(2)))} kg</span>
       `;
   atualizarPopoverQuantidade(item);
 
@@ -801,8 +841,11 @@ function descartarItemAtual() {
     quantidade,
   });
   fecharItemPopover();
-  renderizarSlotsEquipados();
-  renderizarMochilaGrid();
+  if (restante > 0) atualizarQuantidadeItemNaTela(item);
+  else {
+    renderizarSlotsEquipados();
+    renderizarMochilaGrid();
+  }
   salvarInventario();
   toast(`${quantidade} × ${item.name} descartado(s).`, "info");
 }

@@ -21,36 +21,42 @@
   <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
   <header id="mestre-cabecalho" data-pagina="figurantes"></header>
   <main id="mestre-conteudo" tabindex="-1" class="fig-pagina master-main">
-    <div class="fig-topo fig-cabecalho">
-      <div>
-        <p class="fig-eyebrow">PERSONAGENS DA CAMPANHA</p>
-        <h2 id="fig-titulo">Inimigos</h2>
-      </div>
+    <div class="fig-toolbar">
       <div id="fig-tipos" class="fig-tipos" role="group" aria-label="Tipo de figurante">
         <button id="fig-tipo-npcs" type="button" data-fig-tipo="npcs" aria-pressed="false">NPCs</button>
         <button id="fig-tipo-inimigos" type="button" data-fig-tipo="inimigos" aria-pressed="true">Inimigos</button>
       </div>
-    </div>
-    <div class="fig-toolbar">
       <div class="fig-abas" role="tablist" aria-label="Seção"><button id="fig-aba-biblioteca" role="tab"
           aria-selected="true">Biblioteca</button><button id="fig-aba-batalha" role="tab"
           aria-selected="false">Batalha</button></div>
       <button id="fig-novo" class="fig-primario">+ Novo inimigo</button>
       <label class="fig-busca"><span class="sr-only">Buscar figurantes</span><input id="fig-busca" maxlength="100"
           placeholder="Buscar por nome, descrição ou história…"></label>
-      <button id="fig-limpar" class="fig-perigo">Limpar batalha inteira</button>
+    </div>
+    <div class="fig-batalha-ferramentas">
+      <div id="master-resumo-jogadores"></div>
+      <details id="fig-menu-batalha" class="fig-tatica-menu" hidden>
+        <summary>Opções da batalha</summary>
+        <div class="fig-tatica-menu-opcoes">
+          <button id="fig-limpar" type="button" class="fig-perigo">Limpar batalha inteira</button>
+        </div>
+      </details>
     </div>
     <section id="fig-biblioteca" aria-label="Biblioteca de figurantes">
       <p id="fig-contagem" class="fig-discreto"></p>
       <div id="fig-cartoes" class="fig-grade"></div>
+      <div id="fig-biblioteca-rodape" class="fig-biblioteca-rodape" tabindex="-1">
+        <p id="fig-contagem-rodape" class="fig-discreto"></p>
+        <button id="fig-carregar-mais" type="button" hidden>Carregar mais 100</button>
+      </div>
     </section>
     <section id="fig-batalha" class="hidden" aria-label="Batalha em andamento">
-      </div>
       <div class="fig-mesa-combate">
         <aside class="fig-resumos-painel" aria-label="Resumos dos combatentes">
           <ul id="fig-combatentes" class="fig-resumos" aria-label="Combatentes em batalha"></ul>
         </aside>
         <section id="fig-ficha-regiao" class="fig-ficha-selecionada" aria-labelledby="fig-selecionado-titulo">
+          <div id="fig-selecao-aviso" class="rpg-message" role="status" hidden><span id="fig-selecao-aviso-texto"></span> <button id="fig-limpar-filtro" type="button">Limpar filtro</button></div>
           <h3 id="fig-selecionado-titulo" class="sr-only">Ficha do selecionado</h3>
           <div id="fig-selecionado"></div>
         </section>
@@ -59,7 +65,7 @@
   </main>
 
   <div id="fig-editor" class="fig-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fig-editor-titulo">
-    <form id="fig-form" class="fig-janela fig-ficha">
+    <form novalidate id="fig-form" class="fig-janela fig-ficha">
       <header class="fig-janela-topo">
         <div>
           <p class="fig-eyebrow" id="fig-editor-tipo">INIMIGO</p>
@@ -87,6 +93,11 @@
                   required></label><label>Máxima<input id="fig-energia-max" type="number" min="0" max="99999" value="10"
                   required></label></div><small>Reserva usada para habilidades e magias.</small>
           </fieldset>
+          <fieldset class="fig-defesa">
+            <legend>Defesa</legend>
+            <label>Dificuldade para acertar<input id="fig-defesa" type="number" min="0" max="999" step="1" value="10" required aria-describedby="fig-defesa-ajuda"></label>
+            <small id="fig-defesa-ajuda">Valor necessário para acertar este alvo.</small>
+          </fieldset>
         </div>
         <section class="fig-editor-arma" aria-labelledby="fig-arma-titulo">
           <div class="fig-topo">
@@ -106,7 +117,7 @@
                   <option value="dagger">Adaga</option>
                 </select></label></div>
             <div class="fig-tres"><label>Alcance<input id="fig-arma-alcance" maxlength="60"
-                  placeholder="Ex.: 1,5 m ou 12 m"></label><label>Dano<input id="fig-arma-dano" maxlength="30"
+                  placeholder="Ex.: 1,5 m ou 12 m"></label><label>Dano<input id="fig-arma-dano" data-validar-dados="arma" maxlength="30"
                   placeholder="Ex.: 1d8+3 ou 5"></label><label>Categoria<select id="fig-arma-categoria">
                   <option value="leve">Leve</option>
                   <option value="media" selected>Média</option>
@@ -172,7 +183,7 @@
 
   <div id="fig-poder-editor" class="fig-overlay fig-sobreposta hidden" role="dialog" aria-modal="true"
     aria-labelledby="fig-poder-titulo">
-    <form id="fig-poder-form" class="fig-janela">
+    <form novalidate id="fig-poder-form" class="fig-janela">
       <header class="fig-janela-topo">
         <div>
           <p class="fig-eyebrow">HABILIDADE / MAGIA</p>
@@ -189,8 +200,8 @@
         <label>Efeito<textarea id="fig-poder-efeito" rows="3" maxlength="4000"
             placeholder="O que faz nas regras? Condições, bônus e consequências."></textarea></label>
         <div class="fig-dois"><label>Custo em energia<input id="fig-poder-custo" type="number" min="0" max="99999"
-              value="0" required></label><label>Dano principal<input id="fig-poder-dano" maxlength="30"
-              placeholder="1d20+5 (opcional)"></label></div>
+              value="0" required></label><label>Dano principal<input id="fig-poder-dano" data-validar-dados="poder" maxlength="30"
+              placeholder="1d6+1d4+2 (opcional)"></label></div>
         <section>
           <div class="fig-topo">
             <h3>Danos extras</h3><button id="fig-extra-adicionar" type="button">+ Dano extra</button>

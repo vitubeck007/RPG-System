@@ -7,7 +7,8 @@
    ========================================================================= */
 
 let bausLiberados = [];
-let bauJanelaRecolhida = false;
+let bauJanelaRecolhida = true;
+let bausSincronizados = false;
 
 function novoPedidoId() {
   return `p_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
@@ -41,20 +42,33 @@ function renderizarJanelaDoBau() {
   if (!janela) return;
   janela.replaceChildren();
   janela.classList.toggle("hidden", bausLiberados.length === 0);
+  janela.classList.toggle("bau-recolhido", bauJanelaRecolhida);
   if (!bausLiberados.length) return;
 
-  const topo = elementoBau("div", "flex justify-between items-center");
-  topo.append(elementoBau("span", "font-cinzel font-bold text-amber-200 text-sm", "Baú"));
-  const alternar = elementoBau("button", "px-2 py-0.5 border border-dungeon-700 rounded text-[11px]", bauJanelaRecolhida ? "Abrir" : "Minimizar");
+  const alternar = elementoBau("button", "px-2 py-0.5 border border-dungeon-700 rounded text-[11px]", bauJanelaRecolhida ? "" : "Minimizar");
   alternar.type = "button";
   alternar.id = "bau-alternar";
+  alternar.setAttribute("aria-label", bauJanelaRecolhida ? "Abrir baú" : "Minimizar baú");
+  alternar.setAttribute("aria-expanded", String(!bauJanelaRecolhida));
+  alternar.setAttribute("aria-controls", "bau-janela");
+  alternar.title = bauJanelaRecolhida ? "Abrir baú" : "Minimizar baú";
   alternar.addEventListener("click", () => {
     bauJanelaRecolhida = !bauJanelaRecolhida;
     renderizarJanelaDoBau();
+    document.getElementById("bau-alternar")?.focus({ preventScroll: true });
   });
+  if (bauJanelaRecolhida) {
+    const icone = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icone.setAttribute("class", "rpg-icon"); icone.setAttribute("viewBox", "0 0 24 24");
+    icone.setAttribute("aria-hidden", "true"); icone.setAttribute("focusable", "false");
+    const simbolo = document.createElementNS(icone.namespaceURI, "use");
+    simbolo.setAttribute("href", "/CSS/icones.svg#chest"); icone.append(simbolo);
+    alternar.append(icone); janela.append(alternar); return;
+  }
+  const topo = elementoBau("div", "flex justify-between items-center");
+  topo.append(elementoBau("span", "font-cinzel font-bold text-amber-200 text-sm", "Baú"));
   topo.append(alternar);
   janela.append(topo);
-  if (bauJanelaRecolhida) return;
 
   for (const bau of bausLiberados) {
     const bloco = elementoBau("section", "space-y-1.5");
@@ -101,6 +115,15 @@ const ehObjetoSimples = (v) => v !== null && typeof v === "object" && !Array.isA
 
 socket.on("baus_estado", ({ baus } = {}) => {
   if (!dadosDeBausValidos(baus)) return;
+  if (bausSincronizados) {
+    const anteriores = new Set(bausLiberados.map(bau => bau.id));
+    for (const bau of baus) if (!anteriores.has(bau.id)) toast(`Novo baú: ${bau.nome}!`, 'evento');
+  }
+  bausSincronizados = true;
+  if (!bausLiberados.length && baus.length) bauJanelaRecolhida = true;
   bausLiberados = baus;
   renderizarJanelaDoBau();
+});
+socket.on('bau_item_retirado', ({ jogador, item, quantidade } = {}) => {
+  if (jogador && item && quantidade) toast(`${jogador} pegou ${quantidade} × ${item}.`, 'evento');
 });

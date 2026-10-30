@@ -247,7 +247,13 @@ function rolarCombo() {
 
   // Valida tudo antes de rolar: uma fórmula inválida cancela a rolagem inteira
   // (nada de total parcial no histórico nem no painel do mestre).
-  const componentes = STATE.combo.map((item) => ({ item, leitura: lerFormulaCombo(item.formula) }));
+  const componentes = STATE.combo.flatMap((item) => {
+    const simples = lerFormulaCombo(item.formula);
+    if (simples) return [{ item, leitura: simples }];
+    const termos = dadoDePoderValido(item.formula) && lerExpressaoRolagem(item.formula);
+    return termos ? termos.map(termo => ({ item, leitura: lerFormulaCombo(termo.formula), sinal: termo.sinal }))
+      : [{ item, leitura: null }];
+  });
   const invalido = componentes.find((c) => !c.leitura);
   if (invalido) {
     toast(`Fórmula inválida em "${invalido.item.nome}": ${invalido.item.formula}`, "error");
@@ -263,7 +269,7 @@ function rolarCombo() {
   let totalFinal = 0;
   const breakdownList = [];
 
-  componentes.forEach(({ item, leitura }) => {
+  componentes.forEach(({ item, leitura, sinal = 1 }) => {
     if (leitura.tipo === "bonus") {
       totalFinal += leitura.bonus;
       breakdownList.push({ nome: item.nome, detalhe: leitura.formula, soma: leitura.bonus });
@@ -277,11 +283,11 @@ function rolarCombo() {
       resultados.push(v);
       subtotal += v;
     }
-    const totalComBonus = subtotal + leitura.bonus;
+    const totalComBonus = (subtotal + leitura.bonus) * sinal;
     totalFinal += totalComBonus;
     breakdownList.push({
       nome: item.nome,
-      detalhe: `${leitura.formula} -> [${resultados.join(", ")}]`,
+      detalhe: `${sinal < 0 ? "-" : ""}${leitura.formula} -> [${resultados.join(", ")}]`,
       soma: totalComBonus,
     });
   });

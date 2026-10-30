@@ -55,10 +55,6 @@ window.addEventListener("DOMContentLoaded", () => {
         });
       },
     );
-
-    window.addEventListener("resize", () => {
-      renderizarMochilaGrid();
-    });
   } catch (erro) {
     console.error("[RPG] Falha ao iniciar a ficha:", erro);
     // eslint-disable-next-line no-undef -- `let` global declarada em conexao.js (este arquivo carrega por último)

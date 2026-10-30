@@ -25,22 +25,29 @@
     class="rpg-app master-app flex flex-col">
     <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
 
-    <!-- Menu, token e conexão: montados pelo comum.js -->
+    <!-- Menu e conexão: montados pelo comum.js -->
     <header id="mestre-cabecalho" data-pagina="habilidades-magias"></header>
 
     <main id="mestre-conteudo" tabindex="-1" class="master-main space-y-6">
 
         <div class="master-section-heading">
-            <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2">
-                <i class="fa-solid fa-wand-sparkles"></i> Habilidades e Magias
-            </h2>
             <div class="flex gap-2" role="tablist" aria-label="Tipo de poder">
                 <button id="habmag-aba-habilidades" type="button" role="tab" aria-controls="habmag-catalogo" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Habilidades</button>
                 <button id="habmag-aba-magias" type="button" role="tab" aria-controls="habmag-catalogo" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Magias</button>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <section id="habmag-enviar" class="habmag-entrega" aria-labelledby="habmag-entrega-titulo">
+            <div class="habmag-entrega-controles">
+                <h3 id="habmag-entrega-titulo">Entregar para</h3>
+                <select id="habmag-personagem" aria-label="Personagem que receberá o poder"></select>
+                <button id="habmag-atualizar-personagens" type="button" aria-label="Atualizar lista de personagens" title="Atualizar lista"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
+            </div>
+            <p id="habmag-destinatario" class="master-recipient" role="status">Selecione o destinatário antes de entregar um poder.</p>
+            <p class="rpg-hint">Use “Entregar” no poder desejado. Para personagens offline, a entrega fica pendente até abrirem a ficha.</p>
+        </section>
+
+        <div id="habmag-layout">
             <!-- Catálogo: lista, busca e ações de cada entrada -->
             <section id="habmag-catalogo" role="tabpanel" aria-labelledby="habmag-aba-habilidades" class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
                 <div class="master-filters">
@@ -50,22 +57,6 @@
                 </div>
                 <div id="habmag-lista" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </section>
-
-            <div class="space-y-6">
-                <!-- Adicionar à ficha: escolher o personagem uma vez; cada cartão tem o botão de 1 clique -->
-                <section id="habmag-enviar" class="bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
-                    <h3 class="font-cinzel font-bold text-amber-200 text-sm flex items-center gap-2">
-                        <i class="fa-solid fa-paper-plane text-amberGold-500"></i> Adicionar à ficha
-                    </h3>
-                    <div class="flex gap-2">
-                        <select id="habmag-personagem" aria-label="Personagem que receberá o poder" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1.5 text-xs font-mono"></select>
-                        <button id="habmag-atualizar-personagens" type="button" aria-label="Atualizar lista de personagens" class="px-2 py-1.5 rounded text-xs border border-dungeon-700" title="Atualizar lista">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                    <p id="habmag-destinatario" class="master-recipient" role="status">Selecione o destinatário antes de adicionar um poder.</p>
-                    <p class="text-[11px] text-slate-500">Escolha o personagem e use "Adicionar" no cartão. Se ele estiver offline, a entrada espera na caixa dele e entra ao abrir a ficha.</p>
-                </section>
 
                 <!-- Editor -->
                 <section id="habmag-editor" class="bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2 hidden">
@@ -79,14 +70,14 @@
                                 <label>Classe do ícone<input id="hm-icon" maxlength="40" placeholder="Ex.: fa-fire" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                             </details>
                         </div>
-                        <label>Dado<input id="hm-dice" maxlength="30" placeholder="2d8+3" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                        <label>Dado<input id="hm-dice" data-validar-dados="poder" maxlength="30" placeholder="1d6+1d4+2" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                         <label>Tipo de dano<input id="hm-tipoDano" maxlength="40" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                         <label>Custo
                             <span class="flex gap-1">
-                                <select id="hm-custo-vital" class="bg-dungeon-950 border border-dungeon-700 rounded px-1 py-1">
+                                <select id="hm-custo-vital" aria-label="Recurso consumido" class="bg-dungeon-950 border border-dungeon-700 rounded px-1 py-1">
                                     <option value="">nenhum</option><option value="hp">Vida</option><option value="vigor">Vigor</option><option value="sanity">Sanidade</option>
                                 </select>
-                                <input id="hm-custo-valor" type="number" min="0" max="100000" value="0" class="w-14 bg-dungeon-950 border border-dungeon-700 rounded px-1 py-1">
+                                <input id="hm-custo-valor" aria-label="Quantidade do custo" type="number" min="0" max="100000" value="0" class="w-14 bg-dungeon-950 border border-dungeon-700 rounded px-1 py-1">
                             </span>
                         </label>
                         <label>Ação<input id="hm-acao" maxlength="60" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
@@ -103,7 +94,6 @@
                         <button id="hm-cancelar" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
                     </div>
                 </section>
-            </div>
         </div>
 
     </main>

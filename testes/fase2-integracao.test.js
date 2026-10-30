@@ -100,6 +100,8 @@ describe("Fase 2: integração do painel do mestre", { concurrency: false }, () 
     const bau = await salvar(m, "baus", { nome: "Baú-VIS", itens: [{ item: pocao, quantidade: 4 }] });
     await salvar(m, "baus", { nome: "Baú-OCULTO", itens: [{ item: tesouro, quantidade: 1 }] });
     assert.equal((await cmd(m, "master_bau_liberar", { id: bau.id, liberado: true })).ok, true);
+    await esperarAte(() => Object.values(fichasDe).every(f => f.document.getElementById("bau-alternar")), { rotulo: "ícone do baú nas 3 fichas" });
+    for (const f of Object.values(fichasDe)) f.document.getElementById("bau-alternar").click();
     await esperarAte(() => ["ana", "bia", "caio"].every((c) => fichasDe[c].document.getElementById("bau-janela").textContent.includes("Baú-VIS")), { rotulo: "janela do baú nas 3 fichas" });
     for (const c of ["ana", "bia", "caio"]) {
       assert.ok(!fichasDe[c].document.getElementById("bau-janela").textContent.includes("OCULTO"), `${c}: baú oculto não aparece`);
@@ -158,6 +160,8 @@ describe("Fase 2: integração do painel do mestre", { concurrency: false }, () 
     assert.equal(f.bia.run("STATE.spells.filter((a) => /BIA-ONLY/.test(a.nome)).length"), 1);
     assert.deepEqual(["ana", "bia", "caio"].map((c) => quantidadeDoItem(f[c], pocao.id)).sort(), [0, 2, 2]);
     assert.equal((await ler(m3, "baus")).find((b) => b.id === bau.id).liberado, true, "baú continua liberado");
+    await esperarAte(() => Object.values(f).every(pg => pg.document.getElementById("bau-alternar")), { rotulo: "ícones do baú depois do reinício" });
+    for (const pg of Object.values(f)) pg.document.getElementById("bau-alternar").click();
     await esperarAte(() => f.caio.document.getElementById("bau-janela").textContent.includes("Baú-VIS"), { rotulo: "janela do baú depois do reinício" });
     // o desfazer vive só na memória: depois do reinício a aplicação anterior não pode mais ser desfeita (e nada quebra)
     assert.equal((await cmd(m3, "master_desfazer_dano", { aplicacaoId: ataque.dados.aplicacaoId })).erro, "nao_e_a_ultima");
@@ -313,20 +317,26 @@ describe("Fase 2: integração do painel do mestre", { concurrency: false }, () 
     it("página do NPC: editar só a lore na aba velha não desfaz o HP ajustado em outra aba", async () => {
       const m = await mestre();
       const npc = await salvar(m, "npcs", { nome: "Duas-Abas", hp: { atual: 10, max: 10 } });
-      const a = await abrirPaginaMestre(s, "npc", { real: true, tokenInicial: SENHA });
-      const b = await abrirPaginaMestre(s, "npc", { real: true, tokenInicial: SENHA });
+      const a = await abrirPaginaMestre(s, "figurantes", { real: true, tokenInicial: SENHA });
+      const b = await abrirPaginaMestre(s, "figurantes", { real: true, tokenInicial: SENHA });
       paginas.push(a, b);
-      const cartao = (pg) => [...pg.document.querySelectorAll("#npc-cartoes [data-id]")].find((c) => c.querySelector("h4").textContent === "Duas-Abas");
+      await esperarAte(() => a.run("figurantes.carregou") && b.run("figurantes.carregou"), { rotulo: "bibliotecas carregadas" });
+      for (const pg of [a, b]) pg.run("figurantes.tipo = 'npcs'; renderizarFigurantes()");
+      const cartao = pg => pg.document.querySelector(`#fig-cartoes [data-id="${npc.id}"]`);
       await esperarAte(() => cartao(a) && cartao(b), { rotulo: "NPC nas duas páginas" });
-      const clicar = (pg, el) => el.dispatchEvent(new pg.window.MouseEvent("click", { bubbles: true }));
       // a aba B abre o editor (cópia com HP 10)...
-      clicar(b, cartao(b).querySelector('[data-acao="editar"]'));
+      await b.run(`abrirFichaFigurante(figurantes.npcs.find(n => n.id === ${JSON.stringify(npc.id)}))`);
       // ...a aba A baixa o HP...
-      for (let i = 0; i < 4; i++) clicar(a, cartao(a).querySelector('[data-acao="hp-1"]'));
+      cartao(a).querySelector('[data-acao="expandir-ficha"]').click();
+      for (const esperado of [9, 8, 7, 6]) {
+        cartao(a).querySelector('[aria-label="Diminuir vida de Duas-Abas"]').click();
+        await esperarAte(() => a.run(`figurantes.npcs.find(n => n.id === ${JSON.stringify(npc.id)}).hp.atual`) === esperado
+          && !cartao(a).querySelector('[aria-label="Diminuir vida de Duas-Abas"]').disabled, { rotulo: `HP ${esperado} confirmado` });
+      }
       await esperarAte(async () => (await ler(m, "npcs")).find((n) => n.id === npc.id).hp.atual === 6, { rotulo: "HP 6" });
       // ...e a aba B salva só uma lore nova
-      b.document.getElementById("np-lore").value = "lore da aba B";
-      clicar(b, b.document.getElementById("np-salvar"));
+      b.document.getElementById("fig-lore").value = "lore da aba B";
+      await b.run("salvarFichaFigurante()");
       await esperarAte(async () => (await ler(m, "npcs")).find((n) => n.id === npc.id).lore === "lore da aba B", { rotulo: "lore salva" });
       assert.equal((await ler(m, "npcs")).find((n) => n.id === npc.id).hp.atual, 6, "o HP da aba A foi preservado");
     });

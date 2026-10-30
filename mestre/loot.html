@@ -21,82 +21,225 @@
     <link rel="stylesheet" href="/mestre/CSS/painel-visual.css">
 </head>
 
-<body
-    class="rpg-app master-app flex flex-col">
+<body class="rpg-app master-app flex flex-col">
     <a class="rpg-skip" href="#mestre-conteudo">Pular para o conteúdo</a>
 
-    <!-- Menu, token e conexão: montados pelo comum.js -->
+    <!-- Menu e conexão: montados pelo comum.js -->
     <header id="mestre-cabecalho" data-pagina="loot"></header>
 
     <main id="mestre-conteudo" tabindex="-1" class="master-main space-y-6">
 
         <div class="master-section-heading">
-            <h2 class="font-cinzel text-lg font-bold text-amberGold-400 flex items-center gap-2"><i class="fa-solid fa-gem"></i> Loot</h2>
             <div class="flex gap-2" role="tablist" aria-label="Catálogo de loot">
-                <button id="loot-aba-itens" type="button" role="tab" aria-controls="loot-itens" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Itens</button>
-                <button id="loot-aba-baus" type="button" role="tab" aria-controls="loot-baus" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Baús</button>
+                <button id="loot-aba-itens" type="button" role="tab" aria-controls="loot-itens"
+                    class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Itens</button>
+                <button id="loot-aba-baus" type="button" role="tab" aria-controls="loot-baus"
+                    class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Baús</button>
             </div>
         </div>
 
         <!-- Catálogo de itens -->
-        <div id="loot-itens" role="tabpanel" aria-labelledby="loot-aba-itens" class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div id="loot-itens" role="tabpanel" aria-labelledby="loot-aba-itens"
+            class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
                 <div class="master-filters">
-                    <input id="loot-busca-item" aria-label="Buscar itens" type="search" maxlength="80" placeholder="Buscar item…" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
-                    <select id="loot-filtro-tipo" aria-label="Filtrar por tipo de item" class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono"><option value="">Todos os tipos</option></select>
-                    <button id="loot-novo-item" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo</button>
+                    <input id="loot-busca-item" aria-label="Buscar itens" type="search" maxlength="80"
+                        placeholder="Buscar item…"
+                        class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
+                    <select id="loot-filtro-tipo" aria-label="Filtrar por tipo de item"
+                        class="bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1 text-xs font-mono">
+                        <option value="">Todos os tipos</option>
+                    </select>
+                    <button id="loot-novo-item" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo item</button>
                 </div>
                 <div id="loot-lista-itens" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </section>
-            <section id="loot-editor-item" class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
+            <section id="loot-editor-item"
+                class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
                 <h3 id="li-titulo" class="font-cinzel font-bold text-amber-200 text-sm"></h3>
                 <div class="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <label class="col-span-2">Nome<input id="li-name"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Tipo<input id="li-type"   maxlength="40" placeholder="Arma, Poção…" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Dado<input id="li-dice"   maxlength="30" placeholder="1d6+2" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="col-span-2">Nome<input id="li-name" maxlength="80"
+                            class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label class="">Tipo<input id="li-type" list="li-tipos-existentes" maxlength="40" placeholder=""
+                            class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <datalist id="li-tipos-existentes"></datalist>
+                    <label>Tipo de rolagem<select id="li-tipo-rolagem">
+                            <option value="dano">Dano</option>
+                            <option value="cura">Cura</option>
+                        </select></label>
+                    <label>Tipo de cura<select id="li-tipo-cura">
+                            <option value="vigor">Vigor</option>
+                            <option value="vida">Vida</option>
+                            <option value="sanidade">Sanidade</option>
+                            <option value="mana">Mana</option>
+                        </select></label>
+                    <label>Usos<input id="li-usos" type="number" min="0" max="100000" step="1" value="1"></label>
+                    <label class="">Dado<input id="li-dice" data-validar-dados="poder" maxlength="30"
+                            placeholder="1d10+1d4+2"
+                            class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                    <label>Tipo de dano<input id="li-tipoDano" maxlength="40" placeholder="Impacto, fogo…"></label>
+                    <label>Atributo<input id="li-atributo" maxlength="40" placeholder="Ex.: FOR, STR"></label>
+                    <label>Categoria<input id="li-categoria" maxlength="40" placeholder="Ex.: pesada"></label>
+                    <label class="col-span-2">Subtítulo<input id="li-subtitulo" maxlength="120"
+                            placeholder="Ex.: Martelo ancestral"></label>
+                    <div class="col-span-2">
+                        <div class="loot-imagem-resumo">
+                            <div id="li-miniatura" class="loot-imagem-miniatura"><i class="fa-regular fa-image"
+                                    aria-hidden="true"></i></div>
+                            <div class="loot-imagem-escolher">
+                                <button id="li-escolher-imagem" class="loot-imagem-botao" type="button"><i
+                                        class="fa-solid fa-image" aria-hidden="true"></i> <span
+                                        id="li-escolher-imagem-texto">Escolher imagem</span></button>
+                                <button id="li-editar-imagem" class="loot-imagem-botao" type="button"><i
+                                        class="fa-solid fa-crop-simple" aria-hidden="true"></i> Editar imagem</button>
+                                <input id="li-arquivo-imagem" type="file" accept="image/png,image/jpeg,image/webp"
+                                    hidden>
+                            </div>
+                        </div>
+                        <details class="loot-imagem-avancado">
+                            <summary>Avançado: endereço da imagem</summary>
+                            <label>URL ou caminho local<input id="li-imagem" maxlength="2000"
+                                    placeholder="https://… ou /imagens/…"></label>
+                        </details>
+                        <dialog id="li-enquadramento" class="loot-enquadramento"
+                            aria-labelledby="li-enquadramento-titulo">
+                            <div class="loot-enquadramento-topo">
+                                <div>
+                                    <h3 id="li-enquadramento-titulo">Enquadrar imagem</h3>
+                                    <p>Arraste a imagem para mover e use a roda do mouse para aproximar.</p>
+                                </div><button id="li-fechar-enquadramento" type="button"
+                                    aria-label="Fechar editor de imagem">×</button>
+                            </div>
+                            <div class="loot-enquadramento-conteudo">
+                                <canvas id="li-imagem-previa" width="220" height="220"
+                                    aria-label="Prévia do enquadramento"></canvas>
+                                <div class="loot-enquadramento-controles">
+                                    <label>Aproximação<input id="li-imagem-zoom" type="range" min="0.01" max="3"
+                                            step="any" value="1"></label>
+                                    <label>Horizontal<input id="li-imagem-x" type="range" min="0" max="100" step="0.1"
+                                            value="50"></label>
+                                    <label>Vertical<input id="li-imagem-y" type="range" min="0" max="100" step="0.1"
+                                            value="50"></label>
+                                    <label>Rotação <output id="li-imagem-angulo">0°</output><input
+                                            id="li-imagem-rotacao" type="range" min="-180" max="180" step="1"
+                                            value="0"></label>
+                                </div>
+                            </div>
+                            <div class="loot-enquadramento-acoes"><button id="li-imagem-cancelar" type="button">Remover
+                                    seleção</button><button id="li-concluir-enquadramento"
+                                    type="button">Concluir</button></div>
+                        </dialog>
+                    </div>
                     <div id="li-aparencia" class="col-span-2 master-appearance">
+                        <p class="loot-previa-legenda">Aparência do item</p>
                         <div class="master-appearance-fields" data-aparencia-visual></div>
-                        <details><summary>Avançado: ícone e cor personalizados</summary>
+                        <details>
+                            <summary>Avançado: ícone e cor personalizados</summary>
                             <p class="rpg-hint">Opcional. Valores existentes são mantidos até você alterá-los.</p>
-                            <label>Classe do ícone<input id="li-icon" maxlength="40" placeholder="Ex.: fa-flask" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                            <label>Classes de cor<input id="li-color" maxlength="40" placeholder="Ex.: from-slate-800 to-slate-900" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                            <label>Classe do ícone<input id="li-icon" maxlength="40" placeholder="Ex.: fa-flask"
+                                    class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                            <label>Classes de cor<input id="li-color" maxlength="40"
+                                    placeholder="Ex.: from-slate-800 to-slate-900"
+                                    class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                         </details>
                     </div>
-                    <label class="">Peso<input id="li-weight"   type="number" min="0" step="0.01" value="0" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Pilha máx.<input id="li-maxStack"   type="number" min="1" max="999" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Largura<input id="li-w"   type="number" min="1" max="10" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="">Altura<input id="li-h"   type="number" min="1" max="10" value="1" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
-                    <label class="col-span-2">Descrição<textarea id="li-desc" rows="3" maxlength="2000" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></textarea></label>
-                    <label class="col-span-2 flex items-center gap-2"><input id="li-twoHanded" type="checkbox"> Duas mãos</label>
+                    <div class="col-span-2 loot-item-medidas">
+                        <div class="loot-item-opcoes">
+                            <label><input id="li-twoHanded" type="checkbox"> Duas mãos</label>
+                            <label><input id="li-impossivel-armazenar" type="checkbox"> Impossível armazenar</label>
+                        </div>
+                        <div class="loot-item-medidas-grid">
+                            <label>Peso <span class="loot-medida-peso"><input id="li-weight" type="number" min="0"
+                                        step="0.01" value="0"><span>kg</span></span></label>
+                            <label>Pilha máxima <input id="li-maxStack" type="number" min="1" max="999"
+                                    value="1"></label>
+                            <label class="loot-medida-tamanho">Tamanho físico <input id="li-tamanho" type="text"
+                                    maxlength="40" placeholder="Ex.: 1,5 m"></label>
+                        </div>
+                        <!-- Mantém as dimensões existentes até a implementação do editor de formato. -->
+                        <div hidden>
+                            <p id="li-quadrantes-legenda">Dimensões atuais da mochila</p>
+                            <label id="li-largura-grupo">Largura <input id="li-w" type="number" min="1" max="10"
+                                    value="1"></label>
+                            <label id="li-altura-grupo">Altura <input id="li-h" type="number" min="1" max="10"
+                                    value="1"></label>
+                        </div>
+                        <input id="li-formato" type="hidden">
+                        <figure class="loot-formato">
+                            <figcaption><span>Formato na mochila</span><span class="loot-formato-medida">6 × 6</span>
+                            </figcaption>
+                            <div class="loot-formato-grade" role="img"
+                                aria-label="Grade vazia com seis linhas e seis colunas, ainda sem edição">
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span><span></span>
+                            </div>
+                            <div class="loot-formato-acoes"><button id="li-formato-limpar"
+                                    type="button">Limpar</button><button id="li-formato-preencher"
+                                    type="button">Preencher retângulo</button></div>
+                            <div id="li-formato-imagem-controles"
+                                class="loot-formato-imagem-controles loot-enquadramento-controles" hidden>
+                                <label>Tamanho da imagem<input id="li-formato-imagem-escala" type="range" min="20"
+                                        max="200" value="100"></label>
+                                <label>Horizontal<input id="li-formato-imagem-x" type="range" min="0" max="100"
+                                        value="50"></label>
+                                <label>Vertical<input id="li-formato-imagem-y" type="range" min="0" max="100"
+                                        value="50"></label>
+                                <label>Rotação <output id="li-formato-imagem-angulo">0°</output><input
+                                        id="li-formato-imagem-rotacao" type="range" min="-180" max="180"
+                                        value="0"></label>
+                            </div>
+                            <p id="li-formato-ajuda" role="status">Clique ou arraste para desenhar. Os quadrantes
+                                precisam estar conectados.</p>
+                        </figure>
+                    </div>
+                    <label class="col-span-2">Descrição<textarea id="li-desc" rows="3" maxlength="2000"
+                            class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></textarea></label>
                 </div>
                 <div class="flex gap-2 pt-1">
-                    <button id="li-salvar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
-                    <button id="li-cancelar" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
+                    <button id="li-salvar" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
+                    <button id="li-cancelar" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
                 </div>
             </section>
         </div>
 
         <!-- Baús -->
-        <div id="loot-baus" role="tabpanel" aria-labelledby="loot-aba-baus" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div id="loot-baus" role="tabpanel" aria-labelledby="loot-aba-baus"
+            class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <section class="lg:col-span-2 bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-3">
                 <div class="flex justify-between items-center">
-                    <p class="text-[11px] text-slate-500">Liberar mostra o baú aos jogadores conectados; recolher o esconde. Baú liberado não se edita.</p>
-                    <button id="loot-novo-bau" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo baú</button>
+                    <p class="text-[11px] text-slate-500">Liberar mostra o baú aos jogadores conectados; recolher o
+                        esconde. Baú liberado não se edita.</p>
+                    <button id="loot-novo-bau" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">+ Novo baú</button>
                 </div>
                 <div id="loot-lista-baus" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </section>
-            <section id="loot-editor-bau" class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
+            <section id="loot-editor-bau"
+                class="hidden bg-dungeon-900 border border-dungeon-700 rounded-xl p-4 shadow-xl space-y-2">
                 <h3 id="lb-titulo" class="font-cinzel font-bold text-amber-200 text-sm"></h3>
-                <label class="text-xs font-mono block">Nome do baú<input id="lb-nome"   maxlength="80" class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
+                <label class="text-xs font-mono block">Nome do baú<input id="lb-nome" maxlength="80"
+                        class="w-full bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></label>
                 <div id="lb-linhas" class="space-y-1"></div>
                 <div class="flex gap-2 text-xs font-mono">
-                    <select id="lb-item" aria-label="Item a adicionar ao baú" class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
-                    <input id="lb-qtd" aria-label="Quantidade a adicionar" type="number" min="1" max="999" value="1" class="w-16 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1">
-                    <button id="lb-add" type="button" class="px-2 py-1 rounded border border-dungeon-700">Adicionar</button>
+                    <select id="lb-item" aria-label="Item a adicionar ao baú"
+                        class="flex-1 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1"></select>
+                    <input id="lb-qtd" aria-label="Quantidade a adicionar" type="number" min="1" max="999" value="1"
+                        class="w-16 bg-dungeon-950 border border-dungeon-700 rounded px-2 py-1">
+                    <button id="lb-add" type="button"
+                        class="px-2 py-1 rounded border border-dungeon-700">Adicionar</button>
                 </div>
                 <div class="flex gap-2 pt-1">
-                    <button id="lb-salvar" type="button" class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
-                    <button id="lb-cancelar" type="button" class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
+                    <button id="lb-salvar" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono bg-amberGold-600 text-white">Salvar</button>
+                    <button id="lb-cancelar" type="button"
+                        class="px-3 py-1.5 rounded text-xs font-mono border border-dungeon-700">Cancelar</button>
                 </div>
             </section>
         </div>

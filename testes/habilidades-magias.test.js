@@ -312,9 +312,26 @@ describe("Habilidades e Magias com o servidor real", { concurrency: false }, () 
     for (let i = 0; i < 6; i++) lista.push(await criarEntrada(m1, i % 2 ? "magias" : "habilidades", { nome: `Lote${i}` }));
     const rs = await Promise.all(lista.map((e, i) => cmd(i % 2 ? m1 : m2, "master_entregar", { tipo: i % 2 ? "magias" : "habilidades", catalogId: e.id, player: "ana", nomePasta: ana.pasta })));
     assert.ok(rs.every((r) => r.ok), JSON.stringify(rs.find((r) => !r.ok)));
-    const f = await abrir(ana);
+    const f = await abrirFicha(s, {
+      player: ana.conta, nomePasta: ana.pasta, token: ana.token, atrasarInicio: 20,
+      antesDoInicio: rodar => rodar(`if (!window.__monitorLote) {
+        window.__monitorLote = { prematuras: [], maxEmVoo: 0 };
+        const tipos = new Map(), emitir = socket.emit.bind(socket);
+        socket.on('entrega', e => tipos.set(e.entregaId, e.tipo === 'itens' ? 'inventario' : e.tipo));
+        socket.emit = (evento, dados, ...resto) => {
+          if (evento === 'salvar_personagem') window.__monitorLote.maxEmVoo = Math.max(window.__monitorLote.maxEmVoo, emVoo[dados.arquivo] || 0);
+          const tipo = tipos.get(dados?.entregaId);
+          if (evento === 'entrega_aplicada' && tipo && arquivoProtegido(tipo)) window.__monitorLote.prematuras.push(dados.entregaId);
+          return emitir(evento, dados, ...resto);
+        };
+      }`),
+    });
+    fichas.push(f);
     await esperarAte(() => lista.every((e) => f.run(`[...STATE.abilities, ...STATE.spells].some((a) => a.catalogId === ${JSON.stringify(e.id)})`)), { rotulo: "6 entregas aplicadas" });
+    await f.salvos();
     await esperarAte(() => caixa(ana).filter((x) => lista.some((e) => e.id === x.entrada.catalogId)).every((x) => x.status === "entregue"), { rotulo: "todas entregues" });
+    assert.ok(f.run("window.__monitorLote.maxEmVoo") >= 2, "o cenário exercita salvamentos sobrepostos");
+    assert.equal(f.run("window.__monitorLote.prematuras.length"), 0, "nenhuma entrega é confirmada antes de terminar o salvamento do arquivo");
     assert.equal(f.run("[...STATE.abilities, ...STATE.spells].filter((a) => /^Lote/.test(a.nome)).length"), 6);
     f.fechar();
     await esperar(300);
@@ -430,6 +447,13 @@ describe("Habilidades e Magias com o servidor real", { concurrency: false }, () 
     const clicar = (pg, el) => el.dispatchEvent(new pg.window.MouseEvent("click", { bubbles: true }));
 
     it("criar (nasce privada), editar, publicar, duplicar, buscar e excluir com confirmação", async () => {
+      const { dadoDePoderValido } = require("../JS/regras.js");
+      for (const formula of ["1d6+1d4+2", "2d8+3", "1d6 + 1d4 - 2"]) {
+        assert.ok(dadoDePoderValido(formula));
+        assert.equal(require("../personagem.js").normalizarEntradaCodice({ nome: "Teste", dice: formula }, new Set()).dice, formula);
+      }
+      for (const formula of ["1d6++1d4", "1d6; apagar", "1000d6+1d4", "1d0+1d4"]) assert.equal(dadoDePoderValido(formula), false);
+      assert.equal(require("../rolagem.js").rolar("1d6+1d4+2", lados => lados).total, 12);
       const pg = await abrirPagina();
       try {
         await esperarAte(() => pg.run("habmag.carregou"), { rotulo: "página carregar" });
@@ -438,8 +462,9 @@ describe("Habilidades e Magias com o servidor real", { concurrency: false }, () 
         preencher(pg, "hm-nome", "Chama Viva <img src=x onerror=alert(1)>");
         preencher(pg, "hm-dice", "1d6; apagar");
         clicar(pg, pg.document.getElementById("hm-salvar"));
-        assert.match(pg.document.getElementById("toast-container").textContent, /Dado inválido/, "valida antes de enviar");
-        preencher(pg, "hm-dice", "2d6+1");
+        assert.equal(pg.document.getElementById("hm-dice").getAttribute("aria-invalid"), "true");
+        assert.match(pg.document.getElementById("hm-dice-erro").textContent, /Dado inválido/, "valida antes de enviar");
+        preencher(pg, "hm-dice", "1d6+1d4+2");
         preencher(pg, "hm-tipoDano", "Fogo");
         preencher(pg, "hm-custo-vital", "vigor");
         preencher(pg, "hm-custo-valor", "3");
@@ -450,7 +475,9 @@ describe("Habilidades e Magias com o servidor real", { concurrency: false }, () 
         const c = cartaoDe(pg, nome);
         assert.equal(c.querySelector("[data-visibilidade]").dataset.visibilidade, "privado");
         assert.equal(pg.document.querySelectorAll("#habmag-lista img").length, 0, "texto do usuário nunca vira HTML");
-        assert.match(c.textContent, /2d6\+1 · Fogo · 3 Vigor/);
+        assert.match(c.textContent, /1d6\+1d4\+2 · Fogo · 3 Vigor/);
+        const arquivo = JSON.parse(fs.readFileSync(path.join(s.dir, "catalogo", "habilidades.json"), "utf8"));
+        assert.equal(arquivo.items.find(item => item.nome === nome).dice, "1d6+1d4+2", "fórmula composta preservada no JSON");
 
         // editar e publicar
         clicar(pg, c.querySelector('[data-acao="editar"]'));
@@ -532,9 +559,9 @@ describe("Habilidades e Magias com o servidor real", { concurrency: false }, () 
       const pg = await abrirPaginaMestre(s, "habilidades-magias", { real: true, tokenInicial: "errado" });
       try {
         await esperarAte(() => pg.run("socket.connected"), { rotulo: "conectar" });
-        await esperar(400);
+        await esperarAte(() => /incorreta/.test(pg.run("habmag.erro")), { rotulo: "erro de autorização no catálogo" });
         assert.equal(pg.run("habmag.carregou"), false);
-        assert.match(pg.document.getElementById("toast-container")?.textContent || "", /incorreta/);
+        assert.match(pg.document.getElementById("habmag-lista").textContent, /incorreta/);
       } finally { pg.fechar(); }
     });
   });

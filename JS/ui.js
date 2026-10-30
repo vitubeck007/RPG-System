@@ -25,6 +25,7 @@ function atualizarIdentidadeVisual() {
   const titulo = document.getElementById("sheet-character-name");
   const nome = document.getElementById("char-name-input")?.value.trim() || STATE.name;
   if (titulo) { titulo.textContent = nome; titulo.title = nome; }
+  if (nome) document.title = nome;
 }
 
 function elTexto(tag, classe, texto) {
@@ -34,9 +35,17 @@ function elTexto(tag, classe, texto) {
   return el;
 }
 
+const temporizadoresToastFicha = new WeakMap();
 function toast(mensagem, tipo = "info") {
+  if (tipo !== 'error' && tipo !== 'evento') return;
   const container = document.getElementById("toast-container");
   if (!container) return;
+  const existente = [...container.children].find(el => el.dataset.tipo === tipo && el.querySelector('span')?.textContent === String(mensagem));
+  if (existente) {
+    clearTimeout(temporizadoresToastFicha.get(existente));
+    if (tipo !== 'error') temporizadoresToastFicha.set(existente, setTimeout(() => existente.remove(), 5000));
+    return;
+  }
   const aviso = document.createElement("div");
   aviso.className = "sheet-toast";
   aviso.dataset.tipo = tipo;
@@ -50,7 +59,7 @@ function toast(mensagem, tipo = "info") {
   container.appendChild(aviso);
   while (container.children.length > 4) container.firstElementChild.remove();
   // Erros exigem leitura/decisão: permanecem até serem dispensados.
-  if (tipo !== "error") setTimeout(() => aviso.remove(), 5000);
+  if (tipo !== "error") temporizadoresToastFicha.set(aviso, setTimeout(() => aviso.remove(), 5000));
 }
 
 document.addEventListener("DOMContentLoaded", () => {

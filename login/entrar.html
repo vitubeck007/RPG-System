@@ -32,7 +32,7 @@
         <span class="rpg-eyebrow">Bem-vindo à mesa</span>
         <h2 id="login-title">Entrar no Grimório</h2>
         <p>Use sua conta para escolher um personagem.</p>
-        <form id="login-form" class="login-form">
+        <form novalidate id="login-form" class="login-form">
           <div class="rpg-field">
             <label for="player-name">Nome do jogador</label>
             <input id="player-name" class="rpg-input" name="nome" required maxlength="40" autocomplete="username" placeholder="Seu nome de acesso" autocapitalize="none" spellcheck="false">
@@ -59,7 +59,7 @@
     let autenticando = false;
 
     async function autenticar(criarSeNaoExistir) {
-      if (autenticando || !form.reportValidity()) return;
+      if (autenticando || !RPGUI.validarFormulario(form)) return;
       const nome = document.getElementById('player-name').value.trim();
       const senha = document.getElementById('player-password').value;
       if (!nome) {

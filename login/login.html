@@ -68,7 +68,7 @@
   </div>
 
   <div id="modal-novo" class="rpg-modal" role="dialog" aria-modal="true" aria-labelledby="new-title" aria-describedby="new-description" tabindex="-1" hidden>
-    <form id="new-character-form" class="rpg-modal-panel">
+    <form novalidate id="new-character-form" class="rpg-modal-panel">
       <div class="rpg-modal-heading">
         <div><span class="rpg-eyebrow">Uma nova história</span><h2 id="new-title">Novo personagem</h2></div>
         <button type="button" class="rpg-btn rpg-btn--quiet rpg-btn--icon" onclick="fecharModalNovoPersonagem()" aria-label="Fechar criação">
@@ -329,7 +329,7 @@
 
     async function confirmarNovoPersonagem() {
       const form = document.getElementById('new-character-form');
-      if (criacaoEmAndamento || resultadoMutanteIncerto || !form.reportValidity()) return;
+      if (criacaoEmAndamento || resultadoMutanteIncerto || !RPGUI.validarFormulario(form)) return;
       const nome = document.getElementById('novo-nome-input').value.trim();
       const mensagem = document.getElementById('new-message');
       if (!nome) {

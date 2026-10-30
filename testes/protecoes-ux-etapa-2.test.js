@@ -62,6 +62,8 @@ test('smoke 9–16 e 21: acesso antecipado, estado visual, ajustes, edição e e
     fig.run(`figurantes.inimigos = [{id:'i1',nome:'Guardião',hpMax:40,energia:{atual:9,max:10},habilidades:[{uid:'p1',nome:'Fogo',desc:'Chama'}]}];
       figurantes.carregou = true; renderizarFigurantes()`);
     let card = el('fig-cartoes').firstElementChild;
+    card.querySelector('[data-acao="expandir-ficha"]').click();
+    assert.equal(card.querySelector('.fig-biblioteca-corpo').hidden, false);
     card.querySelector('details').open = true;
     card.querySelector('[data-preservar="copias"]').value = '7'; card.querySelector('[data-preservar="copias"]').focus();
     fig.run(`figurantes.inimigos[0].energia.atual = 8; renderizarFigurantes()`);

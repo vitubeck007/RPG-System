@@ -33,6 +33,7 @@ function resumoDaEntrada(e) {
   return partes.join(" · ");
 }
 
+const descricoesAbertas = new Set();
 function criarCartao(entrada) {
   const cartao = criar("article", "master-catalog-card bg-dungeon-950 border border-dungeon-700 rounded-lg");
   cartao.dataset.id = entrada.id;
@@ -48,20 +49,43 @@ function criarCartao(entrada) {
   cartao.append(topo);
   const resumo = resumoDaEntrada(entrada);
   if (resumo) cartao.append(criar("p", "text-[11px] text-slate-400 font-mono", resumo));
-  if (entrada.desc) cartao.append(criar("p", "text-xs text-slate-300 line-clamp-3", entrada.desc));
+  if (entrada.desc && entrada.desc.length <= 140 && !entrada.desc.includes('\n')) {
+    cartao.append(criar('p', 'rpg-power-description', entrada.desc));
+  } else if (entrada.desc) {
+    const descricao = criar('details', 'rpg-power-description');
+    const resumo = criar('summary');
+    resumo.append(criar('span', 'rpg-power-excerpt', entrada.desc), criar('span', 'rpg-power-read', 'Ler descrição completa'));
+    descricao.append(resumo, criar('p', '', entrada.desc));
+    descricao.dataset.detalhe = `descricao-${entrada.id}`;
+    descricao.open = descricoesAbertas.has(entrada.id);
+    resumo.querySelector('.rpg-power-read').textContent = descricao.open ? 'Recolher descrição' : 'Ler descrição completa';
+    descricao.addEventListener('toggle', () => {
+      if (!descricao.isConnected) return;
+      if (descricao.open) descricoesAbertas.add(entrada.id); else descricoesAbertas.delete(entrada.id);
+      resumo.querySelector('.rpg-power-read').textContent = descricao.open ? 'Recolher descrição' : 'Ler descrição completa';
+    });
+    cartao.append(descricao);
+  }
 
-  const acoes = criar("div", "flex flex-wrap gap-1.5");
+  const acoes = criar("div", "master-power-actions");
   acoes.append(
-    botaoDeAcao("enviar", "Adicionar", "bg-amberGold-600 text-white"),
+    botaoDeAcao("enviar", "Entregar", "bg-amberGold-600 text-white"),
     botaoDeAcao("editar", "Editar", ""),
+  );
+  const menu = criar("details", "master-catalog-menu");
+  menu.append(criar("summary", "", "Mais ações"));
+  const opcoes = criar("div", "master-catalog-menu-opcoes");
+  opcoes.append(
     botaoDeAcao("duplicar", "Duplicar", ""),
     botaoDeAcao("excluir", "Excluir", "text-rose-300"),
   );
+  menu.append(opcoes); acoes.append(menu);
   cartao.append(acoes);
   return cartao;
 }
 
 function renderizarLista() {
+  campo('habmag-novo').textContent = habmag.tipo === 'magias' ? '+ Nova magia' : '+ Nova habilidade';
   const lista = campo("habmag-lista");
   const termo = semAcento(habmag.busca);
   const itens = habmag.catalogo[habmag.tipo].filter(
@@ -69,7 +93,7 @@ function renderizarLista() {
   );
   lista.replaceChildren();
   if (!itens.length) {
-    const vazio = habmag.catalogo[habmag.tipo].length ? "Nada encontrado." : `Nenhuma ${TIPOS_HABMAG[habmag.tipo].rotulo.toLowerCase()} ainda. Use "+ Nova".`;
+    const vazio = habmag.catalogo[habmag.tipo].length ? "Nenhum poder corresponde à busca. Limpe o campo ou tente outro nome." : `Nenhuma ${TIPOS_HABMAG[habmag.tipo].rotulo.toLowerCase()} ainda. Crie a primeira pelo botão acima.`;
     lista.append(criar("p", "master-empty", vazio));
   } else {
     itens.forEach((e) => lista.append(criarCartao(e)));
@@ -111,7 +135,9 @@ function atualizarDestinatarioVisual() {
     : habmag.erroPersonagens || (habmag.carregandoPersonagens ? "Atualizando personagens…" : "Escolha explicitamente o personagem que receberá o poder.");
   campo("habmag-lista").querySelectorAll('[data-acao="enviar"]').forEach(botao => {
     botao.disabled = !alvo || habmag.carregandoPersonagens || Boolean(habmag.erroPersonagens) || botao.dataset.enviando === "1";
-    if (botao.dataset.enviando !== "1") botao.textContent = alvo ? `Entregar a ${alvo.nome}` : "Escolha o destinatário";
+    if (botao.dataset.enviando !== "1") botao.textContent = "Entregar";
+    botao.title = alvo ? `Entregar a ${alvo.nome}` : "Escolha o destinatário na barra acima do catálogo.";
+    botao.setAttribute("aria-label", alvo ? `Entregar poder a ${alvo.nome}` : "Entregar poder: escolha o destinatário");
   });
 }
 
@@ -128,9 +154,9 @@ async function carregarPersonagens() {
 }
 
 /* ------------------------------ editor ------------------------------ */
-function abrirEditor(entrada) {
+async function abrirEditor(entrada) {
   if (campo("hm-salvar").disabled) return;
-  if (!podeDescartarEditorMestre("habmag-editor")) return;
+  if ((editorMestreAlterado("habmag-editor") && !await podeDescartarEditorMestre("habmag-editor"))) return;
   habmag.editando = { id: entrada?.id ?? null };
   const e = entrada || {};
   campo("hm-titulo").textContent = entrada ? `Editar ${TIPOS_HABMAG[habmag.tipo].rotulo.toLowerCase()}` : `Nova ${TIPOS_HABMAG[habmag.tipo].rotulo.toLowerCase()}`;
@@ -144,18 +170,20 @@ function abrirEditor(entrada) {
   campo("hm-efeitos").value = (e.efeitos || []).join("\n");
   campo("hm-publico").checked = Boolean(e.publico); // nova entrada nasce privada
   campo("habmag-editor").classList.remove("hidden");
+  RPGUI.abrirModal('habmag-editor-modal', 'hm-nome');
   atualizarAparenciaMestre('hm');
-  protegerEditorMestre("habmag-editor");
+  protegerEditorMestre("habmag-editor", () => null, { chave: `${habmag.tipo}:${entrada?.id || "novo"}`, aposRestaurar: () => atualizarAparenciaMestre('hm') });
   campo("hm-nome").focus();
 }
 
-function fecharEditor(salvo = false) {
+async function fecharEditor(salvo = false) {
   if (campo("hm-salvar").disabled && !salvo) return false;
-  if (!salvo && !podeDescartarEditorMestre("habmag-editor")) return false;
+  if (!salvo && (editorMestreAlterado("habmag-editor") && !await podeDescartarEditorMestre("habmag-editor"))) return false;
   const estavaAberto = !campo("habmag-editor").classList.contains("hidden");
   habmag.editando = null;
   campo("habmag-editor").classList.add("hidden");
-  limparProtecaoEditorMestre("habmag-editor");
+  RPGUI.fecharModal('habmag-editor-modal');
+  limparProtecaoEditorMestre("habmag-editor", salvo);
   if (estavaAberto) campo("habmag-novo").focus();
   return true;
 }
@@ -186,7 +214,7 @@ function lerEditor() {
 async function salvarEditor() {
   if (!validarCamposMestre('habmag-editor', {
     'hm-nome': valor => !valor ? 'Dê um nome ao poder.' : '',
-    'hm-dice': valor => valor && !/^\d{0,3}d\d{1,4}\s*([+-]\s*\d{1,4})?$/i.test(valor) ? 'Dado inválido. Use 1d6 ou 2d8+3.' : '',
+    'hm-dice': valor => valor && !dadoDePoderValido(valor) ? 'Dado inválido. Use 2d6+1 ou 1d6+1d4+2 (até 30 caracteres).' : '',
   })) return;
   const item = lerEditor();
   if (!item.nome) {
@@ -194,8 +222,8 @@ async function salvarEditor() {
     campo("hm-nome").focus();
     return;
   }
-  if (item.dice && !/^\d{0,3}d\d{1,4}\s*([+-]\s*\d{1,4})?$/i.test(item.dice)) {
-    toast("Dado inválido. Exemplos: 1d6, 2d8+3.", "error");
+  if (item.dice && !dadoDePoderValido(item.dice)) {
+    toast("Dado inválido. Exemplos: 2d6+1, 1d6+1d4+2.", "error");
     return;
   }
   marcarEnvioMestre("hm-salvar", true);
@@ -222,7 +250,7 @@ function excluirEntrada(entrada, botao) {
   confirmarNoBotao(botao, () =>
     pedirAoServidor("master_campanha_remover", { tipo: habmag.tipo, id: entrada.id }, { muda: true })
       .then(() => toast("Excluída do catálogo (as fichas que já a receberam a mantêm).", "success"))
-      .catch(() => {}));
+      .catch(() => {}), `Excluir ${entrada.nome} do catálogo?`);
 }
 
 async function enviarParaFicha(entrada) {
@@ -243,7 +271,7 @@ async function enviarParaFicha(entrada) {
 
 /* ------------------------------ carga e tempo real ------------------------------ */
 async function carregarCatalogo() {
-  if (!tokenDoMestre() || habmag.carregando) return;
+  if (habmag.carregando) return;
   habmag.carregando = true; habmag.erro = "";
   renderizarLista();
   try {
@@ -269,9 +297,13 @@ socket.on("campanha_atualizada", ({ tipo, dados } = {}) => {
 socket.on("connect", () => setTimeout(carregarCatalogo, 0));
 
 document.addEventListener("DOMContentLoaded", () => {
+  const contexto = lerContextoMestre("poderes");
+  if (["habilidades", "magias"].includes(contexto.tipo)) habmag.tipo = contexto.tipo;
+  if (typeof contexto.busca === "string") habmag.busca = campo("habmag-busca").value = contexto.busca;
+  window.addEventListener("pagehide", () => guardarContextoMestre("poderes", { tipo: habmag.tipo, busca: habmag.busca }));
   for (const tipo of Object.keys(TIPOS_HABMAG)) {
-    campo(`habmag-aba-${tipo}`).addEventListener("click", () => {
-      if (!fecharEditor()) return;
+    campo(`habmag-aba-${tipo}`).addEventListener("click", async () => {
+      if (!await fecharEditor()) return;
       habmag.tipo = tipo;
       renderizarLista();
     });
@@ -295,8 +327,12 @@ document.addEventListener("DOMContentLoaded", () => {
       editar: () => abrirEditor(entrada), duplicar: () => executarAcaoMestre(botao, "Duplicando…", () => duplicarEntrada(entrada)),
       excluir: () => excluirEntrada(entrada, botao) })[botao.dataset.acao]?.();
   });
-  // token digitado/colado depois de abrir a página: recarrega
-  document.getElementById("master-token-input")?.addEventListener("change", () => setTimeout(carregarCatalogo, 50));
+  campo("habmag-lista").addEventListener("keydown", ev => {
+    const menu = ev.target.closest(".master-catalog-menu");
+    if (ev.key === "Escape" && menu?.open) {
+      ev.preventDefault(); menu.open = false; menu.querySelector("summary").focus();
+    }
+  });
   renderizarLista();
   renderizarPersonagens();
 });

@@ -1,7 +1,7 @@
 /* =========================================================================
    DANO (Sprint 6): aplicar dano a vários alvos de uma vez, com multiplicador por alvo, e desfazer.
    - alvos: jogadores online, NPCs e inimigos em batalha, todos por `alvoId` (o mesmo de master_listar_alvos);
-   - multiplicador só da lista fechada (×½, ×1, ×2), conta compartilhada com a página (calcularDano);
+   - multiplicador individual não negativo, com arredondamento para baixo compartilhado com a página;
    - jogadores pelo MESMO caminho do ajuste de vida do mestre (status.json, aviso à ficha, card);
      NPCs pelo registro do NPC; inimigos pelo estado da batalha (atômico, com derrotado automático);
    - alvo ausente (jogador que saiu, NPC excluído) é relatado e não recebe dano; nada passa de 0;
@@ -10,9 +10,10 @@
    ========================================================================= */
 
 const crypto = require("crypto");
-const { calcularDano, MULTIPLICADORES_DANO } = require("./JS/regras.js");
+const { calcularDano, validarMultiplicadorDano } = require("./JS/regras.js");
 const { ErroCampanha } = require("./campanha.js");
 const regrasDaBatalha = require("./batalha.js");
+const { MAX_VITAL } = require("./personagem.js");
 
 const MAX_ALVOS_POR_ATAQUE = 100;
 
@@ -81,20 +82,23 @@ function criarDano({ campanha, jogadores }) {
       if (a === null || typeof a !== "object" || typeof a.alvoId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(a.alvoId)) {
         throw new ErroCampanha("alvos_invalidos", "Alvo inválido.");
       }
-      if (!MULTIPLICADORES_DANO.includes(a.mult)) throw new ErroCampanha("multiplicador_invalido", "Multiplicador inválido: use ×½, ×1 ou ×2.");
+      if (!validarMultiplicadorDano(a.mult)) throw new ErroCampanha("multiplicador_invalido", "O multiplicador deve ser um número não negativo.");
       if (vistos.has(a.alvoId)) throw new ErroCampanha("alvo_repetido", "O mesmo alvo foi escolhido duas vezes.");
       vistos.add(a.alvoId);
     }
   }
 
   return {
+    validarAlvos,
     aplicar: ({ total, alvos }) =>
       enfileirar(async () => {
-        if (!Number.isInteger(total)) throw new ErroCampanha("formato_invalido", "Valor de dano inválido.");
+        if (!Number.isSafeInteger(total)) throw new ErroCampanha("formato_invalido", "Valor de dano inválido.");
         validarAlvos(alvos);
+        // Valide todos os produtos antes de qualquer gravação para não causar dano parcial por entrada inválida.
+        if (alvos.some(a => calcularDano(total, a.mult) === null)) throw new ErroCampanha("multiplicador_invalido", "O multiplicador produz um dano grande demais.");
         const resultados = new Array(alvos.length);
         const lotes = { npc: [], inimigo: [] };
-        alvos.forEach(({ alvoId, mult }, indice) => {
+        for (const [indice, { alvoId, mult }] of alvos.entries()) {
           const dano = calcularDano(total, mult);
           const alvo = resolver(alvoId);
           if (!alvo) {
@@ -103,7 +107,8 @@ function criarDano({ campanha, jogadores }) {
             resultados[indice] = { alvoId, ok: true, tipo: alvo.tipo, nome: alvo.nome, mult, dano, antes: alvo.hp.atual, depois: alvo.hp.atual, derrotado: alvo.hp.atual === 0 };
           } else if (alvo.tipo === "jogador") {
             try {
-              const { antes, depois } = jogadores.ajustar(alvo.charId, -dano);
+              // Dano excedente não precisa ultrapassar o limite de ajuste vital do servidor.
+              const { antes, depois } = await jogadores.ajustar(alvo.charId, -Math.min(dano, MAX_VITAL));
               resultados[indice] = { alvoId, ok: true, tipo: "jogador", nome: alvo.nome, mult, dano, antes, depois, derrotado: depois === 0 };
             } catch {
               resultados[indice] = { alvoId, ok: false, motivo: "erro", nome: alvo.nome, tipo: "jogador", mult, dano };
@@ -111,7 +116,7 @@ function criarDano({ campanha, jogadores }) {
           } else {
             lotes[alvo.tipo].push({ indice, alvoId, mult, dano, nome: alvo.nome, tipo: alvo.tipo });
           }
-        });
+        }
         for (const tipo of ["npc", "inimigo"]) {
           if (!lotes[tipo].length) continue;
           const saida = await emLote(tipo, lotes[tipo], (hp, it) => {
@@ -140,7 +145,7 @@ function criarDano({ campanha, jogadores }) {
         const pendentes = ultima.resultados.map((r, indice) => ({ r, indice })).filter(({ r }) => r.ok && r.antes !== r.depois);
         const restaurados = new Array(pendentes.length);
         const lotes = { npc: [], inimigo: [] };
-        pendentes.forEach(({ r }, posicao) => {
+        for (const [posicao, { r }] of pendentes.entries()) {
           const alvo = resolver(r.alvoId);
           const base = { alvoId: r.alvoId, nome: r.nome };
           if (!alvo) {
@@ -148,18 +153,18 @@ function criarDano({ campanha, jogadores }) {
           } else if (alvo.tipo === "jogador") {
             if (alvo.hp.atual !== r.depois) {
               restaurados[posicao] = { ...base, ok: false, motivo: "hp_mudou", atual: alvo.hp.atual };
-              return;
+              continue;
             }
             try {
-              const { antes, depois } = jogadores.ajustar(alvo.charId, r.antes - r.depois);
+              const { antes, depois } = await jogadores.ajustar(alvo.charId, r.antes - r.depois, r.depois);
               restaurados[posicao] = { ...base, ok: true, antes, depois };
-            } catch {
-              restaurados[posicao] = { ...base, ok: false, motivo: "erro" };
+            } catch (erro) {
+              restaurados[posicao] = { ...base, ok: false, motivo: erro.codigo === "hp_mudou" ? "hp_mudou" : "erro", ...(erro.codigo === "hp_mudou" ? { atual: erro.atual } : {}) };
             }
           } else {
             lotes[alvo.tipo].push({ indice: posicao, alvoId: r.alvoId, esperado: r.depois, restaurar: r.antes, base });
           }
-        });
+        }
         for (const tipo of ["npc", "inimigo"]) {
           if (!lotes[tipo].length) continue;
           const saida = await emLote(tipo, lotes[tipo], (hp, it) => {

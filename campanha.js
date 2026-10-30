@@ -42,9 +42,11 @@ const {
   lerJson,
   gravarJson,
   trocarArquivo,
+  gravarJsonAsync,
+  trocarArquivoAsync,
 } = require("./personagem.js");
 const { urlDeImagem } = require("./JS/regras.js");
-const { sincronizarFigurantes } = require("./figurantes.js");
+const { sincronizarFigurantes, sincronizarFigurantesAsync } = require("./figurantes.js");
 
 const SCHEMA_VERSION = 1;
 const MAX_BACKUPS = 7;
@@ -145,6 +147,7 @@ function normalizarNpc(bruto) {
     lore: texto(bruto.lore, 4000),
     segredo: texto(bruto.segredo, 2000), // só do mestre: nunca sai para os jogadores
     hp: vitalDe(bruto.hp, 10),
+    defesa: inteiro(bruto.defesa, 0, 999, 10),
     energia: vitalDe(bruto.energia, 10),
     arma: normalizarArma(bruto.arma),
     habilidades: listaDe(bruto.habilidades, 20, normalizarHabilidadeResumida),
@@ -202,6 +205,7 @@ function normalizarInimigo(bruto) {
     ...baseDe(bruto, "ini", "Inimigo"),
     imagem: urlDeImagem(bruto.imagem),
     hpMax: inteiro(bruto.hpMax, 1, MAX_VITAL, 10),
+    defesa: inteiro(bruto.defesa, 0, 999, 10),
     descricao: texto(bruto.descricao, 2000),
     lore: texto(bruto.lore, 4000),
     energia: vitalDe(bruto.energia, 10),
@@ -218,6 +222,7 @@ function normalizarInimigo(bruto) {
 // Item de loot (catálogo de itens e linhas de baú): só campos que a ficha conhece, com limites. O `id` é o
 // TIPO do item (duas adagas têm o mesmo id); o uid de cada instância é criado pela ficha ao receber.
 const COR_OU_ICONE = /^[a-z0-9-]{1,40}$/i;
+const COR_ITEM = /^(?:[a-z0-9-]+|from-[a-z0-9-]+ to-[a-z0-9-]+)$/i;
 function normalizarItemDeLoot(bruto) {
   if (!ehObjeto(bruto)) return null;
   const nome = texto(bruto.name, 80).trim();
@@ -233,13 +238,42 @@ function normalizarItemDeLoot(bruto) {
     h: inteiro(bruto.h, 1, 10, 1),
     maxStack: inteiro(bruto.maxStack, 1, MAX_PILHA, 1),
     twoHanded: bruto.twoHanded === true,
+    impossivelArmazenar: bruto.impossivelArmazenar === true,
   };
+  if (bruto.formato !== undefined) {
+    const formato = require('./JS/regras.js').normalizarFormatoItem(bruto.formato);
+    if (!formato) return null;
+    saida.formato = formato;
+    saida.w = Math.max(...formato.map(p=>p[0])) + 1;
+    saida.h = Math.max(...formato.map(p=>p[1])) + 1;
+  }
   const icone = texto(bruto.icon, 40).trim();
+  if (ehObjeto(bruto.imagemFormato)) {
+    saida.imagemFormato = { x: inteiro(bruto.imagemFormato.x,0,100,50), y: inteiro(bruto.imagemFormato.y,0,100,50), escala: inteiro(bruto.imagemFormato.escala,20,200,100), rotacao: inteiro(bruto.imagemFormato.rotacao,-180,180,0) };
+  }
   if (COR_OU_ICONE.test(icone)) saida.icon = icone;
   const cor = texto(bruto.color, 40).trim();
-  if (COR_OU_ICONE.test(cor)) saida.color = cor;
+  if (COR_ITEM.test(cor)) saida.color = cor;
   const dado = texto(bruto.dice, 30).trim();
   if (DADO_VALIDO.test(dado)) saida.dice = dado;
+  const tipoDano = texto(bruto.tipoDano, 40).trim();
+  const atributo = texto(bruto.atributo, 40).trim();
+  const categoria = texto(bruto.categoria, 40).trim();
+  const subtitulo = texto(bruto.subtitulo, 120).trim();
+  const tamanho = texto(bruto.tamanho, 40).trim();
+  const imagem = urlDeImagem(bruto.imagem);
+  if (tipoDano) saida.tipoDano = tipoDano;
+  if (atributo) saida.atributo = atributo;
+  if (categoria) saida.categoria = categoria;
+  if (subtitulo) saida.subtitulo = subtitulo;
+  if (tamanho) saida.tamanho = tamanho;
+  if (imagem) saida.imagem = imagem;
+  if (['dano', 'cura'].includes(bruto.tipoRolagem)) saida.tipoRolagem = bruto.tipoRolagem;
+  if (bruto.tipoRolagem === 'cura') {
+    saida.tipoCura = ['vigor', 'vida', 'sanidade', 'mana'].includes(bruto.tipoCura) ? bruto.tipoCura : 'vida';
+    saida.usos = inteiro(bruto.usos, 0, 100000, 1);
+    delete saida.tipoDano; delete saida.categoria;
+  }
   return saida;
 }
 
@@ -303,6 +337,7 @@ function normalizarCombatente(bruto) {
     nome: texto(bruto.nome, 80).trim() || "Combatente",
     imagem: urlDeImagem(bruto.imagem),
     hp: vitalDe(bruto.hp, 10),
+    defesa: inteiro(bruto.defesa, 0, 999, 10),
     energia: vitalDe(bruto.energia, 10),
     arma: normalizarArma(bruto.arma),
     derrotado: bruto.derrotado === true,
@@ -440,6 +475,11 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
   const caminhoDe = (tipo) => path.join(ARQUIVOS_NO_CATALOGO.includes(tipo) ? pastaCatalogo : dir, `${tipo}.json`);
   const organizar = (tipo, arquivo) => {
     if (pastaFigurantes && ["npcs", "inimigos"].includes(tipo)) sincronizarFigurantes(pastaFigurantes, tipo, arquivo.items);
+  };
+  const organizarAsync = async (tipo, arquivo, anterior = null) => {
+    if (pastaFigurantes && ["npcs", "inimigos"].includes(tipo)) {
+      await sincronizarFigurantesAsync(pastaFigurantes, tipo, arquivo.items, anterior?.items ?? null);
+    }
   };
 
   const cache = {};
@@ -590,13 +630,13 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
       const arquivo = normalizarArquivo(tipo, arquivoDe(tipo, nova === undefined ? atual : nova));
       if (!arquivo) throw new ErroCampanha("dados_invalidos", "Dados inválidos.");
       fs.mkdirSync(path.dirname(caminhoDe(tipo)), { recursive: true });
-      gravarJson(caminhoDe(tipo), arquivo);
+      await gravarJsonAsync(caminhoDe(tipo), arquivo);
       try {
-        organizar(tipo, arquivo);
+        await organizarAsync(tipo, arquivo, cache[tipo]);
       } catch (erro) {
         // Só confirma quando ambos os formatos estão gravados; desfaz a alteração se a organização falhar.
-        gravarJson(caminhoDe(tipo), cache[tipo]);
-        try { organizar(tipo, cache[tipo]); } catch (recuperacao) { log.error("[FIGURANTE] Falha ao reconstruir pastas:", recuperacao); }
+        await gravarJsonAsync(caminhoDe(tipo), cache[tipo]);
+        try { await organizarAsync(tipo, cache[tipo]); } catch (recuperacao) { log.error("[FIGURANTE] Falha ao reconstruir pastas:", recuperacao); }
         throw erro;
       }
       cache[tipo] = arquivo;
@@ -656,6 +696,7 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
       const bau = baus.find((b) => b.id === bauId);
       const linha = bau?.liberado ? bau.itens.find((l) => l.id === linhaId) : null;
       if (!linha) throw new ErroCampanha("bau_indisponivel", "Esse baú ou item não está disponível.");
+      if (linha.item.impossivelArmazenar) throw new ErroCampanha("impossivel_armazenar", "Esse item é grande demais para guardar na mochila.");
       if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > linha.quantidade) {
         throw new ErroCampanha("indisponivel", linha.quantidade > 0 ? `Só há ${linha.quantidade} disponível.` : "Esse item acabou.");
       }
@@ -703,13 +744,13 @@ function criarCampanha(dir, { log = console, agora = () => new Date(), pastaCata
         const para = caminhoDe(tipo);
         if (fs.existsSync(de)) {
           fs.copyFileSync(de, `${para}.tmp`);
-          trocarArquivo(`${para}.tmp`, para);
+          await trocarArquivoAsync(`${para}.tmp`, para);
         } else if (fs.existsSync(para) && !ARQUIVOS_NO_CATALOGO.includes(tipo)) {
           fs.rmSync(para); // não existia naquele backup (o catálogo nunca é apagado: backups antigos não o tinham)
         }
       }
       for (const tipo of TIPOS) carregarArquivo(tipo, { reescrever: false });
-      for (const tipo of ["npcs", "inimigos"]) if (!tiposCorrompidos.has(tipo)) organizar(tipo, cache[tipo]);
+      for (const tipo of ["npcs", "inimigos"]) if (!tiposCorrompidos.has(tipo)) await organizarAsync(tipo, cache[tipo]);
       for (const tipo of TIPOS) campanha.aoMudar?.(tipo, clonar(visaoDe(tipo, cache[tipo])));
       log.log(`[CAMPANHA] Restaurado o backup ${nome}.`);
     });

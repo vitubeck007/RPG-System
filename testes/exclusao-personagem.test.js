@@ -27,6 +27,8 @@ it("seleção: exclusão confirmada remove a pasta e persiste após recarregar e
       url: `${servidor.url}/selecao`, runScripts: "outside-only",
     });
     const w = dom.window;
+    w.AbortController = globalThis.AbortController;
+    w.AbortSignal = globalThis.AbortSignal;
     w.sessionStorage.setItem("rpg_player", "exclusao");
     w.sessionStorage.setItem("rpg_token", login.token);
     w.sessionStorage.setItem("rpg_character", JSON.stringify({ player: "exclusao", nomePasta: alvo.nomePasta }));

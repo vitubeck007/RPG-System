@@ -3,7 +3,7 @@
    Ajuste dos valores, edição do máximo e desenho das barras.
    ========================================================================= */
 
-function alterarVital(tipo, delta) {
+function alterarVital(tipo, delta, origem = null) {
   if (!personagemCarregado) return;
   if (tipo === "vigor" && !GLOBAL_CONFIG.AtivarMana) return;
 
@@ -21,6 +21,7 @@ function alterarVital(tipo, delta) {
   if (vital.current > vital.max) {
     vital.current = vital.max;
   }
+  window.numeroFlutuante?.(origem, vital.current - anterior);
 
   atualizarBarras();
   salvarStatus();
@@ -33,7 +34,7 @@ function alterarVital(tipo, delta) {
     maximo: vital.max,
   });
 
-  syncPlayerToServer();
+  // O salvamento confirmado já publica os vitais no painel do mestre.
 }
 
 function abrirAjusteVital(tipo) {
@@ -68,7 +69,6 @@ function definirMaximoVital(tipo, valorBruto) {
   atualizarBarras();
   salvarStatus();
   registrarNoTerminal("Máximo vital alterado", { atributo: tipo, anterior, atual: novo });
-  syncPlayerToServer();
 }
 
 function editarMaximoVital(tipo) {

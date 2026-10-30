@@ -2,12 +2,16 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { normalizarNpc, normalizarInimigo } = require("../campanha.js");
 const { iniciarServidor, abrirPaginaMestre, esperarAte } = require("./ajuda/ambiente");
 
 test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e notas", async () => {
   const s = await iniciarServidor();
   let pg;
   try {
+    assert.equal(normalizarNpc({ nome: "Antigo" }).defesa, 10, "registro antigo recebe defesa padrão");
+    assert.equal(normalizarInimigo({ nome: "Sem proteção", defesa: 0 }).defesa, 0, "defesa zero é preservada");
+    assert.equal(normalizarInimigo({ nome: "Limite", defesa: 1000 }).defesa, 999, "defesa respeita o limite do JSON");
     pg = await abrirPaginaMestre(s, "figurantes", { real: true, tokenInicial: "senha-teste" });
     await esperarAte(() => pg.run("figurantes.carregou"));
     const pedir = (evento, dados) => pg.run(`pedirAoServidor(${JSON.stringify(evento)}, ${JSON.stringify(dados)}, { muda: true })`);
@@ -15,18 +19,22 @@ test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e 
     const arma = { nome: "Espada curta", icone: "sword", alcance: "1,5 m", dano: "1d6+2", categoria: "leve" };
     const inimigo = await pedir("master_campanha_salvar", { tipo: "inimigos", item: {
       nome: "Guardião", imagem: "/CSS/retrato-padrao.svg?modelo=1", descricao: "D".repeat(240), lore: "História da torre.", nota: "Carrega uma chave.", hpMax: 20,
-      energia: { atual: 5, max: 8 }, atributos: { FOR: 12, DES: 8, INT: 0, SAB: 6, PRE: 4, VON: 10 }, arma, habilidades: [poder], magias: [{ ...poder, nome: "Chama", desc: "<img src=x onerror=alert(1)> Fogo azul." }],
+      defesa: 17, energia: { atual: 5, max: 8 }, atributos: { FOR: 12, DES: 8, INT: 0, SAB: 6, PRE: 4, VON: 10 }, arma, habilidades: [poder], magias: [{ ...poder, nome: "Chama", desc: "<img src=x onerror=alert(1)> Fogo azul." }],
     } });
-    const npc = await pedir("master_campanha_salvar", { tipo: "npcs", item: { nome: "Aliada", hp: { atual: 8, max: 12 }, energia: { atual: 3, max: 6 }, notas: "Nota da biblioteca" } });
+    const npc = await pedir("master_campanha_salvar", { tipo: "npcs", item: { nome: "Aliada", defesa: 12, hp: { atual: 8, max: 12 }, energia: { atual: 3, max: 6 }, notas: "Nota da biblioteca" } });
     await pg.run("abrirFichaFigurante(figurantes.inimigos[0])");
     assert.equal(pg.document.getElementById("fig-tem-arma").checked, true);
     assert.equal(pg.document.getElementById("fig-arma-nome").value, arma.nome);
     assert.equal(pg.document.getElementById("fig-arma-dano").value, arma.dano);
-    pg.run('fecharJanelaFig("fig-editor", true)');
+    assert.equal(pg.document.getElementById("fig-defesa").value, "17");
+    pg.document.getElementById("fig-defesa").value = "19";
+    await pg.run("salvarFichaFigurante()");
+    await esperarAte(() => pg.run("figurantes.inimigos[0].defesa") === 19);
     let card = pg.document.querySelector(`#fig-cartoes [data-id="${inimigo.id}"]`);
     assert.equal(card.querySelector(".fig-biblioteca-corpo").hidden, true, "biblioteca começa recolhida");
     assert.match(card.querySelector(".fig-biblioteca-maximos").textContent, /VidaAtual \/ máximo20\/ 20EnergiaAtual \/ máximo5\/ 8/);
-    assert.deepEqual([...card.querySelectorAll(".fig-tatica-atributos dt")].map(el => el.textContent), ["Força", "Destreza", "Inteligência", "Sabedoria", "Presença", "Vontade"]);
+    assert.deepEqual([...card.querySelectorAll(".fig-tatica-atributos dt")].map(el => el.textContent), ["Força", "Destreza", "Inteligência", "Sabedoria", "Presença", "Vontade", "Defesa"]);
+    assert.equal(card.querySelector('[data-atributo="DEF"] dd').textContent, "19");
     assert.equal(card.querySelectorAll(".fig-tatica-atributos dd")[2].textContent, "0", "atributo zero não vira ausência");
     card.querySelector('[data-acao="expandir-ficha"]').click();
     assert.equal(card.querySelector(".fig-biblioteca-corpo").hidden, false);
@@ -35,6 +43,9 @@ test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e 
     assert.match(card.textContent, /História da torre/); assert.match(card.textContent, /Carrega uma chave/);
     assert.equal(card.querySelector(".fig-tatica-expansao").open, false);
     assert.equal(card.querySelector(".fig-tatica-narrativa img"), null, "texto do mestre não é interpretado como HTML");
+    assert.equal(card.querySelector(".fig-tatica-usar"), null, "poderes recolhidos são montados sob demanda");
+    card.querySelector(".fig-tatica-expansao").open = true;
+    card.querySelector(".fig-tatica-expansao").dispatchEvent(new pg.window.Event("toggle"));
     assert.equal(card.querySelector(".fig-tatica-usar").textContent, "", "ação do poder é somente um ícone");
     card.querySelector('[aria-label="Aumentar vida de Guardião"]').click();
     await esperarAte(() => pg.run("figurantes.inimigos[0].hpMax === 21"));
@@ -52,6 +63,7 @@ test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e 
     pg.document.getElementById("fig-tipo-npcs").click();
     assert.equal(pg.document.getElementById("fig-titulo").textContent, "NPCs");
     assert.equal(pg.document.getElementById("fig-tipo-npcs").getAttribute("aria-pressed"), "true");
+    pg.document.querySelector(`#fig-cartoes [data-id="${npc.id}"] [data-acao="expandir-ficha"]`).click();
     pg.document.querySelector(`#fig-cartoes [data-id="${npc.id}"] [data-acao="Colocar em batalha"]`).click();
     await esperarAte(() => pg.run("figurantes.batalha.combatentes.length === 3"));
     assert.equal(pg.run("figurantes.batalha.combatentes[2].tipo"), "npc");
@@ -74,7 +86,8 @@ test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e 
     assert.equal(pg.document.querySelectorAll("#fig-selecionado > article").length, 1, "uma única ficha completa");
     assert.ok(combate().querySelector(".fig-tatica-hp .fig-tatica-barra"), "vida mantém a barra na ficha compacta");
     const cabecalho = combate().querySelector("header");
-    assert.deepEqual([...cabecalho.querySelectorAll(".fig-tatica-atributos dt")].map(el => el.textContent), ["FOR", "DES", "INT", "SAB", "PRE", "VON"]);
+    assert.deepEqual([...cabecalho.querySelectorAll(".fig-tatica-atributos dt")].map(el => el.textContent), ["FOR", "DES", "INT", "SAB", "PRE", "VON", "DEF"]);
+    assert.equal(cabecalho.querySelector('[data-atributo="DEF"] dd').textContent, "19", "a cópia de combate herda a defesa do modelo");
     assert.ok(cabecalho.contains(combate().querySelector(".fig-tatica-recursos")), "recursos ficam no cabeçalho");
     assert.ok(cabecalho.contains(combate().querySelector(".fig-tatica-menu")), "mais ações ficam no cabeçalho");
     assert.ok(combate().querySelector(".fig-tatica-menu [data-acao='Marcar derrotado']"));
@@ -158,8 +171,12 @@ test("Comando tático: tipos, coluna de combate, seleção, caídos, recursos e 
     await esperarAte(() => pg.run("figurantes.carregou"));
     assert.equal(pg.run("figurantes.inimigos[0].arma.nome"), "Machado", "modelo persiste após reiniciar");
     assert.equal(pg.run("figurantes.batalha.combatentes[0].arma.nome"), "Machado", "cópia sincronizada persiste após reiniciar");
+    assert.equal(pg.run("figurantes.inimigos[0].defesa"), 19);
+    assert.equal(pg.run("figurantes.npcs[0].defesa"), 12);
+    assert.equal(pg.run("figurantes.batalha.combatentes[0].defesa"), 19, "defesa da batalha persiste após reiniciar");
     const pastas = fs.readdirSync(path.join(s.dir, "Figurante", "Inimigos"));
     const individual = JSON.parse(fs.readFileSync(path.join(s.dir, "Figurante", "Inimigos", pastas[0], "figurante.json"), "utf8"));
     assert.equal(individual.arma.nome, "Machado", "pasta individual e catálogo são coerentes");
+    assert.equal(individual.defesa, 19, "JSON individual preserva a defesa");
   } finally { pg?.fechar(); await s.parar(); }
 });

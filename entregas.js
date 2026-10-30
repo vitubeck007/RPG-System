@@ -14,7 +14,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { ehIdSeguro, ehObjeto, lerJson, gravarJson, trocarArquivo } = require("./personagem.js");
+const { ehIdSeguro, ehObjeto, lerJson, gravarJsonAsync, trocarArquivo, trocarArquivoAsync } = require("./personagem.js");
 
 const TIPOS_ENTREGA = ["habilidades", "magias", "itens"];
 const MAX_PENDENTES = 100;
@@ -84,10 +84,25 @@ function criarEntregas({ pastaDoPersonagem, log = console }) {
     }
   }
 
-  function gravar(caminho, itens) {
+  async function lerAsync(caminho) {
+    let texto;
+    try { texto = await fs.promises.readFile(caminho, "utf8"); }
+    catch (erro) { if (erro.code === "ENOENT") return []; throw erro; }
+    try {
+      const bruto = JSON.parse(texto.replace(/^\uFEFF/, ""));
+      if (!Array.isArray(bruto?.items)) throw new Error("formato");
+      return bruto.items.map(normalizarEntrega).filter(Boolean);
+    } catch {
+      await trocarArquivoAsync(caminho, `${caminho}.corrompido-${Date.now()}`);
+      log.warn(`[ENTREGAS] ${caminho} estava corrompido e foi guardado à parte.`);
+      return [];
+    }
+  }
+
+  async function gravar(caminho, itens) {
     const pendentes = itens.filter((i) => i.status === "pendente");
     const finalizadas = itens.filter((i) => i.status !== "pendente").slice(-MAX_FINALIZADAS_GUARDADAS);
-    gravarJson(caminho, { schemaVersion: 1, items: [...finalizadas, ...pendentes] });
+    await gravarJsonAsync(caminho, { schemaVersion: 1, items: [...finalizadas, ...pendentes] });
   }
 
   function naFila(caminho, tarefa) {
@@ -103,20 +118,24 @@ function criarEntregas({ pastaDoPersonagem, log = console }) {
 
   const entregas = {
     pendentes: (player, nomePasta) => ler(caminhoDe(player, nomePasta)).filter((i) => i.status === "pendente"),
+    pendentesAsync: (player, nomePasta) => {
+      const caminho = caminhoDe(player, nomePasta);
+      return naFila(caminho, async () => (await lerAsync(caminho)).filter(i => i.status === "pendente"));
+    },
 
     // Deixa uma entrega na caixa. Recusa repetida (mesma entrada ainda pendente) e caixa cheia.
     adicionar: (player, nomePasta, { tipo, entrada, origem }) => {
       const caminho = caminhoDe(player, nomePasta);
-      return naFila(caminho, () => {
+      return naFila(caminho, async () => {
         const nova = normalizarEntrega({ entregaId: `ent_${crypto.randomBytes(8).toString("hex")}`, tipo, entrada, origem, status: "pendente" });
         if (!nova) throw new ErroEntrega("entrega_invalida", "Entrega inválida.");
-        const itens = ler(caminho);
+        const itens = await lerAsync(caminho);
         const pend = itens.filter((i) => i.status === "pendente");
         if (!origem && pend.some((i) => i.tipo === tipo && i.entrada.catalogId === entrada.catalogId)) {
           throw new ErroEntrega("ja_pendente", "Já há uma entrega pendente desta entrada para este personagem.");
         }
         if (pend.length >= MAX_PENDENTES) throw new ErroEntrega("caixa_cheia", "A caixa de entregas deste personagem está cheia.");
-        gravar(caminho, [...itens, nova]);
+        await gravar(caminho, [...itens, nova]);
         return nova;
       });
     },
@@ -125,14 +144,14 @@ function criarEntregas({ pastaDoPersonagem, log = console }) {
     cancelar: (player, nomePasta, entregaId, motivo) => {
       if (!ehIdSeguro(entregaId)) return Promise.resolve(null);
       const caminho = caminhoDe(player, nomePasta);
-      return naFila(caminho, () => {
-        const itens = ler(caminho);
+      return naFila(caminho, async () => {
+        const itens = await lerAsync(caminho);
         const alvo = itens.find((i) => i.entregaId === entregaId && i.status === "pendente");
         if (!alvo) return null;
         alvo.status = "cancelada";
         alvo.motivo = String(motivo || "cancelada").slice(0, 40);
         alvo.entregueEm = new Date().toISOString();
-        gravar(caminho, itens);
+        await gravar(caminho, itens);
         return alvo;
       });
     },
@@ -141,13 +160,13 @@ function criarEntregas({ pastaDoPersonagem, log = console }) {
     marcarEntregue: (player, nomePasta, entregaId) => {
       if (!ehIdSeguro(entregaId)) return Promise.resolve(null);
       const caminho = caminhoDe(player, nomePasta);
-      return naFila(caminho, () => {
-        const itens = ler(caminho);
+      return naFila(caminho, async () => {
+        const itens = await lerAsync(caminho);
         const alvo = itens.find((i) => i.entregaId === entregaId && i.status === "pendente");
         if (!alvo) return null;
         alvo.status = "entregue";
         alvo.entregueEm = new Date().toISOString();
-        gravar(caminho, itens);
+        await gravar(caminho, itens);
         return alvo;
       });
     },

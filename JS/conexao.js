@@ -4,6 +4,26 @@
    faixa de estado (conectando, sem conexão, sessão expirada) e erros de carga.
    ========================================================================= */
 
+const notificacoesVitaisPendentes = new Map();
+function agruparNotificacaoVital(charId, tipo, variacao) {
+  if (!['hp', 'vigor', 'sanity'].includes(tipo) || !Number.isFinite(variacao) || variacao === 0) return;
+  const chave = JSON.stringify([charId, tipo]);
+  const pendente = notificacoesVitaisPendentes.get(chave) || { total: 0, timer: null };
+  pendente.total += variacao;
+  clearTimeout(pendente.timer);
+  pendente.timer = setTimeout(() => {
+    notificacoesVitaisPendentes.delete(chave);
+    if (STATE.id !== charId || !pendente.total) return;
+    const valor = Math.abs(pendente.total);
+    const recurso = tipo === 'sanity' ? 'sanidade' : 'energia';
+    const mensagem = tipo === 'hp'
+      ? pendente.total < 0 ? `Você tomou ${valor} de dano!` : `Você recuperou ${valor} de vida!`
+      : pendente.total < 0 ? `${valor} de ${recurso} perdido.` : `${valor} de ${recurso} recuperado.`;
+    toast(mensagem, 'evento');
+  }, 2000);
+  notificacoesVitaisPendentes.set(chave, pendente);
+}
+
 socket.on("vital_adjusted", (data) => {
   if (data.charId === STATE.id) {
     const vital = STATE.vitals?.[data.type];
@@ -21,7 +41,8 @@ socket.on("vital_adjusted", (data) => {
       "Atributos vitais atualizados pelo mestre",
       data.vitals,
     );
-    toast("Atributos vitais atualizados pelo Mestre!", "combat");
+    const variacao = Number.isFinite(data.variacao) ? data.variacao : data.delta;
+    agruparNotificacaoVital(data.charId, data.type, variacao);
   }
 });
 
@@ -202,6 +223,7 @@ socket.on("connect", () => {
   atualizarEstadoFicha();
 });
 socket.on("disconnect", atualizarEstadoFicha);
+socket.on("disconnect", () => toast("Servidor desconectado.", "evento"));
 
 // Vigia: o index.js conecta o socket no fim da inicialização. Se em 6 s nada tentou conectar, ele não
 // rodou (arquivo faltando ou de versão antiga, ou erro de sintaxe): diz isso em vez de ficar "Conectando…".

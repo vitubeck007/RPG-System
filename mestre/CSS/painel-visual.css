@@ -1,5 +1,35 @@
 /* Rodada visual 3: apresentação opt-in. Contratos, medidas da mochila e regras não mudam. */
 .master-app { background: var(--rpg-bg); color: var(--rpg-text); font-family: var(--rpg-font); }
+.master-app .rpg-editor-sections { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.master-app .rpg-editor-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; margin: 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--rpg-line); }
+.master-app .rpg-editor-group legend { padding: 0 8px 0 0; color: var(--rpg-gold); font: 16px/1.3 var(--rpg-title); }
+.master-app .rpg-editor-group > .col-span-2 { grid-column: 1 / -1; }
+.master-app .rpg-editor-group label { min-width: 0; }
+.master-app .rpg-editor-group label > :is(input:not([type="checkbox"]),textarea,select) { width: 100%; }
+.master-app .rpg-editor-group label:has(> #hm-publico) { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 10px; }
+.master-app .rpg-editor-group #hm-publico { width: 20px; min-width: 20px; height: 20px; margin: 2px 0 0; }
+.master-app .master-editor-overlay { backdrop-filter: blur(6px); padding: 24px; }
+.master-app .master-editor-panel { width: min(960px, 100%); max-width: 960px; max-height: calc(100dvh - 48px); padding: 24px 28px; border-radius: 16px; overscroll-behavior: contain; }
+.master-app .master-editor-panel .rpg-editor-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; }
+.master-app .master-editor-panel .rpg-editor-actions { position: sticky; bottom: -24px; z-index: 2; padding: 16px 0; background: var(--rpg-surface); }
+@media (max-width: 700px) {
+  .master-app .master-editor-overlay { padding: 12px; }
+  .master-app .master-editor-panel { max-height: calc(100dvh - 24px); padding: 20px; }
+  .master-app .master-editor-panel .rpg-editor-sections { grid-template-columns: minmax(0, 1fr); }
+  .master-app .master-editor-panel .rpg-editor-actions { bottom: -20px; }
+}
+.master-app .rpg-editor-sections .rpg-editor-group textarea { min-height: 120px; }
+.master-app .rpg-editor-actions { border-top: 1px solid var(--rpg-line); margin-top: 20px; padding-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+.rpg-power-description { font-size: 13px; line-height: 1.6; color: var(--rpg-text); }
+.rpg-power-description summary { display: block; cursor: pointer; border-radius: 5px; }
+.rpg-power-excerpt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.rpg-power-read { display: inline-flex; align-items: center; min-height: 36px; color: var(--rpg-gold); text-decoration: underline; text-underline-offset: 4px; }
+.rpg-power-description summary:hover .rpg-power-read { color: var(--rpg-text); }
+.rpg-power-description[open] .rpg-power-excerpt { display: none; }
+.rpg-power-description > p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; }
+.master-app .master-action { min-height: 40px; padding: 8px 12px; border: 1px solid var(--rpg-line); background: var(--rpg-raised); color: var(--rpg-text); border-radius: 8px; }
+.master-app .master-action:active:not(:disabled) { background: var(--rpg-gold-soft); }
+@media (max-width: 420px) { .master-app .rpg-editor-group { grid-template-columns: minmax(0, 1fr); } .master-app .rpg-editor-group > * { grid-column: 1; } }
 .master-app .hidden { display: none !important; }
 .master-app :where(main, section, article, form, fieldset, label, .grid, .flex) { min-width: 0; }
 .master-app .font-mono { font-family: var(--rpg-font); font-variant-numeric: tabular-nums; }
@@ -27,6 +57,7 @@
 .master-appearance-preview { grid-column: 1 / -1; min-height: 76px; padding: 12px; border: 1px solid var(--rpg-line); border-radius: 8px; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 12px; align-items: center; color: #f1f5f9; overflow-wrap: anywhere; }
 .master-appearance-preview > i { grid-row: span 2; font-size: 25px; text-align: center; }
 .master-appearance-preview > small { grid-column: 2; font-size: 13px; }
+.master-app .loot-appearance-preview { display: block; padding: 0; border: 0; background: transparent; }
 .master-appearance details { margin-top: 10px; }
 .master-appearance summary { cursor: pointer; display: flex; align-items: center; color: var(--rpg-gold); }
 .master-appearance summary::after { content: '+'; margin-left: auto; padding-left: 8px; }
@@ -37,7 +68,7 @@
 .master-app button.bg-rose-600 { color: var(--rpg-danger); background: var(--rpg-danger-soft); border: 1px solid #78505b; }
 .master-app button[aria-selected="true"] { color: var(--rpg-gold); background: var(--rpg-gold-soft); border-color: var(--rpg-gold); }
 .master-app :is(input:not([type="checkbox"]), select, textarea) { min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--rpg-line); border-radius: 8px; padding: 10px 12px; background: var(--rpg-bg); color: var(--rpg-text); font-size: 16px; line-height: 1.4; }
-.master-app :where(textarea) { resize: vertical; min-height: 90px; }
+.master-app textarea { resize: none; min-height: 120px; field-sizing: content; }
 .master-app :where(input, textarea)::placeholder { color: #899bac; opacity: 1; }
 .master-app input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--rpg-gold); margin: 0; }
 .master-app label:has(> input[type="checkbox"]) { min-height: 44px; }
@@ -46,36 +77,29 @@
 .master-app :where(.shadow-xl, .shadow-2xl, .shadow-lg) { box-shadow: none; }
 .master-app :where(section.bg-dungeon-900) { background: var(--rpg-surface); border-color: var(--rpg-line); padding: 22px; border-radius: 12px; }
 .master-header { background: var(--rpg-surface); border-bottom: 1px solid var(--rpg-line); }
-.master-header-inner { max-width: 1280px; margin: auto; padding: 20px 32px 12px; display: grid; grid-template-columns: 1fr auto; gap: 18px 24px; }
-.master-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.master-heading h1 { font-size: 29px; margin-top: 4px; }
-.master-heading .rpg-eyebrow { font-size: 10px; letter-spacing: .12em; }
-.master-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.master-header-inner { max-width: 1400px; margin: auto; padding: 10px 32px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 16px; }
+.master-heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.master-heading h1 { font-size: 22px; line-height: 1.25; margin: 0; overflow-wrap: anywhere; }
+.master-heading .rpg-sigil { width: 30px; height: 30px; border-radius: 8px; }
+.master-heading .rpg-sigil .rpg-icon { width: 19px; height: 19px; }
+.master-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .master-connection { display: inline-flex; align-items: center; gap: 8px; color: var(--rpg-muted); font-size: 12px; }
 .master-connection-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rpg-gold); }
 .master-connection[data-estado="online"] { color: var(--rpg-success); }
 .master-connection[data-estado="online"] .master-connection-dot { background: var(--rpg-success); }
 .master-connection[data-estado="offline"] { color: var(--rpg-danger); }
 .master-connection[data-estado="offline"] .master-connection-dot { background: var(--rpg-danger); }
-.master-credentials { position: relative; }
-.master-credentials summary { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--rpg-line); border-radius: 8px; color: var(--rpg-text); font-size: 13px; cursor: pointer; list-style: none; }
-.master-credentials summary::after { content: "+"; color: var(--rpg-gold); font-size: 19px; }
-.master-credentials[open] summary::after { content: "−"; }
-.master-credentials-panel { position: absolute; top: calc(100% + 8px); right: 0; width: min(320px, calc(100vw - 32px)); padding: 20px; background: var(--rpg-raised); border: 1px solid var(--rpg-line); border-radius: 12px; z-index: 45; box-shadow: 0 12px 36px #0008; }
-.master-credentials-panel label { display: block; font-size: 13px; margin-bottom: 8px; }
-.master-credentials-panel input { width: 100%; }
-.master-credentials-panel p { font-size: 12px; color: var(--rpg-muted); margin-top: 10px; }
-.master-nav { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--rpg-line); }
-.master-nav-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 10px 15px; color: var(--rpg-muted) !important; text-decoration: none; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+.master-nav { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--rpg-line); }
+.master-nav-link { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 6px 12px; color: var(--rpg-muted) !important; text-decoration: none; border-radius: 8px; font-size: 13px; line-height: 1.4; }
 .master-nav-link:hover { background: var(--rpg-raised); color: var(--rpg-text) !important; }
 .master-nav-short { display: none; }
 .master-app .master-catalog-card h4 { font-size: 21px; }
 .master-nav-link[aria-current="page"] { background: var(--rpg-gold-soft); color: var(--rpg-gold) !important; box-shadow: inset 0 -2px var(--rpg-gold); }
-.master-notice { grid-column: 1 / -1; color: var(--rpg-muted); font-size: 12px; line-height: 1.5; }
+.master-notice { grid-column: 1 / -1; margin: 0; color: var(--rpg-muted); font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .master-notice[data-estado="error"] { color: var(--rpg-danger); border-left: 3px solid var(--rpg-danger); padding-left: 10px; }
 .master-notice[data-estado="success"] { color: var(--rpg-success); }
-.master-main { max-width: 1280px; width: 100%; margin: 28px auto 0; padding: 0 32px 48px; flex: 1; }
-.master-main > .master-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--rpg-line); }
+.master-main { max-width: 1400px; width: 100%; margin: 16px auto 0; padding: 0 32px 48px; flex: 1; }
+.master-main > .master-section-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--rpg-line); }
 .master-main :where([role="tablist"]) { flex-wrap: wrap; }
 .master-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .master-filters input { flex: 1 1 220px; width: 100%; }
@@ -84,6 +108,76 @@
 .master-catalog-card { display: flex; flex-direction: column; gap: 12px; padding: 18px; background: var(--rpg-bg); border: 1px solid var(--rpg-line); border-radius: 10px; }
 .master-catalog-card > :last-child { margin-top: auto; padding-top: 8px; }
 .master-catalog-card > :first-child { flex-wrap: wrap; }
+.master-app .loot-item-card { gap: 12px; padding: 16px; border-top-width: 3px; }
+.master-app .loot-item-card > .loot-item-base { margin-top: auto; padding-top: 0; }
+.loot-item-base { display: grid; grid-template-rows: minmax(38px, auto) auto; }
+.loot-item-corpo { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; }
+.loot-item-identidade { min-width: 0; text-align: center; }
+.loot-item-retrato { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--item-line); border-radius: 10px; background: var(--item-raised); color: var(--item-accent); font-size: 28px; }
+.loot-item-retrato :is(img, canvas) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.loot-item-retrato:has(img) > i { visibility: hidden; }
+.master-app .loot-item-card .loot-item-nome { margin: 0; color: var(--item-text); font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.loot-item-detalhes { min-width: 0; display: grid; gap: 5px; }
+.loot-item-resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.loot-item-linha { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; min-width: 0; padding: 6px 9px; border-radius: 6px; background: var(--item-raised); }
+.loot-item-rotulo, .loot-item-info { color: var(--item-muted); font-size: 12px; }
+.loot-item-valor { color: var(--item-text); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.loot-item-subtitulo { margin: 0; color: var(--item-accent); font-size: 13px; overflow-wrap: anywhere; }
+.loot-item-descricao { margin: 0; color: var(--item-text); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.loot-item-info { margin: 0; }
+.master-app .loot-item-medidas { padding: 12px; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-bg); }
+.master-app .loot-item-opcoes { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--rpg-line); }
+.master-app .loot-item-opcoes label { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 6px 9px; border: 1px solid var(--rpg-line); border-radius: 7px; background: var(--rpg-raised); color: var(--rpg-text); font-size: 13px; line-height: 1.3; cursor: pointer; }
+.master-app .loot-item-opcoes label:has(input:checked) { border-color: var(--rpg-gold); background: var(--rpg-gold-soft); }
+.master-app .loot-item-opcoes input[type='checkbox'] { appearance: none; display: grid; place-content: center; width: 17px; height: 17px; border: 1px solid var(--rpg-line); border-radius: 4px; background: var(--rpg-bg); cursor: pointer; }
+.master-app .loot-item-opcoes input[type='checkbox']:checked { border-color: var(--rpg-gold); background: var(--rpg-gold); }
+.master-app .loot-item-opcoes input[type='checkbox']:checked::after { content: '✓'; color: var(--rpg-on-gold); font-size: 14px; font-weight: 800; line-height: 1; }
+.master-app .loot-item-opcoes input[type='checkbox']:focus-visible { outline: 2px solid var(--rpg-gold); outline-offset: 3px; }
+.master-app .loot-item-medidas-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 16px; }
+.master-app .loot-item-medidas-grid > label { display: grid; align-content: start; gap: 6px; min-width: 0; color: var(--rpg-text); font-size: 13px; }
+.master-app .loot-item-medidas-grid > label[hidden] { display: none; }
+.master-app #loot-editor-item .loot-item-medidas-grid label > input, .master-app #loot-editor-item .loot-item-medidas-grid label > span { width: 100%; min-width: 0; margin-top: 0; }
+.master-app .loot-item-medidas-grid .loot-medida-peso { display: flex; align-items: center; gap: 5px; }
+.master-app .loot-item-medidas-grid .loot-medida-peso input { flex: 1 1 auto; width: 0; min-width: 0; }
+.master-app .loot-item-medidas-grid .loot-medida-peso span { flex: 0 0 auto; color: var(--rpg-muted); white-space: nowrap; }
+.master-app #loot-editor-item .loot-item-medidas-grid input { min-height: 42px; padding: 8px 10px; font-size: 14px; }
+.master-app .loot-item-medidas-grid > .loot-medida-tamanho { grid-column: 1 / -1; }
+.master-app .loot-formato { margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--rpg-line); }
+.master-app .loot-formato figcaption { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; color: var(--rpg-text); font-size: 13px; }
+.master-app .loot-formato-medida { color: var(--rpg-muted); font-variant-numeric: tabular-nums; }
+.master-app .loot-formato-grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(0, 1fr)); gap: 1px; width: 100%; max-width: 360px; aspect-ratio: 1; margin-inline: auto; padding: 1px; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 8px; background: var(--rpg-line); }
+.master-app .loot-formato-grade > span { min-width: 0; min-height: 0; background: var(--rpg-surface); }
+.master-app .loot-formato[hidden] { display:none; }
+.master-app .loot-formato-grade > .loot-formato-celula { min-width:0; min-height:0; padding:0; border:0; border-radius:0; background:var(--rpg-surface); touch-action:none; cursor:crosshair; }
+.master-app .loot-formato-grade > .loot-formato-celula[aria-pressed='true'] { background:var(--rpg-gold); box-shadow:inset 0 0 0 2px var(--rpg-bg); }
+.loot-formato-celula:focus-visible { outline:2px solid var(--rpg-text); outline-offset:-3px; }
+.loot-formato-acoes { display:flex; gap:8px; margin-top:10px; }
+.master-app .loot-formato-grade { position: relative; isolation: isolate; background: var(--rpg-bg); }
+.loot-formato-imagem { position: absolute; z-index: -1; transform: translate(-50%, -50%); pointer-events: none; }
+.loot-formato-imagem > :is(img,canvas) { display: block; width: 100%; height: 100%; object-fit: contain; }
+.master-app .loot-formato-grade > .loot-formato-celula { background: transparent; box-shadow: inset 0 0 0 1px var(--rpg-line); }
+.master-app .loot-formato-grade > .loot-formato-celula[aria-pressed='true'] { background: #d1b77c30; box-shadow: inset 0 0 0 2px var(--rpg-gold); }
+.loot-formato-imagem-controles { display: grid; gap: 6px; margin-top: 10px; }
+.loot-formato-imagem-controles[hidden] { display: none; }
+.loot-formato-imagem-controles label { display: grid; gap: 3px; font-size: 12px; }
+.master-app .loot-formato > p { margin: 10px 0 0; color: var(--rpg-muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 420px) { .master-app .loot-item-medidas-grid { grid-template-columns: 1fr; } }
+.loot-item-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; border-top: 1px solid var(--item-line); padding-top: 6px; }
+.master-app .loot-item-nao-armazenavel { margin: 0; padding-top: 8px; border-top: 1px solid var(--item-line); color: var(--item-muted); font-size: 12px; }
+.master-app .loot-item-disposicao { margin-top: 0; border-top: 1px solid var(--item-line); padding-top: 4px; }
+.loot-item-disposicao summary { display: flex; align-items: center; gap: 7px; cursor: pointer; color: var(--item-muted); font-size: 12px; }
+.loot-item-disposicao summary::before { content: '▸'; }
+.loot-item-disposicao[open] summary::before { content: '▾'; }
+.loot-item-disposicao summary:hover, .loot-item-disposicao summary:focus-visible { color: var(--item-accent); }
+.loot-disposicao-grade { display: grid; grid-template-columns: repeat(var(--loot-colunas), 20px); gap: 2px; width: max-content; max-width: 100%; overflow-x: auto; margin: 10px 0 5px; }
+.loot-disposicao-quadrante { width: 20px; height: 20px; border: 1px solid var(--item-accent); border-radius: 3px; background: var(--item-raised); }
+.loot-disposicao-aviso { margin: 6px 0 0; color: var(--item-muted); font-size: 12px; }
+.loot-item-card .master-catalog-menu > summary { color: var(--item-muted); }
+.loot-item-card .master-catalog-menu > summary:hover { color: var(--item-accent); }
+.loot-item-rodape .loot-item-info { min-width: 0; overflow-wrap: anywhere; }
+.loot-item-rodape .master-catalog-menu { flex: 0 0 auto; }
+.loot-item-card:has(.master-catalog-menu[open]) { position: relative; z-index: 8; }
+@media (max-width: 400px) { .loot-item-corpo { grid-template-columns: 52px minmax(0, 1fr); gap: 10px; } }
 .master-empty { grid-column: 1 / -1; padding: 28px 16px; color: var(--rpg-muted); text-align: center; border: 1px dashed var(--rpg-line); border-radius: 10px; }
 .master-action[data-acao="excluir"], .master-action[data-acao="remover-linha"] { color: var(--rpg-danger); }
 .master-action[data-confirmar="1"] { background: var(--rpg-danger-soft); border-color: var(--rpg-danger); }
@@ -91,10 +185,31 @@
 .master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) h3 { color: var(--rpg-gold); margin-bottom: 14px; }
 .master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) label > :where(input:not([type="checkbox"]), textarea, span, select) { margin-top: 6px; }
 .master-app :where(#loot-editor-item, #loot-editor-bau, #habmag-editor) > div:last-child { flex-wrap: wrap; gap: 10px; }
-.master-app #habmag-enviar { border-left: 3px solid var(--rpg-gold); }
-.master-app #habmag-enviar h3 { font-size: 21px; }
-.master-app #habmag-enviar select { width: 100%; }
-.master-app #habmag-enviar p { margin-top: 10px; }
+.master-app #habmag-enviar { position: sticky; top: 8px; z-index: 20; padding: 12px 16px; border: 1px solid var(--rpg-line); border-left: 3px solid var(--rpg-gold); border-radius: 10px; background: var(--rpg-surface); }
+.habmag-entrega-controles { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.master-app #habmag-enviar h3 { margin: 0; font-size: 16px; }
+.master-app #habmag-enviar select { flex: 1 1 220px; width: auto; max-width: 520px; }
+.master-app #habmag-enviar p { margin: 6px 0 0; }
+.master-app #habmag-enviar .master-recipient { padding: 0; background: transparent; }
+.master-app :is(#loot-itens, #loot-baus), .master-app #habmag-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.master-app :is(#loot-itens, #loot-baus) > section, .master-app #habmag-catalogo { grid-column: auto; min-width: 0; }
+.master-app :is(#habmag-lista, #loot-lista-itens, #loot-lista-baus) { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.master-app #loot-lista-itens { grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr)); }
+.master-power-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.master-app #habmag-lista .master-catalog-card > div:first-child { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.master-app #habmag-lista [data-visibilidade] { font-size: 11px; white-space: nowrap; }
+.master-app .fig-biblioteca-rodape:has(> p[hidden]):has(> button[hidden]) { margin-top: 0; }
+.master-catalog-menu { position: relative; margin-left: auto; }
+.master-catalog-menu > summary { cursor: pointer; padding: 7px 4px; font-size: 13px; color: var(--rpg-muted); }
+.master-catalog-menu-opcoes { position: absolute; right: 0; top: calc(100% + 4px); z-index: 7; display: grid; gap: 6px; min-width: 180px; padding: 8px; background: var(--rpg-surface); border: 1px solid var(--rpg-line); border-radius: 8px; box-shadow: 0 8px 20px #0006; }
+.master-catalog-menu-opcoes button { width: 100%; text-align: left; }
+.master-catalog-menu-opcoes button[data-acao="excluir"] { border-top: 1px solid var(--rpg-line); margin-top: 3px; }
+@media (min-width: 1101px) {
+  .master-app #habmag-layout:has(> #habmag-editor:not(.hidden)),
+  .master-app #loot-itens:has(> #loot-editor-item:not(.hidden)),
+  .master-app #loot-baus:has(> #loot-editor-bau:not(.hidden)) { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); }
+  .master-app #loot-itens:has(> #loot-editor-item:not(.hidden)) { grid-template-columns: minmax(0, 1fr) minmax(350px, 380px); gap: 18px; }
+}
 .master-app #hm-custo-vital { width: 100%; flex: 1; }
 .master-app #hm-custo-valor { width: 75px; flex: 0 0 75px; }
 .master-app #lb-item { width: 100%; flex: 1 1 100%; }
@@ -112,6 +227,61 @@
 .master-app #atk-alvos [data-campo="mult"] { grid-column: 3; grid-row: 2; width: 78px; }
 .master-app #atk-alvos [data-previa] { grid-column: 1 / -1; white-space: normal; color: var(--rpg-gold); font-size: 13px; padding-top: 8px; border-top: 1px solid var(--rpg-line); }
 .master-app #players-cards-container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.master-app .mesa-player-card { min-width: 0; padding: 12px; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-surface); }
+.mesa-card-topo { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
+.mesa-card-identidade { min-width: 0; text-align: center; }
+.mesa-card-foto { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-raised); color: var(--rpg-gold); font-size: 30px; }
+.mesa-card-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mesa-card-nome { display: block; margin-top: 4px; color: var(--rpg-gold); font-size: 13px; overflow-wrap: anywhere; line-height: 1.25; }
+.mesa-card-conteudo { display: grid; align-content: start; min-width: 0; gap: 8px; }
+.mesa-card-vitais { display: grid; gap: 4px; }
+.mesa-vital { display: grid; grid-template-columns: 56px 25px minmax(0, 1fr) 25px; align-items: center; gap: 3px; }
+.mesa-vital-nome { color: var(--rpg-muted); font-size: 11px; }
+.mesa-vital-hp { color: var(--rpg-danger); }
+.mesa-vital-vigor { color: var(--rpg-vigor); }
+.mesa-vital-sanity { color: var(--rpg-sanity); }
+.master-app .mesa-card-botao { min-width: 25px; min-height: 25px; padding: 2px 5px; border: 1px solid var(--rpg-line); background: var(--rpg-raised); color: var(--rpg-text); font-size: 12px; }
+.master-app .mesa-vital-trilho { position: relative; overflow: hidden; min-width: 0; width: 100%; padding: 2px; background: var(--rpg-bg); }
+.mesa-vital-preenchimento { position: absolute; inset: 0 auto 0 0; background: currentColor; opacity: .55; }
+.mesa-vital-hp .mesa-vital-preenchimento { background: var(--rpg-danger); }
+.mesa-vital-vigor .mesa-vital-preenchimento { background: var(--rpg-vigor); }
+.mesa-vital-sanity .mesa-vital-preenchimento { background: var(--rpg-sanity); }
+.mesa-vital-numero { position: relative; color: var(--rpg-text); font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px #000; }
+.mesa-card-atributos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; margin: 0; }
+.mesa-card-atributos > div { min-width: 0; padding: 3px 1px; border: 1px solid var(--rpg-line); border-radius: 5px; background: var(--rpg-bg); text-align: center; }
+.mesa-card-atributos dt { color: var(--rpg-muted); font-size: 9px; }
+.mesa-card-atributos dd { margin: 0; color: var(--rpg-text); font-size: 13px; font-weight: 600; }
+.master-app .mesa-card-expandir { width: 100%; margin-top: 8px; color: var(--rpg-gold); }
+.mesa-card-expandido { display: grid; gap: 9px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--rpg-line); }
+.mesa-arma { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 7px; border: 1px solid var(--rpg-line); border-radius: 6px; background: var(--rpg-bg); font-size: 12px; }
+.mesa-secao-titulo, .mesa-arma-meta, .mesa-texto-vazio { color: var(--rpg-muted); font-size: 12px; }
+.mesa-arma-icone { color: var(--rpg-gold); } .mesa-arma-nome { color: var(--rpg-text); }
+.mesa-poder-abas, .mesa-paginacao { display: flex; align-items: center; gap: 5px; }
+.master-app .mesa-poder-abas [aria-pressed="true"] { border-color: var(--rpg-gold); color: var(--rpg-gold); background: var(--rpg-gold-soft); }
+.mesa-poder-lista { display: grid; gap: 4px; list-style: none; margin: 7px 0 0; padding: 0; }
+.mesa-poder-linha { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 7px; padding: 6px; background: var(--rpg-bg); border-radius: 5px; font-size: 12px; }
+.mesa-poder-linha:has(.mesa-poder-balao) { position: relative; cursor: help; }
+.mesa-poder-linha:focus-visible { outline: 2px solid var(--rpg-gold); outline-offset: 2px; }
+.mesa-poder-balao { display: none; position: absolute; z-index: 30; left: 0; bottom: calc(100% + 7px); width: min(320px, 100%); max-height: 220px; overflow-y: auto; padding: 12px; border: 1px solid var(--rpg-gold); border-radius: 9px; background: var(--rpg-surface); color: var(--rpg-text); box-shadow: 0 10px 24px #000a; line-height: 1.45; }
+.mesa-poder-linha:hover .mesa-poder-balao, .mesa-poder-linha:focus-within .mesa-poder-balao { display: block; }
+.mesa-poder-balao .mesa-balao-titulo { display: block; color: var(--rpg-gold); margin-bottom: 5px; }
+.mesa-poder-balao p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mesa-poder-linha strong, .mesa-poder-linha span { min-width: 0; overflow-wrap: anywhere; }
+.mesa-poder-linha span { color: var(--rpg-muted); }
+.mesa-paginacao { justify-content: center; margin-top: 6px; color: var(--rpg-muted); font-size: 12px; }
+.mesa-ficha-completa > summary { color: var(--rpg-muted); cursor: pointer; font-size: 12px; }
+.mesa-ficha-completa-conteudo { display: grid; gap: 12px; margin-top: 8px; }
+.mesa-progressao { margin: 0; padding: 6px 0; color: var(--rpg-gold); font-size: 13px; border-bottom: 1px solid var(--rpg-line); }
+.mesa-pericias { display: grid; gap: 2px; }
+.mesa-pericia { display: grid; grid-template-columns: minmax(0, 1fr) 38px 35px; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 4px; background: var(--rpg-bg); color: var(--rpg-text); font-size: 12px; }
+.mesa-pericia > span:nth-child(2) { color: var(--rpg-muted); text-align: center; font-size: 10px; }
+.mesa-pericia strong { color: var(--rpg-gold); text-align: right; font-variant-numeric: tabular-nums; }
+.mesa-equipamentos { display: grid; gap: 2px; }
+.mesa-equipamentos > div { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 1fr); gap: 6px; padding: 3px 0; font-size: 12px; }
+.mesa-equipamentos > div > span:last-child { max-width: none; overflow-wrap: anywhere; }
+.mesa-mochila-detalhes { margin-top: 5px; font-size: 12px; color: var(--rpg-muted); }
+.mesa-mochila-detalhes summary { cursor: pointer; }
+@media (max-width: 400px) { .mesa-card-topo { grid-template-columns: 72px minmax(0, 1fr); gap: 8px; } .mesa-vital { grid-template-columns: 48px 25px minmax(0, 1fr) 25px; } }
 .master-app #players-cards-container > div { min-width: 0; }
 .master-app #players-cards-container h3 { max-width: none; font-size: 22px; }
 .master-player-vital > div:first-child { flex-wrap: wrap; gap: 6px; }
@@ -157,22 +327,22 @@
   .master-app #loot-editor-item, .master-app #loot-editor-bau, .master-app #habmag-editor { scroll-margin-top: 20px; }
 }
 @media (max-width: 800px) {
-  .master-header-inner { padding: 16px 20px 12px; gap: 14px; }
-  .master-main { padding: 0 20px 36px; margin-top: 22px; }
-  .master-heading h1 { font-size: 26px; }
+  .master-app #habmag-enviar { position: static; }
+  .master-header-inner { padding: 10px 20px 8px; gap: 6px 12px; }
+  .master-main { padding: 0 20px 36px; margin-top: 14px; }
+  .master-heading h1 { font-size: 21px; }
   .master-heading .rpg-sigil { display: none; }
   .master-tools { justify-content: flex-end; gap: 8px; }
-  .master-nav-link { padding: 9px 12px; }
+  .master-nav-link { padding: 6px 10px; }
   .master-app .master-mesa { grid-template-columns: minmax(0, 1fr); }
   .master-app .master-mesa > section { grid-column: auto; }
 }
 @media (max-width: 600px) {
-  .master-header-inner { grid-template-columns: minmax(0, 1fr) auto; padding: 16px 16px 12px; gap: 12px; }
-  .master-heading h1 { font-size: 27px; }
-  .master-tools { flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; }
-  .master-heading .rpg-eyebrow { max-width: 180px; font-size: 9px; }
+  .master-header-inner { grid-template-columns: minmax(0, 1fr) auto; padding: 8px 16px; gap: 6px 10px; }
+  .master-heading h1 { font-size: 20px; }
+  .master-tools { flex-direction: column; align-items: flex-end; justify-content: center; gap: 3px; }
   .master-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
-  .master-nav-link { flex-direction: column; gap: 5px; font-size: 11px; padding: 8px 2px; text-align: center; }
+  .master-nav-link { min-height: 44px; flex-direction: column; gap: 3px; font-size: 11px; padding: 5px 2px; text-align: center; }
   .master-nav-full { display: none; }
   .master-nav-short { display: block; }
   .master-main { padding: 0 16px 32px; }
@@ -199,3 +369,63 @@
   .master-app .fig-topo > .fig-acoes { flex-wrap: wrap; }
   .master-app #rolls-feed-container { max-height: 480px; }
 }
+.master-app .master-draft-notice { grid-column: 1 / -1; margin: 10px 0; padding: 10px; border: 1px solid var(--rpg-line); border-radius: 8px; background: var(--rpg-bg); }
+.master-app .master-draft-notice p { margin: 0 0 8px; }
+.master-app .master-draft-notice button + button { margin-left: 8px; }
+
+.master-app .loot-imagem-escolher { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loot-imagem-resumo { display: flex; align-items: center; gap: 10px; }
+.loot-imagem-miniatura { position: relative; display: grid; place-items: center; flex: 0 0 64px; height: 64px; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 8px; background: var(--rpg-raised); color: var(--rpg-muted); font-size: 24px; }
+.loot-imagem-miniatura :is(img, canvas) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--rpg-raised); }
+.loot-imagem-avancado { margin-top: 8px; }
+.loot-imagem-avancado summary { color: var(--rpg-muted); font-size: 12px; cursor: pointer; }
+.loot-imagem-avancado label { display: grid; margin-top: 8px; }
+.loot-imagem-avancado input { width: 100%; }
+.loot-previa-legenda { margin: 0 0 8px; color: var(--rpg-muted); font-size: 12px; }
+.master-app .loot-imagem-escolher .loot-imagem-botao { display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid var(--rpg-line); border-radius: 7px; background: var(--rpg-raised); color: var(--rpg-text); font: inherit; cursor: pointer; }
+.master-app .loot-imagem-escolher .loot-imagem-botao i { color: var(--rpg-gold); }
+.master-app .loot-imagem-escolher .loot-imagem-botao:hover { border-color: var(--rpg-gold); }
+.master-app .loot-imagem-escolher .loot-imagem-botao:disabled { opacity: .42; cursor: not-allowed; border-color: var(--rpg-line); }
+.master-app .loot-enquadramento { width: min(560px, calc(100% - 32px)); max-height: calc(100% - 32px); margin: auto; padding: 20px; border: 1px solid var(--rpg-line); border-radius: 12px; background: var(--rpg-surface); color: var(--rpg-text); box-shadow: 0 18px 70px #000a; overflow: auto; }
+.master-app .loot-enquadramento::backdrop { background: #04080dc9; backdrop-filter: blur(5px); }
+.master-app .loot-enquadramento-topo { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.master-app .loot-enquadramento-topo h3 { color: var(--rpg-gold); font-size: 17px; font-weight: 700; }
+.master-app .loot-enquadramento-topo p { margin-top: 4px; color: var(--rpg-muted); font-size: 12px; }
+.master-app .loot-enquadramento-topo button { display: grid; place-items: center; min-width: 32px; min-height: 32px; padding: 4px; border: 1px solid var(--rpg-line); border-radius: 6px; background: var(--rpg-raised); font-size: 22px; line-height: 1; }
+.master-app .loot-enquadramento-conteudo { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.master-app .loot-enquadramento canvas { display: block; width: min(220px, 100%); height: auto; aspect-ratio: 1; border: 1px solid var(--rpg-line); border-radius: 8px; background: var(--rpg-raised); cursor: grab; touch-action: none; }
+.master-app .loot-enquadramento canvas.arrastando { cursor: grabbing; }
+.master-app .loot-enquadramento-controles { display: grid; flex: 1 1 200px; gap: 12px; }
+.master-app .loot-enquadramento-controles label { display: grid; gap: 3px; }
+.master-app .loot-enquadramento-controles input[type='range'] { appearance: none; width: 100%; min-height: 28px; margin: 0; padding: 0; border: 0; border-radius: 0; background: linear-gradient(to right, var(--rpg-gold) var(--loot-progresso, 50%), var(--rpg-line) var(--loot-progresso, 50%)) center / 100% 5px no-repeat; cursor: pointer; }
+.master-app .loot-enquadramento-controles input[type='range']::-webkit-slider-runnable-track { height: 5px; background: transparent; }
+.master-app .loot-enquadramento-controles input[type='range']::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; margin-top: -5.5px; border: 2px solid var(--rpg-bg); border-radius: 50%; background: var(--rpg-gold); box-shadow: 0 0 0 1px var(--rpg-gold); }
+.master-app .loot-enquadramento-controles input[type='range']::-moz-range-track { height: 5px; background: transparent; }
+.master-app .loot-enquadramento-controles input[type='range']::-moz-range-thumb { width: 13px; height: 13px; border: 2px solid var(--rpg-bg); border-radius: 50%; background: var(--rpg-gold); box-shadow: 0 0 0 1px var(--rpg-gold); }
+.master-app .loot-enquadramento-controles input[type='range']:focus-visible { outline: 2px solid var(--rpg-gold); outline-offset: 3px; border-radius: 4px; }
+.master-app .loot-enquadramento-acoes { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.master-app .loot-enquadramento-acoes button { min-height: 38px; padding: 8px 12px; border: 1px solid var(--rpg-line); border-radius: 7px; background: var(--rpg-raised); color: var(--rpg-text); font-size: 13px; cursor: pointer; }
+.master-app .loot-enquadramento-acoes #li-concluir-enquadramento { border-color: var(--rpg-gold); background: var(--rpg-gold); color: var(--rpg-on-gold); font-weight: 650; }
+.master-resumo-jogadores { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 10px; }
+.master-resumo-jogadores:has(.master-resumo-lista:empty) { padding: 6px 10px; border-left: 2px solid var(--rpg-line); background: var(--rpg-surface); border-radius: 0 6px 6px 0; }
+.master-resumo-lista:empty { display: none; }
+.master-resumo-status { flex: 0 0 auto; color: var(--rpg-muted); font-size: 11px; }
+.master-resumo-lista { display: flex; flex: 1 1 auto; min-width: 0; gap: 6px; overflow-x: auto; list-style: none; margin: 0; padding: 2px 0 4px; scrollbar-width: thin; }
+.master-resumo-jogador { display: flex; flex: 0 0 260px; align-items: center; gap: 9px; min-width: 0; padding: 7px 9px; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-surface); }
+.master-resumo-foto { position: relative; display: grid; place-items: center; flex: 0 0 48px; height: 48px; overflow: hidden; border: 1px solid var(--rpg-line); border-radius: 10px; background: var(--rpg-raised); color: var(--rpg-gold); font-size: 22px; }
+.master-resumo-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.master-resumo-dados { flex: 1; min-width: 0; }
+.master-resumo-nome { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rpg-text); font-size: 13px; }
+.master-resumo-nome::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--rpg-success); vertical-align: middle; }
+.master-resumo-jogador[data-offline="true"] { opacity: .65; }
+.master-resumo-jogador[data-offline="true"] .master-resumo-nome::after { background: var(--rpg-danger); }
+.master-resumo-vitais { display: grid; gap: 3px; margin-top: 4px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.master-resumo-vital { display: grid; grid-template-columns: 15px minmax(0, 1fr) auto; align-items: center; gap: 4px; }
+.master-resumo-vida { color: var(--rpg-danger); }
+.master-resumo-energia { color: var(--rpg-vigor); }
+.master-resumo-icone { font-size: 14px; line-height: 1; text-align: center; }
+.master-resumo-trilho { height: 8px; overflow: hidden; border-radius: 5px; background: var(--rpg-raised); }
+.master-resumo-barra { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+.master-resumo-valor { min-width: 40px; color: var(--rpg-text); text-align: right; font-weight: 600; }
+.fig-batalha-ferramentas .master-resumo-jogadores { margin-bottom: 0; }
+@media (max-width: 600px) { .master-resumo-jogadores { flex-wrap: wrap; gap: 3px 6px; } .master-resumo-lista { flex-basis: 100%; } }

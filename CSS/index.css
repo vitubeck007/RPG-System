@@ -1,21 +1,5 @@
 ﻿
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: #0c0f16;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #232d42;
-      border-radius: 3px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: #d97706;
-    }
+    /* Barras de rolagem compartilhadas: CSS/rpg-ui.css. */
 
     .gold-glow {
       box-shadow: 0 0 16px rgba(245, 158, 11, 0.22);

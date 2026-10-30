@@ -306,7 +306,8 @@ describe("Fundação do painel do mestre (Sprint 1 da Fase 2)", { concurrency: f
         const erro = await p;
         assert.equal(erro.codigo, "tempo_esgotado");
         assert.equal(erro.acaoId, pedido.dados.acaoId);
-        assert.match(textoDoToast(pg), /não respondeu a tempo/);
+        assert.match(textoDoToast(pg), /Resultado ainda não confirmado/);
+        assert.match(textoDoToast(pg), /Atualize os dados antes de repetir/);
 
         // reenvio com o mesmo id
         pg.run(`window.__id = ${JSON.stringify(erro.acaoId)}`);

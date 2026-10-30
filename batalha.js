@@ -54,6 +54,7 @@ function adicionar(batalha, inimigo, quantidade) {
       imagem: inimigo.imagem || inimigo.retrato,
       hp: { atual: inimigo.hpMax ?? inimigo.hp?.atual ?? 10, max: inimigo.hpMax ?? inimigo.hp?.max ?? 10 },
       energia: clonar(inimigo.energia || { atual: 10, max: 10 }),
+      defesa: inimigo.defesa ?? 10,
       arma: inimigo.arma ? clonar(inimigo.arma) : null,
       derrotado: (inimigo.hpMax ?? inimigo.hp?.atual ?? 10) === 0,
       atributos: clonar(inimigo.atributos || {}),

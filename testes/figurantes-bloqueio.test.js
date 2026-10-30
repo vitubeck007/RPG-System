@@ -39,14 +39,15 @@ test("HP sem resumo no HTML: confirmações, recusas e falhas locais liberam os 
     await esperarAte(liberou);
     assert.equal(vida().value, "19", "recusa não aplica o valor localmente");
 
-    pg.run(`var renderOriginalTeste = renderizarFigurantes;
-      renderizarFigurantes = () => { renderizarFigurantes = renderOriginalTeste; throw new Error("Falha visual simulada"); };`);
+    pg.run(`var controlesOriginaisTeste = atualizarControlesRecursoFig;
+      atualizarControlesRecursoFig = () => { atualizarControlesRecursoFig = controlesOriginaisTeste; throw new Error("Falha visual simulada"); };`);
     diminuir().click();
     await esperarAte(liberou);
     assert.equal(pedidosHp().length, 2, "falha antes do envio não cria pedido nem deixa pendência presa");
     assert.ok(avisos.some(texto => texto.includes("Falha na interface")));
 
-    pg.run(`renderizarFigurantes = () => { renderizarFigurantes = renderOriginalTeste; throw new Error("Falha ao carregar interface"); };
+    pg.run(`var renderOriginalTeste = renderizarFigurantes;
+      renderizarFigurantes = () => { renderizarFigurantes = renderOriginalTeste; throw new Error("Falha ao carregar interface"); };
       carregarFigurantes();`);
     const leitura = pg.falso.pedidos.at(-1);
     assert.equal(leitura.evento, "master_campanha_ler");

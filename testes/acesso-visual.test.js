@@ -17,6 +17,8 @@ function abrir(pagina, { fetch, sessao = {} } = {}) {
     url: 'http://localhost/' + (pagina === 'entrar.html' ? 'login' : 'selecao'),
     runScripts: 'dangerously', virtualConsole: vc,
     beforeParse(w) {
+      w.AbortController = globalThis.AbortController;
+      w.AbortSignal = globalThis.AbortSignal;
       for (const [key, value] of Object.entries(sessao)) w.sessionStorage.setItem(key, value);
       w.fetch = fetch || (async () => ({ ok: true, json: async () => ({ success: true, personagens: [] }) }));
       w.eval(fs.readFileSync(path.join(raiz, 'JS/interface.js'), 'utf8'));
@@ -85,7 +87,8 @@ it('login: mantém contrato de sessão, limpa personagem anterior e recupera fal
     assert.equal(pg.w.sessionStorage.getItem('rpg_character_name'), null);
     pg.w.fetch = async () => { throw new Error('offline'); };
     await pg.w.autenticar(false);
-    assert.match(pg.d.getElementById('login-message').textContent, /conectar ao servidor/);
+    assert.match(pg.d.getElementById('login-message').textContent, /conexão/);
+    assert.equal(pg.d.getElementById('login-message').dataset.state, 'error');
     assert.equal(pg.d.getElementById('create-account-button').disabled, false);
     assert.deepEqual(pg.erros, []);
   } finally { pg.fechar(); }

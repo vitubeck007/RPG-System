@@ -192,12 +192,19 @@ describe("Checklist ponta a ponta", { concurrency: false }, () => {
   });
 
   it("7. adiciona e remove magias e habilidades (catálogo e criação própria)", async () => {
+    const idCatalogo = "habilidade_fixture_integracao";
+    // O catálogo da cópia pode conter apenas entradas privadas; este cenário cria a sua própria pública.
+    const criado = await new Promise((resolve, reject) => mestre.timeout(5000).emit("master_campanha_salvar", {
+      token: "senha-teste", acaoId: "acao_catalogo_integracao", tipo: "habilidades",
+      item: { id: idCatalogo, nome: "Golpe de teste", dice: "1d6", publico: true },
+    }, (erro, resposta) => erro ? reject(erro) : resolve(resposta)));
+    assert.equal(criado.ok, true);
     await run("carregarCatalogoCodice('habilidades')");
     const catalogo = json("CODICE_UI.catalogo.habilidades.map((e) => e.id)");
-    assert.ok(catalogo.length >= 1, "catálogo de habilidades carregado do servidor");
+    assert.ok(catalogo.includes(idCatalogo), "a entrada pública fictícia foi carregada do servidor");
 
-    run(`adicionarDoCatalogo('habilidades', CODICE_UI.catalogo.habilidades.find((e) => e.id === ${JSON.stringify(catalogo[0])}))`);
-    run(`adicionarDoCatalogo('habilidades', CODICE_UI.catalogo.habilidades.find((e) => e.id === ${JSON.stringify(catalogo[0])}))`); // duplicata
+    run(`adicionarDoCatalogo('habilidades', CODICE_UI.catalogo.habilidades.find((e) => e.id === ${JSON.stringify(idCatalogo)}))`);
+    run(`adicionarDoCatalogo('habilidades', CODICE_UI.catalogo.habilidades.find((e) => e.id === ${JSON.stringify(idCatalogo)}))`); // duplicata
     assert.equal(run("STATE.abilities.length"), 1, "mesma entrada do catálogo não entra duas vezes");
 
     // cria uma magia pelo formulário
@@ -914,7 +921,7 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
   const fs = require("node:fs");
   const http = require("node:http");
   const path = require("node:path");
-  const { enderecoEhLocal, lerCookie } = require("../acesso.js");
+  const { lerCookie } = require("../acesso.js");
   let s;
   const tokens = {};
   const pastas = {};
@@ -1109,15 +1116,7 @@ describe("Segurança leve: donos da ficha, páginas pela URL e consistência", {
     assert.match(login.corpo, /entrar/);
   });
 
-  it("acesso.js: endereço local (inclusive o IP da rede da própria máquina) e leitura de cookie", () => {
-    assert.equal(enderecoEhLocal("127.0.0.1"), true);
-    assert.equal(enderecoEhLocal("::1"), true);
-    assert.equal(enderecoEhLocal("::ffff:127.0.0.1"), true);
-    assert.equal(enderecoEhLocal("192.168.0.50"), false, "outro computador da rede");
-    assert.equal(enderecoEhLocal("192.168.0.50", ["10.0.0.2", "192.168.0.50"]), true, "o mestre abrindo pelo IP da rede da própria máquina");
-    assert.equal(enderecoEhLocal("::ffff:192.168.0.50", ["192.168.0.50"]), true);
-    assert.equal(enderecoEhLocal("", []), false);
-    assert.equal(enderecoEhLocal(undefined, []), false);
+  it("acesso.js: leitura de cookie da sessão do jogador", () => {
 
     assert.equal(lerCookie("a=1; rpg_sessao=abc-123; b=2", "rpg_sessao"), "abc-123");
     assert.equal(lerCookie("xrpg_sessao=zzz", "rpg_sessao"), "", "não confunde nomes parecidos");
@@ -1292,7 +1291,10 @@ describe("Painel do mestre em páginas (cinco áreas e aliases de figurantes)", 
     }
     assert.ok(srcs(arquivoDaPagina("index"), "script", "src").includes("/mestre/JS/painel.js"), "a Mesa carrega o seu script");
     for (const id of COM_SCRIPT) {
-      assert.deepEqual(srcs(arquivoDaPagina(id), "script", "src").slice(-2), ["/mestre/JS/comum.js", `/mestre/JS/${id}.js`], `${id}: comum.js e depois o seu script`);
+      const scripts = srcs(arquivoDaPagina(id), "script", "src");
+      const comum = scripts.indexOf("/mestre/JS/comum.js"), proprio = scripts.indexOf(`/mestre/JS/${id}.js`);
+      assert.ok(comum >= 0 && proprio > comum, `${id}: comum.js deve anteceder o script da página`);
+      assert.equal(scripts.at(-1), `/mestre/JS/${id}.js`, `${id}: o script da página vem após seus auxiliares`);
     }
   });
 

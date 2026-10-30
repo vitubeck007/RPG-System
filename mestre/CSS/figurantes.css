@@ -1,6 +1,6 @@
 /* A ficha e as janelas sobrepostas não dependem do CDN para layout ou limites da tela. */
 body { background: #090b10; color: #e2e8f0; margin: 0; font-family: Inter, sans-serif; }
-.fig-pagina { max-width: 1180px; margin: 32px auto; padding: 0 24px 48px; }
+.fig-pagina { margin: 32px auto; padding: 0 24px 48px; }
 .fig-pagina h1 { font: 700 28px Cinzel, serif; color: #fde5ac; margin: 6px 0 10px; }
 .fig-topo, .fig-toolbar, .fig-acoes, .fig-janela-topo, .fig-rodape { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .fig-eyebrow { color: #d9a54b; font-size: 10px; letter-spacing: .2em; font-weight: 700; margin: 0 0 5px; }
@@ -43,9 +43,12 @@ body { background: #090b10; color: #e2e8f0; margin: 0; font-family: Inter, sans-
 .fig-retrato { width: 108px; min-height: 130px; flex-shrink: 0; display: grid; place-items: center; background: #0c111b; border: 1px solid #69502c; border-radius: 9px; font-size: 32px; color: #bd8f47; overflow: hidden; }
 .fig-retrato img { width: 100%; height: 100%; object-fit: cover; }
 .fig-status fieldset { border: 1px solid #424056; padding: 12px; border-radius: 8px; min-width: 0; }
+.fig-status { grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(120px, .7fr); }
 .fig-status fieldset + fieldset { border-color: #28465a; }
 .fig-status legend { font-size: 13px; color: #e9afba; padding: 0 5px; }
 .fig-status fieldset + fieldset legend { color: #8ccce9; }
+.fig-status .fig-defesa { border-color: var(--rpg-line); }
+.fig-status .fig-defesa legend { color: var(--rpg-gold); }
 .fig-status small { display: block; color: #8492a8; font-size: 10px; margin-top: 9px; }
 .fig-legado { padding: 14px; border: 1px solid #2c374c; border-radius: 8px; }
 .fig-legado summary { cursor: pointer; color: #a8b7cc; font-size: 12px; }
@@ -74,3 +77,8 @@ body.fig-modal-aberto { overflow: hidden; }
   .fig-extra { grid-template-columns: 1fr 1fr; }
   .fig-atributos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+.fig-batalha-ferramentas { display: flex; flex-shrink: 0; align-items: center; gap: 8px; min-width: 0; margin-bottom: 8px; }
+.fig-batalha-ferramentas #master-resumo-jogadores { flex: 1; min-width: 0; }
+.fig-batalha-ferramentas #fig-menu-batalha { flex: 0 0 auto; }
+.fig-biblioteca-rodape { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.fig-biblioteca-rodape p { margin: 0; }

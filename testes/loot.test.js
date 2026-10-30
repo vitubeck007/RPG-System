@@ -342,6 +342,11 @@ describe("Loot com o servidor real", { concurrency: false }, () => {
     await liberar(m, bau);
     const fa = await abrir(ana);
     const fb = await abrir(bia);
+    await esperarAte(() => [fa, fb].every(f => f.document.getElementById("bau-alternar")), { rotulo: "ícone do baú nas duas fichas" });
+    for (const f of [fa, fb]) {
+      assert.equal(f.document.getElementById("bau-alternar").getAttribute("aria-expanded"), "false");
+      f.document.getElementById("bau-alternar").click();
+    }
     await esperarAte(() => fa.document.getElementById("bau-janela").textContent.includes("Poção de Cura"), { rotulo: "janela do baú aparecer" });
     assert.ok(!fa.document.getElementById("bau-janela").classList.contains("hidden"));
     const janelaB = () => fb.document.getElementById("bau-janela").textContent;
@@ -386,6 +391,8 @@ describe("Loot com o servidor real", { concurrency: false }, () => {
     const bau = await criarBau(m, [[grande, 2]]);
     await liberar(m, bau);
     const f = await abrir(bia);
+    await esperarAte(() => f.document.getElementById("bau-alternar"), { rotulo: "ícone do baú" });
+    f.document.getElementById("bau-alternar").click();
     await esperarAte(() => f.document.getElementById("bau-janela").textContent.includes("Estátua"), { rotulo: "baú na janela" });
     const antes = f.run("JSON.stringify(STATE.backpackItems)");
     const linhaEl = f.document.querySelector(`#bau-janela [data-linha-id="${bau.itens[0].id}"]`);
@@ -544,21 +551,25 @@ describe("Loot com o servidor real", { concurrency: false }, () => {
         preencher(pg, "li-name", "Dardo");
         preencher(pg, "li-dice", "1d6; apagar");
         clicar(pg, pg.document.getElementById("li-salvar"));
-        assert.match(pg.document.getElementById("toast-container").textContent, /Dado inválido/);
+        assert.equal(pg.document.getElementById("li-dice").getAttribute("aria-invalid"), "true");
+        assert.match(pg.document.getElementById("li-dice-erro").textContent, /Dado inválido/);
         preencher(pg, "li-dice", "1d6");
         preencher(pg, "li-type", "Arma");
         preencher(pg, "li-weight", "0.5");
         preencher(pg, "li-maxStack", "20");
         clicar(pg, pg.document.getElementById("li-salvar"));
         await esperarAte(() => cartao(pg, "loot-lista-itens", "Dardo"), { rotulo: "cartão Dardo" });
-        assert.match(cartao(pg, "loot-lista-itens", "Dardo").textContent, /0\.5 kg · 1×1 · pilha 20 · 1d6/);
+        const dardo = cartao(pg, "loot-lista-itens", "Dardo");
+        assert.match(dardo.querySelector('.loot-item-info').textContent, /0,5 kg · pilha 20/);
+        assert.match(dardo.querySelector('.loot-item-resumo').textContent, /Dados1d6/);
+        assert.match(dardo.querySelector('.loot-item-disposicao').textContent, /1 × 1 quadrantes/);
 
         clicar(pg, pg.document.getElementById("loot-novo-item"));
         preencher(pg, "li-name", nomeXss);
         preencher(pg, "li-type", "Mágico");
         clicar(pg, pg.document.getElementById("li-salvar"));
         await esperarAte(() => cartao(pg, "loot-lista-itens", nomeXss), { rotulo: "cartão XSS" });
-        assert.equal(pg.document.querySelectorAll("#loot-lista-itens img").length, 0);
+        assert.equal(cartao(pg, "loot-lista-itens", nomeXss).querySelectorAll('img').length, 0);
 
         // filtro por tipo e busca (sem acento)
         const filtro = pg.document.getElementById("loot-filtro-tipo");
@@ -576,8 +587,8 @@ describe("Loot com o servidor real", { concurrency: false }, () => {
         await esperarAte(() => cartao(pg, "loot-lista-itens", "Dardo (cópia)"), { rotulo: "cópia" });
         const excluir = () => cartao(pg, "loot-lista-itens", "Dardo (cópia)").querySelector('[data-acao="excluir"]');
         clicar(pg, excluir());
-        assert.equal(excluir().textContent, "Confirmar?");
-        clicar(pg, excluir());
+        assert.match(pg.document.querySelector('.rpg-confirmacao').textContent, /Excluir.*Dardo \(cópia\)/);
+        clicar(pg, pg.document.querySelector('.rpg-confirmacao button:last-child'));
         await esperarAte(() => !cartao(pg, "loot-lista-itens", "Dardo (cópia)"), { rotulo: "cópia excluída" });
       } finally { pg.fechar(); }
     });
@@ -593,7 +604,8 @@ describe("Loot com o servidor real", { concurrency: false }, () => {
 
         clicar(pg, pg.document.getElementById("loot-novo-bau"));
         clicar(pg, pg.document.getElementById("lb-salvar"));
-        assert.match(pg.document.getElementById("toast-container").textContent, /Dê um nome ao baú/);
+        assert.equal(pg.document.getElementById("lb-nome").getAttribute("aria-invalid"), "true");
+        assert.match(pg.document.getElementById("lb-nome-erro").textContent, /Dê um nome ao baú/);
         preencher(pg, "lb-nome", "Baú do Dragão <b>");
         const seletor = pg.document.getElementById("lb-item");
         const dardo = [...seletor.options].find((o) => /^Dardo/.test(o.textContent));

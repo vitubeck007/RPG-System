@@ -1,4 +1,4 @@
-/* Sprint 5 (Fase 2): biblioteca de inimigos, batalha no servidor e lista de alvos. */
+/* Inimigos: modelos, batalha, alvos e compatibilidade das rotas antigas. A UI atual está nos testes de figurantes. */
 const { describe, it, before, after, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -7,7 +7,7 @@ const path = require("node:path");
 const { io: clienteIo } = require("socket.io-client");
 const { criarCampanha, normalizarArquivo, LIMITE_COMBATENTES } = require("../campanha.js");
 const regras = require("../batalha.js");
-const { iniciarServidor, abrirFicha, abrirPaginaMestre, esperar, esperarAte } = require("./ajuda/ambiente.js");
+const { iniciarServidor, abrirFicha, esperar, esperarAte } = require("./ajuda/ambiente.js");
 
 const SENHA = "senha-teste";
 const SEGREDO = "SEGREDO-INI-8812";
@@ -105,7 +105,6 @@ describe("Regras da batalha (batalha.js)", () => {
 describe("Inimigos e batalha com o servidor real", { concurrency: false }, () => {
   let s, ana;
   const abertos = [];
-  const paginas = [];
   const fichas = [];
   let contador = 0;
 
@@ -127,7 +126,6 @@ describe("Inimigos e batalha com o servidor real", { concurrency: false }, () =>
   const limpar = (m) => cmd(m, "master_batalha_limpar");
 
   afterEach(async () => {
-    paginas.splice(0).forEach((p) => p.fechar());
     fichas.splice(0).forEach((f) => f.fechar());
     abertos.splice(0).forEach((k) => k.close());
     await esperar(250);
@@ -322,153 +320,14 @@ describe("Inimigos e batalha com o servidor real", { concurrency: false }, () =>
     assert.ok(!/(io\.emit|broadcast\.emit)\(\s*["'][^"']*(batalha|combat|inimigo)/i.test(codigo));
   });
 
-  /* ---- página ---- */
-  describe("página Inimigos (navegador)", () => {
-    const abrirPagina = async (opcoes = { real: true, tokenInicial: SENHA }) => {
-      const pg = await abrirPaginaMestre(s, "inimigos", opcoes);
-      paginas.push(pg);
-      return pg;
-    };
-    const clicar = (pg, el) => el.dispatchEvent(new pg.window.MouseEvent("click", { bubbles: true }));
-    const preencher = (pg, id, v) => {
-      const el = pg.document.getElementById(id);
-      el.value = v;
-      el.dispatchEvent(new pg.window.Event("input", { bubbles: true }));
-    };
-    const cartoes = (pg) => [...pg.document.querySelectorAll("#ini-cartoes [data-id]")];
-    const cartao = (pg, nome) => cartoes(pg).find((c) => c.querySelector("h4").textContent === nome);
-    const combatentes = (pg) => [...pg.document.querySelectorAll("#ini-combatentes [data-alvo-id]")];
-    const combatente = (pg, nome) => combatentes(pg).find((c) => c.querySelector("h4").textContent === nome);
-
-    it("biblioteca: criar com ataques e habilidades, validar dado/imagem, XSS, editar, buscar, duplicar, excluir", async () => {
-      const m = await mestre();
-      await limpar(m);
-      const pg = await abrirPagina();
-      await esperarAte(() => pg.run("ini.carregou"), { rotulo: "página carregar" });
-      const xss = "Lobo <img src=x onerror=alert(1)>";
-      clicar(pg, pg.document.getElementById("ini-novo"));
-      clicar(pg, pg.document.getElementById("in-salvar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Dê um nome ao inimigo/);
-      preencher(pg, "in-nome", xss);
-      preencher(pg, "in-hpMax", "15");
-      preencher(pg, "in-attr-FOR", "13");
-      clicar(pg, pg.document.getElementById("in-add-ataque"));
-      const linha = pg.document.querySelector("#in-ataques > div");
-      const campoDe = (n) => linha.querySelector(`[data-campo="${n}"]`);
-      campoDe("nome").value = "Mordida";
-      campoDe("dado").value = "2d6; apagar";
-      clicar(pg, pg.document.getElementById("in-salvar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Dado inválido/);
-      campoDe("dado").value = "2d6+1";
-      campoDe("tipo").value = "Perfurante";
-      clicar(pg, pg.document.getElementById("in-add-habilidade"));
-      pg.document.querySelector('#in-habilidades [data-campo="nome"]').value = "Uivo";
-      preencher(pg, "in-imagem", "javascript:alert(1)");
-      clicar(pg, pg.document.getElementById("in-salvar"));
-      assert.match(pg.document.getElementById("toast-container").textContent, /Imagem inválida/);
-      preencher(pg, "in-imagem", "https://exemplo.com/lobo.png");
-      clicar(pg, pg.document.getElementById("in-salvar"));
-      await esperarAte(() => cartao(pg, xss), { rotulo: "cartão" });
-      const c = cartao(pg, xss);
-      assert.match(c.textContent, /HP 15/);
-      assert.match(c.textContent, /Mordida · 2d6\+1 · Perfurante/);
-      assert.match(c.textContent, /✦ Uivo/);
-      assert.equal(c.querySelector("img").getAttribute("src"), "https://exemplo.com/lobo.png");
-      assert.equal(pg.document.querySelectorAll("#ini-cartoes img[onerror], #ini-cartoes b").length, 0);
-
-      clicar(pg, c.querySelector('[data-acao="editar"]'));
-      assert.equal(pg.document.querySelectorAll("#in-ataques > div").length, 1);
-      assert.equal(pg.document.getElementById("in-attr-DES").value, "");
-      clicar(pg, pg.document.querySelector('#in-ataques [data-acao="remover-linha"]'));
-      preencher(pg, "in-nome", "Lobo");
-      clicar(pg, pg.document.getElementById("in-salvar"));
-      await esperarAte(() => cartao(pg, "Lobo"), { rotulo: "cartão editado" });
-      assert.ok(!/Mordida/.test(cartao(pg, "Lobo").textContent), "ataque removido no editor");
-      assert.equal(cartoes(pg).filter((x) => x.querySelector("h4").textContent.startsWith("Lobo")).length, 1);
-
-      preencher(pg, "ini-busca", "LOBO");
-      assert.equal(cartoes(pg).length, 1);
-      preencher(pg, "ini-busca", "zzz");
-      assert.equal(cartoes(pg).length, 0);
-      preencher(pg, "ini-busca", "");
-      clicar(pg, cartao(pg, "Lobo").querySelector('[data-acao="duplicar"]'));
-      await esperarAte(() => cartao(pg, "Lobo (cópia)"), { rotulo: "cópia" });
-      const excluir = () => cartao(pg, "Lobo (cópia)").querySelector('[data-acao="excluir"]');
-      clicar(pg, excluir());
-      assert.equal(excluir().textContent, "Confirmar?");
-      clicar(pg, excluir());
-      await esperarAte(() => !cartao(pg, "Lobo (cópia)"), { rotulo: "cópia excluída" });
-    });
-
-    it("batalha: colocar cópias, ajustar HP (cliques rápidos), derrotado automático e manual, remover, limpar; excluir o modelo não afeta", async () => {
-      const m = await mestre();
-      const g = await criarModelo(m, { nome: "Esqueleto", hpMax: 10, ataques: [{ nome: "Osso", dado: "1d6" }] });
-      await limpar(m);
-      const pg = await abrirPagina();
-      await esperarAte(() => cartao(pg, "Esqueleto"), { rotulo: "cartão" });
-      const cartaoEsq = () => cartao(pg, "Esqueleto");
-      cartaoEsq().querySelector('[data-campo="copias"]').value = "3";
-      clicar(pg, cartaoEsq().querySelector('[data-acao="batalhar"]'));
-      await esperarAte(() => combatentes(pg).length === 3, { rotulo: "3 combatentes" });
-      assert.match(pg.document.getElementById("toast-container").textContent, /Esqueleto 1, Esqueleto 2, Esqueleto 3/);
-      assert.equal(pg.document.getElementById("ini-aba-batalha").textContent, "Batalha (3)");
-      cartaoEsq().querySelector('[data-campo="copias"]').value = "99";
-      clicar(pg, cartaoEsq().querySelector('[data-acao="batalhar"]'));
-      assert.match(pg.document.getElementById("toast-container").textContent, /1 a 20/);
-
-      clicar(pg, pg.document.getElementById("ini-aba-batalha"));
-      assert.ok(!pg.document.getElementById("ini-batalha").classList.contains("hidden"));
-      assert.match(combatente(pg, "Esqueleto 1").textContent, /Osso · 1d6/);
-      const botao = (nome, acao) => combatente(pg, nome).querySelector(`[data-acao="${acao}"]`);
-      for (let i = 0; i < 3; i++) clicar(pg, botao("Esqueleto 1", "hp-1"));
-      await esperarAte(() => /HP 7\/10/.test(combatente(pg, "Esqueleto 1").textContent), { rotulo: "HP 7" });
-      for (let i = 0; i < 2; i++) clicar(pg, botao("Esqueleto 1", "hp-5"));
-      await esperarAte(() => combatente(pg, "Esqueleto 1").dataset.derrotado === "1", { rotulo: "derrotado automático" });
-      assert.match(combatente(pg, "Esqueleto 1").textContent, /HP 0\/10/);
-      assert.match(pg.document.getElementById("ini-batalha-resumo").textContent, /2 de 3 em pé/);
-      clicar(pg, botao("Esqueleto 1", "hp+5"));
-      await esperarAte(() => combatente(pg, "Esqueleto 1").dataset.derrotado === "0", { rotulo: "reerguido por HP" });
-
-      clicar(pg, botao("Esqueleto 2", "derrotado"));
-      await esperarAte(() => combatente(pg, "Esqueleto 2").dataset.derrotado === "1", { rotulo: "derrotado manual" });
-      assert.equal(botao("Esqueleto 2", "derrotado").textContent, "Reerguer");
-      clicar(pg, botao("Esqueleto 2", "derrotado"));
-      await esperarAte(() => combatente(pg, "Esqueleto 2").dataset.derrotado === "0", { rotulo: "reerguido" });
-
-      // excluir o modelo na biblioteca não mexe em quem está em batalha
-      await cmd(m, "master_campanha_remover", { tipo: "inimigos", id: g.id });
-      await esperarAte(() => !cartao(pg, "Esqueleto"), { rotulo: "modelo excluído" });
-      assert.equal(combatentes(pg).length, 3);
-
-      clicar(pg, botao("Esqueleto 3", "remover"));
-      await esperarAte(() => combatentes(pg).length === 2, { rotulo: "removido" });
-      const limparBtn = pg.document.getElementById("ini-limpar");
-      clicar(pg, limparBtn);
-      assert.equal(limparBtn.textContent, "Confirmar?");
-      assert.equal(combatentes(pg).length, 2, "o primeiro clique só pede confirmação");
-      clicar(pg, limparBtn);
-      await esperarAte(() => combatentes(pg).length === 0, { rotulo: "batalha limpa" });
-      assert.match(pg.document.getElementById("ini-combatentes").textContent, /Nenhuma batalha/);
-    });
-
-    it("duas páginas sincronizadas; token errado não carrega nada", async () => {
-      const m = await mestre();
-      const g = await criarModelo(m, { nome: "Gêmeo", hpMax: 6 });
-      await limpar(m);
-      const a = await abrirPagina();
-      const b = await abrirPagina();
-      await esperarAte(() => cartao(a, "Gêmeo") && cartao(b, "Gêmeo"), { rotulo: "páginas carregarem" });
-      clicar(a, cartao(a, "Gêmeo").querySelector('[data-acao="batalhar"]'));
-      await esperarAte(() => combatente(b, "Gêmeo 1"), { rotulo: "combatente na outra página" });
-      clicar(b, combatente(b, "Gêmeo 1").querySelector('[data-acao="hp-5"]'));
-      await esperarAte(() => /HP 1\/6/.test(combatente(a, "Gêmeo 1").textContent), { rotulo: "HP na primeira página" });
-      await cmd(m, "master_campanha_remover", { tipo: "inimigos", id: g.id });
-      await limpar(m);
-      const errada = await abrirPagina({ real: true, tokenInicial: "errado" });
-      await esperarAte(() => errada.run("socket.connected"), { rotulo: "conectar" });
-      await esperar(400);
-      assert.equal(errada.run("ini.carregou"), false);
-      assert.equal(cartoes(errada).length + combatentes(errada).length, 0);
-    });
+  // As páginas separadas foram substituídas pela interface unificada.
+  // O fluxo visual é coberto em figurantes.test.js e figurantes-cartoes.test.js.
+  it("rota antiga de inimigos abre Figurantes e o endereço .html continua compatível", async () => {
+    const resposta = await fetch(s.url + "/mestre/inimigos");
+    assert.equal(resposta.status, 200);
+    assert.match(await resposta.text(), /id="fig-cartoes"/);
+    const antiga = await fetch(s.url + "/mestre/inimigos.html", { redirect: "manual" });
+    assert.equal(antiga.status, 302);
+    assert.equal(antiga.headers.get("location"), "/mestre/figurantes");
   });
 });
