@@ -1,0 +1,39 @@
+# Dados locais da mesa: contas, personagens, campanha e catálogos preenchidos.
+# O servidor cria suas pastas e os dados padrão quando necessário.
+/players/
+/campanha/
+/catalogo/
+/config.json
+/Figurante/*/*
+!/Figurante/*/.gitkeep
+/imagens/itens/
+
+# Credenciais e configurações particulares (modelos sem segredos podem ser publicados).
+.env
+.env.*
+!.env.example
+!.env.sample
+*.local.json
+*.pem
+*.key
+*.p12
+*.pfx
+.secrets/
+
+# Dependências instaladas, cópias de segurança e resultados gerados.
+node_modules/
+**/_backup*/
+**/_corrompidos/
+/outputs/
+coverage/
+*.log
+testes-log*.txt
+npm-debug.log*
+
+# Configurações pessoais das ferramentas e arquivos do sistema.
+.codex/
+.agents/
+.aws/
+.DS_Store
+Thumbs.db
+Desktop.ini
